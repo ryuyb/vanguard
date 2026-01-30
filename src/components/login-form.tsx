@@ -82,75 +82,76 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
           <form
             className="space-y-4"
             noValidate
-          onSubmit={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            form.handleSubmit();
-          }}
-        >
-          <form.Field
-            name="email"
-            validators={{
-              onBlur: ({ value }) => validateEmail(value),
-              onSubmit: ({ value }) => validateEmail(value),
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              form.handleSubmit();
             }}
           >
-            {(field) => {
-              const errorMessage = getErrorMessage(field.state.meta.errors);
+            <form.Field
+              name="email"
+              validators={{
+                onBlur: ({ value }) => validateEmail(value),
+                onSubmit: ({ value }) => validateEmail(value),
+              }}
+            >
+              {(field) => {
+                const errorMessage = getErrorMessage(field.state.meta.errors);
 
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Email</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={Boolean(errorMessage)}
-                    aria-describedby={errorMessage ? "email-error" : undefined}
+                return (
+                  <div className="space-y-2">
+                    <Label htmlFor={field.name}>Email</Label>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) =>
+                        field.handleChange(event.target.value)
+                      }
+                      aria-invalid={Boolean(errorMessage)}
+                      aria-describedby={errorMessage ? "email-error" : undefined}
+                    />
+                    {errorMessage ? (
+                      <p
+                        id="email-error"
+                        className="text-destructive text-sm"
+                        role="alert"
+                      >
+                        {errorMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              }}
+            </form.Field>
+
+            <form.Field name="rememberEmail">
+              {(field) => (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="rememberEmail"
+                    checked={field.state.value}
+                    onCheckedChange={(checked) =>
+                      field.handleChange(checked === true)
+                    }
                   />
-                  {errorMessage ? (
-                    <p
-                      id="email-error"
-                      className="text-destructive text-sm"
-                      role="alert"
-                    >
-                      {errorMessage}
-                    </p>
-                  ) : null}
+                  <Label htmlFor="rememberEmail">Remember email</Label>
                 </div>
-              );
-            }}
-          </form.Field>
+              )}
+            </form.Field>
 
-          <form.Field name="rememberEmail">
-            {(field) => (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="rememberEmail"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) =>
-                    field.handleChange(checked === true)
-                  }
-                />
-                <Label htmlFor="rememberEmail">Remember this email</Label>
-              </div>
-            )}
-          </form.Field>
-
-          <form.Subscribe
-            selector={(state) => ({
-              isSubmitting: state.isSubmitting,
-              email: state.values.email,
-              rememberEmail: state.values.rememberEmail,
-            })}
-          >
-            {({ isSubmitting, email, rememberEmail }) => {
-              return (
+            <form.Subscribe
+              selector={(state) => ({
+                isSubmitting: state.isSubmitting,
+                email: state.values.email,
+                rememberEmail: state.values.rememberEmail,
+              })}
+            >
+              {({ isSubmitting, email, rememberEmail }) => (
                 <div className="space-y-2">
                   <Button type="submit" disabled={isSubmitting} className="w-full">
                     Continue
@@ -174,15 +175,20 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
                     }}
                     className="w-full"
                   >
-                    Use SSO to login
+                    Use single sign-on
                   </Button>
                 </div>
-              );
-            }}
-          </form.Subscribe>
-        </form>
+              )}
+            </form.Subscribe>
+          </form>
         </CardContent>
       </Card>
+      <p className="text-muted-foreground text-center text-sm">
+        New here?{" "}
+        <Button variant="link" type="button" className="h-auto p-0 text-sm">
+          Register
+        </Button>
+      </p>
     </div>
   );
 }
