@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "vanguard",
-        "width": 800,
-        "height": 600
+        "title": "",
+        "width": 1000,
+        "height": 800,
+        "decorations": true
       }
     ],
     "security": {
