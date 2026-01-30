@@ -56,6 +56,7 @@ async fn login_and_sync(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {}))
         .manage(AppState::new())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
