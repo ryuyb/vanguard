@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 
@@ -13,6 +13,7 @@ import {
   SelfHostedModal,
   type SelfHostedConfig,
 } from "@/components/auth/self-hosted-modal";
+import { appStore } from "@/lib/tauri-store";
 
 const HOST_OPTIONS = ["bitwarden.com", "bitwarden.eu", "self-hosted"] as const;
 type HostOption = (typeof HOST_OPTIONS)[number];
@@ -34,6 +35,35 @@ export function AccessingTip({
     serverUrl: "",
   });
 
+  useEffect(() => {
+    let active = true;
+
+    const loadFromStore = async () => {
+      const [serverHost, selfHosted] = await Promise.all([
+        appStore.get("serverHost"),
+        appStore.get("selfHosted"),
+      ]);
+
+      if (!active) {
+        return;
+      }
+
+      if (serverHost && HOST_OPTIONS.includes(serverHost)) {
+        setAccessHost(serverHost);
+      }
+
+      if (selfHosted) {
+        setSelfHostedConfig(selfHosted);
+      }
+    };
+
+    void loadFromStore();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className={className}>
       Accessing:{" "}
@@ -54,6 +84,7 @@ export function AccessingTip({
               if (!HOST_OPTIONS.includes(value as HostOption)) {
                 return;
               }
+              void appStore.set("serverHost", value as HostOption);
               setAccessHost(value as HostOption);
               onChange?.(value as HostOption);
               if (value === "self-hosted") {
@@ -73,7 +104,10 @@ export function AccessingTip({
         open={selfHostedOpen}
         onOpenChange={setSelfHostedOpen}
         value={selfHostedConfig}
-        onSave={setSelfHostedConfig}
+        onSave={async (value) => {
+          setSelfHostedConfig(value);
+          await appStore.set("selfHosted", value);
+        }}
       />
     </div>
   );

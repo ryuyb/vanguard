@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import { useEffect } from "react";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { appStore } from "@/lib/tauri-store";
 import { cn } from "@/lib/utils";
 import loginIllustration from "@/assets/login.svg";
 
@@ -63,9 +65,33 @@ export function LoginForm({
   const form = useForm({
     defaultValues,
     onSubmit: async ({ value }) => {
+      if (value.rememberEmail) {
+        await appStore.set("email", value.email);
+      } else {
+        await appStore.delete("email");
+      }
       await onContinue?.(value);
     },
   });
+
+  useEffect(() => {
+    let active = true;
+
+    const loadEmail = async () => {
+      const email = await appStore.get("email");
+      if (!active || !email) {
+        return;
+      }
+      form.setFieldValue("email", email);
+      form.setFieldValue("rememberEmail", true);
+    };
+
+    void loadEmail();
+
+    return () => {
+      active = false;
+    };
+  }, [form]);
 
   const validateEmail = (value: string) => {
     if (value.length === 0) {
@@ -182,6 +208,11 @@ export function LoginForm({
                       const errors = await form.validateField("email", "submit");
                       if (errors?.length) {
                         return;
+                      }
+                      if (rememberEmail) {
+                        await appStore.set("email", email);
+                      } else {
+                        await appStore.delete("email");
                       }
                       await onSso?.({ email, rememberEmail });
                     }}
