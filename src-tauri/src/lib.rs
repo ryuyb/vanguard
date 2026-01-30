@@ -7,13 +7,9 @@ mod state;
 
 use bitwarden::auth::login::PasswordLoginRequest;
 use bitwarden::{Client, ClientSettings, DeviceType};
-use std::sync::Arc;
 use tauri::State;
-use tokio::sync::Mutex;
 
-struct AppState {
-    client: Arc<Mutex<Option<Client>>>,
-}
+use crate::state::AppState;
 
 // Learn more about Tauri command at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -60,9 +56,7 @@ async fn login_and_sync(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppState {
-            client: Arc::new(Mutex::new(None)),
-        })
+        .manage(AppState::new())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet])
         .invoke_handler(tauri::generate_handler![login_and_sync])
