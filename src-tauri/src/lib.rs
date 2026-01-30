@@ -1,3 +1,10 @@
+mod command;
+mod database;
+mod error;
+mod model;
+mod service;
+mod state;
+
 use bitwarden::auth::login::PasswordLoginRequest;
 use bitwarden::{Client, ClientSettings, DeviceType};
 use std::sync::Arc;
@@ -8,7 +15,7 @@ struct AppState {
     client: Arc<Mutex<Option<Client>>>,
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// Learn more about Tauri command at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
