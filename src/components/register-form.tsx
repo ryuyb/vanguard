@@ -3,23 +3,20 @@ import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import loginIllustration from "@/assets/login.svg";
+import registerIllustration from "@/assets/register.svg";
 
-type LoginFormValues = {
+type RegisterFormValues = {
   email: string;
-  rememberEmail: boolean;
+  name: string;
 };
 
-type LoginFormProps = {
+type RegisterFormProps = {
   className?: string;
-  onContinue?: (values: LoginFormValues) => void | Promise<void>;
-  onSso?: (values: LoginFormValues) => void | Promise<void>;
-  onRegisterClick?: () => void;
+  onContinue?: (values: RegisterFormValues) => void | Promise<void>;
+  onLoginClick?: () => void;
 };
 
 const emailSchema = z.email({ message: "Enter a valid email address" });
@@ -49,15 +46,14 @@ function getErrorMessage(errors: unknown[] | undefined) {
   return undefined;
 }
 
-export function LoginForm({
+export function RegisterForm({
   className,
   onContinue,
-  onSso,
-  onRegisterClick,
-}: LoginFormProps) {
-  const defaultValues: LoginFormValues = {
+  onLoginClick,
+}: RegisterFormProps) {
+  const defaultValues: RegisterFormValues = {
     email: "",
-    rememberEmail: false,
+    name: "",
   };
 
   const form = useForm({
@@ -82,12 +78,12 @@ export function LoginForm({
   return (
     <div className={cn("w-full max-w-md space-y-8", className)}>
       <img
-        src={loginIllustration}
-        alt="Login"
+        src={registerIllustration}
+        alt="Register"
         className="mx-auto h-20"
       />
       <h2 className="text-foreground text-center text-2xl font-semibold">
-        Log in to Bitwarden
+        Create your account
       </h2>
       <Card className="w-full">
         <CardContent>
@@ -100,13 +96,7 @@ export function LoginForm({
               form.handleSubmit();
             }}
           >
-            <form.Field
-              name="email"
-              validators={{
-                onBlur: ({ value }) => validateEmail(value),
-                onSubmit: ({ value }) => validateEmail(value),
-              }}
-            >
+            <form.Field name="email" validators={{ onSubmit: ({ value }) => validateEmail(value) }}>
               {(field) => {
                 const errorMessage = getErrorMessage(field.state.meta.errors);
 
@@ -121,9 +111,7 @@ export function LoginForm({
                       placeholder="you@example.com"
                       value={field.state.value}
                       onBlur={field.handleBlur}
-                      onChange={(event) =>
-                        field.handleChange(event.target.value)
-                      }
+                      onChange={(event) => field.handleChange(event.target.value)}
                       aria-invalid={Boolean(errorMessage)}
                       aria-describedby={errorMessage ? "email-error" : undefined}
                     />
@@ -141,69 +129,39 @@ export function LoginForm({
               }}
             </form.Field>
 
-            <form.Field name="rememberEmail">
+            <form.Field name="name">
               {(field) => (
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="rememberEmail"
-                    checked={field.state.value}
-                    onCheckedChange={(checked) =>
-                      field.handleChange(checked === true)
-                    }
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Name</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="text"
+                    autoComplete="name"
+                    placeholder="Your name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
                   />
-                  <Label htmlFor="rememberEmail">Remember email</Label>
                 </div>
               )}
             </form.Field>
 
-            <form.Subscribe
-              selector={(state) => ({
-                isSubmitting: state.isSubmitting,
-                email: state.values.email,
-                rememberEmail: state.values.rememberEmail,
-              })}
-            >
-              {({ isSubmitting, email, rememberEmail }) => (
-                <div className="space-y-2">
-                  <Button type="submit" disabled={isSubmitting} className="w-full">
-                    Continue
-                  </Button>
-                  <div className="relative py-1">
-                    <Separator />
-                    <span className="bg-card text-muted-foreground absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
-                      or
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}
-                    onClick={async () => {
-                      const errors = await form.validateField("email", "submit");
-                      if (errors?.length) {
-                        return;
-                      }
-                      await onSso?.({ email, rememberEmail });
-                    }}
-                    className="w-full"
-                  >
-                    Use single sign-on
-                  </Button>
-                </div>
-              )}
-            </form.Subscribe>
+            <Button type="submit" disabled={form.state.isSubmitting} className="w-full">
+              Continue
+            </Button>
           </form>
         </CardContent>
       </Card>
       <p className="text-muted-foreground text-center text-sm">
-        New here?{" "}
+        Already have an account?{" "}
         <Button
           variant="link"
           type="button"
           className="h-auto p-0 text-sm"
-          onClick={onRegisterClick}
+          onClick={onLoginClick}
         >
-          Register
+          Log in
         </Button>
       </p>
     </div>
