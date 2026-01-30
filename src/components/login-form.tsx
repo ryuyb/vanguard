@@ -72,13 +72,16 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
     return result.error.issues[0]?.message ?? "Invalid email address";
   };
 
-  const isEmailValid = (value: string) => validateEmail(value) === undefined;
-
   return (
-    <Card className={cn("w-full max-w-md", className)}>
-      <CardContent>
-        <form
-          className="space-y-4"
+    <div className={cn("w-full max-w-md space-y-8", className)}>
+      <h2 className="text-foreground text-center text-2xl font-semibold">
+        Login to Bitwarden
+      </h2>
+      <Card className="w-full">
+        <CardContent>
+          <form
+            className="space-y-4"
+            noValidate
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -141,23 +144,16 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
 
           <form.Subscribe
             selector={(state) => ({
-              canSubmit: state.canSubmit,
               isSubmitting: state.isSubmitting,
               email: state.values.email,
               rememberEmail: state.values.rememberEmail,
             })}
           >
-            {({ canSubmit, isSubmitting, email, rememberEmail }) => {
-              const canSso = isEmailValid(email) && !isSubmitting;
-
+            {({ isSubmitting, email, rememberEmail }) => {
               return (
                 <div className="space-y-2">
-                  <Button
-                    type="submit"
-                    disabled={!canSubmit || isSubmitting}
-                    className="w-full"
-                  >
-                    Continue to next step
+                  <Button type="submit" disabled={isSubmitting} className="w-full">
+                    Continue
                   </Button>
                   <div className="relative py-1">
                     <Separator />
@@ -168,8 +164,14 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!canSso}
-                    onClick={() => onSso?.({ email, rememberEmail })}
+                    disabled={isSubmitting}
+                    onClick={async () => {
+                      const errors = await form.validateField("email", "submit");
+                      if (errors?.length) {
+                        return;
+                      }
+                      await onSso?.({ email, rememberEmail });
+                    }}
                     className="w-full"
                   >
                     Use SSO to login
@@ -179,7 +181,8 @@ export function LoginForm({ className, onContinue, onSso }: LoginFormProps) {
             }}
           </form.Subscribe>
         </form>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
