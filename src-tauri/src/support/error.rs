@@ -39,6 +39,13 @@ impl AppError {
         }
     }
 
+    pub fn status(&self) -> Option<u16> {
+        match self {
+            Self::RemoteStatus { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
     pub fn message(&self) -> String {
         match self {
             Self::Validation(message) => message.clone(),

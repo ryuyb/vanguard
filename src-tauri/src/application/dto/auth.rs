@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone)]
 pub struct PreloginQuery {
     pub base_url: String,
@@ -66,12 +68,51 @@ pub struct TwoFactorChallenge {
     pub error: Option<String>,
     pub error_description: Option<String>,
     pub providers: Vec<String>,
-    pub providers2: Option<serde_json::Value>,
-    pub master_password_policy: Option<serde_json::Value>,
+    pub providers2: Option<HashMap<String, Option<TwoFactorProviderHint>>>,
+    pub master_password_policy: Option<MasterPasswordPolicy>,
 }
 
 #[derive(Debug, Clone)]
 pub enum PasswordLoginOutcome {
     Authenticated(SessionInfo),
     TwoFactorRequired(TwoFactorChallenge),
+}
+
+#[derive(Debug, Clone)]
+pub struct MasterPasswordPolicy {
+    pub min_complexity: Option<i32>,
+    pub min_length: Option<i32>,
+    pub require_lower: bool,
+    pub require_upper: bool,
+    pub require_numbers: bool,
+    pub require_special: bool,
+    pub enforce_on_login: bool,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TwoFactorProviderHint {
+    pub host: Option<String>,
+    pub signature: Option<String>,
+    pub auth_url: Option<String>,
+    pub nfc: Option<bool>,
+    pub email: Option<String>,
+    pub challenge: Option<String>,
+    pub timeout: Option<i32>,
+    pub rp_id: Option<String>,
+    pub allow_credentials: Vec<WebauthnAllowCredential>,
+    pub user_verification: Option<String>,
+    pub extensions: Option<WebauthnRequestExtensions>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WebauthnAllowCredential {
+    pub r#type: Option<String>,
+    pub id: Option<String>,
+    pub transports: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WebauthnRequestExtensions {
+    pub appid: Option<String>,
 }

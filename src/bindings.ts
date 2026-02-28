@@ -47,12 +47,37 @@ async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_sync_now", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_sync_status", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+vaultSyncFailed: VaultSyncFailed,
+vaultSyncStarted: VaultSyncStarted,
+vaultSyncSucceeded: VaultSyncSucceeded
+}>({
+vaultSyncFailed: "vault-sync:failed",
+vaultSyncStarted: "vault-sync:started",
+vaultSyncSucceeded: "vault-sync:succeeded"
+})
 
 /** user-defined constants **/
 
@@ -60,7 +85,7 @@ async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result
 
 /** user-defined types **/
 
-export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
+export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; username: string; password: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
 export type PreloginRequestDto = { baseUrl: string; email: string }
@@ -68,8 +93,20 @@ export type PreloginResponseDto = { kdf: number; kdfIterations: number; kdfMemor
 export type RefreshTokenRequestDto = { baseUrl: string; refreshToken: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPasswordHash: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
-export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: JsonValue | null; masterPasswordPolicy: JsonValue | null }
+export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
+export type SyncNowRequestDto = { accountId: string; baseUrl: string; accessToken: string; excludeDomains: boolean | null }
+export type SyncStateDto = "idle" | "running" | "succeeded" | "failed"
+export type SyncStatusRequestDto = { accountId: string }
+export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto }
+export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
+export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+export type VaultSyncFailed = { accountId: string; code: string; message: string }
+export type VaultSyncStarted = { accountId: string }
+export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }
+export type WebauthnAllowCredentialDto = { type: string | null; id: string | null; transports: string[] }
+export type WebauthnRequestExtensionsDto = { appid: string | null }
+export type WsStatusDto = "unknown" | "connected" | "disconnected"
 
 /** tauri-specta globals **/
 

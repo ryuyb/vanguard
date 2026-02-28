@@ -26,6 +26,10 @@ impl VaultwardenEndpoints {
     pub fn sync(base_url: &str) -> String {
         format!("{}/api/sync", normalize_base(base_url))
     }
+
+    pub fn revision_date(base_url: &str) -> String {
+        format!("{}/api/accounts/revision-date", normalize_base(base_url))
+    }
 }
 
 fn normalize_base(base_url: &str) -> &str {

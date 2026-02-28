@@ -3,8 +3,8 @@ use super::endpoints::VaultwardenEndpoints;
 use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
     PasswordLoginRequest, PreloginRequest, PreloginResponse, RefreshTokenRequest,
-    SendEmailLoginRequest, SyncResponse, TokenErrorResponse, TokenRequest, TokenResponse,
-    VerifyEmailTokenRequest,
+    RevisionDateResponse, SendEmailLoginRequest, SyncResponse, TokenErrorResponse, TokenRequest,
+    TokenResponse, VerifyEmailTokenRequest,
 };
 
 #[derive(Debug, Clone)]
@@ -63,6 +63,11 @@ impl VaultwardenClient {
     pub fn sync_endpoint(&self, base_url: &str) -> VaultwardenResult<String> {
         let base_url = Self::validated_base_url(base_url)?;
         Ok(VaultwardenEndpoints::sync(base_url))
+    }
+
+    pub fn revision_date_endpoint(&self, base_url: &str) -> VaultwardenResult<String> {
+        let base_url = Self::validated_base_url(base_url)?;
+        Ok(VaultwardenEndpoints::revision_date(base_url))
     }
 
     pub fn send_email_login_endpoint(&self, base_url: &str) -> VaultwardenResult<String> {
@@ -220,12 +225,69 @@ impl VaultwardenClient {
     pub async fn sync(
         &self,
         base_url: &str,
-        _access_token: &str,
+        access_token: &str,
+        exclude_domains: bool,
     ) -> VaultwardenResult<SyncResponse> {
-        self.sync_endpoint(base_url)?;
-        Err(VaultwardenError::Transport(String::from(
-            "sync is not implemented yet",
-        )))
+        let endpoint = self.sync_endpoint(base_url)?;
+
+        let response = self
+            .http_client
+            .get(endpoint)
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .query(&[(
+                "excludeDomains",
+                if exclude_domains { "true" } else { "false" },
+            )])
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str::<SyncResponse>(&body)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid sync response: {error}")))
+    }
+
+    pub async fn revision_date(
+        &self,
+        base_url: &str,
+        access_token: &str,
+    ) -> VaultwardenResult<i64> {
+        let endpoint = self.revision_date_endpoint(base_url)?;
+
+        let response = self
+            .http_client
+            .get(endpoint)
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        parse_revision_date(&body).ok_or_else(|| {
+            VaultwardenError::Decode(String::from(
+                "invalid revision-date response: expected integer timestamp in milliseconds",
+            ))
+        })
     }
 
     fn validated_base_url<'a>(base_url: &'a str) -> VaultwardenResult<&'a str> {
@@ -255,20 +317,22 @@ impl VaultwardenClient {
             return None;
         }
 
-        let value: serde_json::Value = serde_json::from_str(body).ok()?;
-
-        if let Some(description) = value.get("error_description").and_then(|v| v.as_str()) {
-            return Some(String::from(description));
-        }
-
-        if let Some(error) = value.get("error").and_then(|v| v.as_str()) {
-            return Some(String::from(error));
-        }
-
-        if let Some(message) = value.get("message").and_then(|v| v.as_str()) {
-            return Some(String::from(message));
-        }
-
-        None
+        let payload: BasicErrorPayload = serde_json::from_str(body).ok()?;
+        payload
+            .error_description
+            .or(payload.error)
+            .or(payload.message)
     }
+}
+
+fn parse_revision_date(body: &str) -> Option<i64> {
+    let parsed: RevisionDateResponse = serde_json::from_str(body).ok()?;
+    parsed.to_revision_ms()
+}
+
+#[derive(serde::Deserialize)]
+struct BasicErrorPayload {
+    error_description: Option<String>,
+    error: Option<String>,
+    message: Option<String>,
 }

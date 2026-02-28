@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 pub mod application;
 pub mod bootstrap;
 pub mod domain;
@@ -23,16 +25,20 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_login_with_password,
             interfaces::tauri::commands::auth::auth_refresh_token,
             interfaces::tauri::commands::auth::auth_send_email_login,
-            interfaces::tauri::commands::auth::auth_verify_email_token
+            interfaces::tauri::commands::auth::auth_verify_email_token,
+            interfaces::tauri::commands::sync::vault_sync_now,
+            interfaces::tauri::commands::sync::vault_sync_status
+        ])
+        .events(tauri_specta::collect_events![
+            interfaces::tauri::events::sync::VaultSyncStarted,
+            interfaces::tauri::events::sync::VaultSyncSucceeded,
+            interfaces::tauri::events::sync::VaultSyncFailed
         ]);
 
+    let invoke_handler = specta_builder.invoke_handler();
+
     #[cfg(debug_assertions)]
-    specta_builder
-        .export(
-            specta_typescript::Typescript::default().header("// @ts-nocheck"),
-            "../src/bindings.ts",
-        )
-        .expect("failed to export specta bindings");
+    export_specta_bindings(&specta_builder).expect("failed to export specta bindings");
 
     tauri::Builder::default()
         .plugin(
@@ -42,7 +48,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .setup(move |app| {
+            specta_builder.mount_events(app);
             let app_state = bootstrap::wiring::build_app_state(app).map_err(
                 |error| -> Box<dyn std::error::Error> {
                     log::error!("failed to wire application state: {error}");
@@ -52,7 +59,32 @@ pub fn run() {
             app.manage(app_state);
             Ok(())
         })
-        .invoke_handler(specta_builder.invoke_handler())
+        .invoke_handler(invoke_handler)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(debug_assertions)]
+fn export_specta_bindings(builder: &tauri_specta::Builder<tauri::Wry>) -> std::io::Result<()> {
+    let output = builder
+        .export_str(specta_typescript::Typescript::default().header("// @ts-nocheck"))
+        .map_err(|error| std::io::Error::other(error.to_string()))?;
+
+    let target_path = bindings_output_path();
+    let temp_path = temporary_bindings_path(&target_path);
+    std::fs::write(&temp_path, output)?;
+    std::fs::rename(&temp_path, &target_path)?;
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+fn bindings_output_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../src/bindings.ts")
+}
+
+#[cfg(debug_assertions)]
+fn temporary_bindings_path(target_path: &Path) -> PathBuf {
+    let mut path = target_path.to_path_buf();
+    path.set_extension("ts.tmp");
+    path
 }

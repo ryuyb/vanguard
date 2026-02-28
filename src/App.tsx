@@ -4,6 +4,7 @@ import {
   type PasswordLoginResponseDto,
   type PreloginResponseDto,
   type SessionResponseDto,
+  type SyncStatusResponseDto,
   type TwoFactorChallengeDto,
 } from "./bindings";
 import "./App.css";
@@ -28,10 +29,14 @@ function App() {
   const [verifyUserId, setVerifyUserId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
   const [refreshTokenInput, setRefreshTokenInput] = useState("");
+  const [syncAccountId, setSyncAccountId] = useState("local-dev-account");
+  const [syncAccessTokenOverride, setSyncAccessTokenOverride] = useState("");
+  const [syncExcludeDomains, setSyncExcludeDomains] = useState(false);
 
   const [prelogin, setPrelogin] = useState<PreloginResponseDto | null>(null);
   const [session, setSession] = useState<SessionResponseDto | null>(null);
   const [challenge, setChallenge] = useState<TwoFactorChallengeDto | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatusResponseDto | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [rawResult, setRawResult] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -157,6 +162,46 @@ function App() {
       }
 
       setRaw({ ok: true });
+    });
+  };
+
+  const handleSyncNow = async () => {
+    await run("vault-sync-now", async () => {
+      const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
+      if (!accessToken) {
+        throw new Error("access token is empty; please login first or provide a token override");
+      }
+
+      const result = await commands.vaultSyncNow({
+        accountId: syncAccountId,
+        baseUrl,
+        accessToken,
+        excludeDomains: syncExcludeDomains,
+      });
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setSyncStatus(result.data);
+      setRaw(result.data);
+    });
+  };
+
+  const handleSyncStatus = async () => {
+    await run("vault-sync-status", async () => {
+      const result = await commands.vaultSyncStatus({
+        accountId: syncAccountId,
+      });
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setSyncStatus(result.data);
+      setRaw(result.data);
     });
   };
 
@@ -286,10 +331,45 @@ function App() {
       </section>
 
       <section style={sectionStyle}>
+        <h2>Vault Sync 联调</h2>
+        <Field label="sync.accountId">
+          <input
+            value={syncAccountId}
+            onChange={(e) => setSyncAccountId(e.currentTarget.value)}
+            placeholder="例如：user-1"
+          />
+        </Field>
+        <Field label="sync.accessToken override (optional)">
+          <input
+            value={syncAccessTokenOverride}
+            onChange={(e) => setSyncAccessTokenOverride(e.currentTarget.value)}
+            placeholder="留空将使用当前 Session.accessToken"
+          />
+        </Field>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <input
+            type="checkbox"
+            checked={syncExcludeDomains}
+            onChange={(e) => setSyncExcludeDomains(e.currentTarget.checked)}
+          />
+          exclude domains
+        </label>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <button type="button" disabled={!!busyAction} onClick={handleSyncNow}>
+            Sync Now
+          </button>
+          <button type="button" disabled={!!busyAction} onClick={handleSyncStatus}>
+            Sync Status
+          </button>
+        </div>
+      </section>
+
+      <section style={sectionStyle}>
         <h2>结果快照</h2>
         <p>Prelogin: {prelogin ? "done" : "none"}</p>
         <p>Session: {session ? "authenticated" : "none"}</p>
         <p>2FA Challenge: {challenge ? "required" : "none"}</p>
+        <p>Sync Status: {syncStatus ? syncStatus.state : "none"}</p>
         <pre style={preStyle}>{rawResult || "No response yet."}</pre>
       </section>
 

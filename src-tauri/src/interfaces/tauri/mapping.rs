@@ -1,12 +1,21 @@
 use crate::application::dto::auth::{
-    PasswordLoginCommand, PasswordLoginOutcome, PreloginInfo, PreloginQuery, RefreshTokenCommand,
-    SendEmailLoginCommand, SessionInfo, TwoFactorChallenge, VerifyEmailTokenCommand,
+    MasterPasswordPolicy, PasswordLoginCommand, PasswordLoginOutcome, PreloginInfo, PreloginQuery,
+    RefreshTokenCommand, SendEmailLoginCommand, SessionInfo, TwoFactorChallenge,
+    TwoFactorProviderHint, VerifyEmailTokenCommand, WebauthnAllowCredential,
+    WebauthnRequestExtensions,
 };
+use crate::application::dto::sync::{SyncOutcome, SyncVaultCommand};
+use crate::domain::sync::{SyncContext, SyncState, SyncTrigger, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
-    PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto, PreloginResponseDto,
-    RefreshTokenRequestDto, SendEmailLoginRequestDto, SessionResponseDto, TwoFactorChallengeDto,
-    VerifyEmailTokenRequestDto,
+    MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto,
+    PreloginResponseDto, RefreshTokenRequestDto, SendEmailLoginRequestDto, SessionResponseDto,
+    TwoFactorChallengeDto, TwoFactorProviderHintDto, VerifyEmailTokenRequestDto,
+    WebauthnAllowCredentialDto, WebauthnRequestExtensionsDto,
 };
+use crate::interfaces::tauri::dto::sync::{
+    SyncCountsDto, SyncNowRequestDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
+};
+use std::collections::HashMap;
 
 pub fn to_prelogin_query(dto: PreloginRequestDto) -> PreloginQuery {
     PreloginQuery {
@@ -94,7 +103,119 @@ pub fn to_two_factor_challenge_dto(challenge: TwoFactorChallenge) -> TwoFactorCh
         error: challenge.error,
         error_description: challenge.error_description,
         providers: challenge.providers,
-        providers2: challenge.providers2,
-        master_password_policy: challenge.master_password_policy,
+        providers2: challenge.providers2.map(to_two_factor_provider_map_dto),
+        master_password_policy: challenge
+            .master_password_policy
+            .map(to_master_password_policy_dto),
+    }
+}
+
+fn to_master_password_policy_dto(policy: MasterPasswordPolicy) -> MasterPasswordPolicyDto {
+    MasterPasswordPolicyDto {
+        min_complexity: policy.min_complexity,
+        min_length: policy.min_length,
+        require_lower: policy.require_lower,
+        require_upper: policy.require_upper,
+        require_numbers: policy.require_numbers,
+        require_special: policy.require_special,
+        enforce_on_login: policy.enforce_on_login,
+        object: policy.object,
+    }
+}
+
+fn to_two_factor_provider_map_dto(
+    providers: HashMap<String, Option<TwoFactorProviderHint>>,
+) -> HashMap<String, Option<TwoFactorProviderHintDto>> {
+    providers
+        .into_iter()
+        .map(|(key, value)| (key, value.map(to_two_factor_provider_hint_dto)))
+        .collect()
+}
+
+fn to_two_factor_provider_hint_dto(hint: TwoFactorProviderHint) -> TwoFactorProviderHintDto {
+    TwoFactorProviderHintDto {
+        host: hint.host,
+        signature: hint.signature,
+        auth_url: hint.auth_url,
+        nfc: hint.nfc,
+        email: hint.email,
+        challenge: hint.challenge,
+        timeout: hint.timeout,
+        rp_id: hint.rp_id,
+        allow_credentials: hint
+            .allow_credentials
+            .into_iter()
+            .map(to_webauthn_allow_credential_dto)
+            .collect(),
+        user_verification: hint.user_verification,
+        extensions: hint.extensions.map(to_webauthn_request_extensions_dto),
+    }
+}
+
+fn to_webauthn_allow_credential_dto(
+    credential: WebauthnAllowCredential,
+) -> WebauthnAllowCredentialDto {
+    WebauthnAllowCredentialDto {
+        r#type: credential.r#type,
+        id: credential.id,
+        transports: credential.transports,
+    }
+}
+
+fn to_webauthn_request_extensions_dto(
+    extensions: WebauthnRequestExtensions,
+) -> WebauthnRequestExtensionsDto {
+    WebauthnRequestExtensionsDto {
+        appid: extensions.appid,
+    }
+}
+
+pub fn to_sync_vault_command(dto: SyncNowRequestDto) -> SyncVaultCommand {
+    SyncVaultCommand {
+        account_id: dto.account_id,
+        base_url: dto.base_url,
+        access_token: dto.access_token,
+        exclude_domains: dto.exclude_domains.unwrap_or(false),
+        trigger: SyncTrigger::Manual,
+    }
+}
+
+pub fn to_sync_status_response_dto(context: SyncContext) -> SyncStatusResponseDto {
+    SyncStatusResponseDto {
+        account_id: context.account_id,
+        base_url: context.base_url,
+        state: to_sync_state_dto(context.state),
+        ws_status: to_ws_status_dto(context.ws_status),
+        last_revision_ms: context.last_revision_ms.map(|value| value.to_string()),
+        last_sync_at_ms: context.last_sync_at_ms.map(|value| value.to_string()),
+        last_error: context.last_error,
+        counts: SyncCountsDto {
+            folders: context.counts.folders,
+            collections: context.counts.collections,
+            policies: context.counts.policies,
+            ciphers: context.counts.ciphers,
+            sends: context.counts.sends,
+        },
+    }
+}
+
+pub fn to_sync_outcome_dto(outcome: SyncOutcome) -> SyncStatusResponseDto {
+    to_sync_status_response_dto(outcome.context)
+}
+
+fn to_sync_state_dto(state: SyncState) -> SyncStateDto {
+    match state {
+        SyncState::Idle => SyncStateDto::Idle,
+        SyncState::Running => SyncStateDto::Running,
+        SyncState::Succeeded => SyncStateDto::Succeeded,
+        SyncState::Failed => SyncStateDto::Failed,
+    }
+}
+
+fn to_ws_status_dto(status: WsStatus) -> WsStatusDto {
+    match status {
+        WsStatus::Unknown => WsStatusDto::Unknown,
+        WsStatus::Connected => WsStatusDto::Connected,
+        WsStatus::Disconnected => WsStatusDto::Disconnected,
     }
 }

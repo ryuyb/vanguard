@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreloginRequest {
@@ -159,13 +158,11 @@ pub struct TokenResponse {
     #[serde(rename = "TwoFactorToken")]
     pub two_factor_token: Option<String>,
     #[serde(rename = "MasterPasswordPolicy")]
-    pub master_password_policy: Option<Value>,
+    pub master_password_policy: Option<MasterPasswordPolicy>,
     #[serde(rename = "AccountKeys")]
-    pub account_keys: Option<Value>,
+    pub account_keys: Option<AccountKeys>,
     #[serde(rename = "UserDecryptionOptions")]
-    pub user_decryption_options: Option<Value>,
-    #[serde(default, flatten)]
-    pub extra: HashMap<String, Value>,
+    pub user_decryption_options: Option<UserDecryptionOptions>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,11 +172,118 @@ pub struct TokenErrorResponse {
     #[serde(rename = "TwoFactorProviders")]
     pub two_factor_providers: Option<Vec<String>>,
     #[serde(rename = "TwoFactorProviders2")]
-    pub two_factor_providers2: Option<Value>,
+    pub two_factor_providers2: Option<HashMap<String, Option<TwoFactorProviderHint>>>,
     #[serde(rename = "MasterPasswordPolicy")]
-    pub master_password_policy: Option<Value>,
-    #[serde(default, flatten)]
-    pub extra: HashMap<String, Value>,
+    pub master_password_policy: Option<MasterPasswordPolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MasterPasswordPolicy {
+    pub min_complexity: Option<i32>,
+    pub min_length: Option<i32>,
+    #[serde(default)]
+    pub require_lower: bool,
+    #[serde(default)]
+    pub require_upper: bool,
+    #[serde(default)]
+    pub require_numbers: bool,
+    #[serde(default)]
+    pub require_special: bool,
+    #[serde(default)]
+    pub enforce_on_login: bool,
+    #[serde(rename = "Object")]
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountKeys {
+    #[serde(rename = "publicKeyEncryptionKeyPair")]
+    pub public_key_encryption_key_pair: Option<PublicKeyEncryptionKeyPair>,
+    #[serde(rename = "Object")]
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PublicKeyEncryptionKeyPair {
+    #[serde(rename = "wrappedPrivateKey")]
+    pub wrapped_private_key: Option<String>,
+    #[serde(rename = "publicKey")]
+    pub public_key: Option<String>,
+    #[serde(rename = "Object")]
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserDecryptionOptions {
+    #[serde(rename = "HasMasterPassword")]
+    pub has_master_password: Option<bool>,
+    #[serde(rename = "MasterPasswordUnlock")]
+    pub master_password_unlock: Option<TokenMasterPasswordUnlock>,
+    #[serde(rename = "Object")]
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenMasterPasswordUnlock {
+    #[serde(rename = "Kdf")]
+    pub kdf: Option<TokenKdfParams>,
+    #[serde(rename = "MasterKeyEncryptedUserKey")]
+    pub master_key_encrypted_user_key: Option<String>,
+    #[serde(rename = "MasterKeyWrappedUserKey")]
+    pub master_key_wrapped_user_key: Option<String>,
+    #[serde(rename = "Salt")]
+    pub salt: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenKdfParams {
+    #[serde(rename = "KdfType")]
+    pub kdf_type: Option<i32>,
+    #[serde(rename = "Iterations")]
+    pub iterations: Option<i32>,
+    #[serde(rename = "Memory")]
+    pub memory: Option<i32>,
+    #[serde(rename = "Parallelism")]
+    pub parallelism: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TwoFactorProviderHint {
+    #[serde(rename = "Host")]
+    pub host: Option<String>,
+    #[serde(rename = "Signature")]
+    pub signature: Option<String>,
+    #[serde(rename = "AuthUrl")]
+    pub auth_url: Option<String>,
+    #[serde(rename = "Nfc")]
+    pub nfc: Option<bool>,
+    #[serde(rename = "Email")]
+    pub email: Option<String>,
+    pub challenge: Option<String>,
+    pub timeout: Option<i32>,
+    #[serde(rename = "rpId")]
+    pub rp_id: Option<String>,
+    #[serde(default)]
+    pub allow_credentials: Vec<WebauthnAllowCredential>,
+    pub user_verification: Option<String>,
+    pub extensions: Option<WebauthnRequestExtensions>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebauthnAllowCredential {
+    pub r#type: Option<String>,
+    pub id: Option<String>,
+    #[serde(default)]
+    pub transports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebauthnRequestExtensions {
+    pub appid: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -200,10 +304,173 @@ pub struct VerifyEmailTokenRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncResponse {
-    pub profile: Value,
-    pub folders: Vec<Value>,
-    pub ciphers: Vec<Value>,
+    pub profile: SyncProfile,
+    #[serde(default)]
+    pub folders: Vec<SyncFolder>,
+    #[serde(default)]
+    pub collections: Vec<SyncCollection>,
+    #[serde(default)]
+    pub policies: Vec<SyncPolicy>,
+    #[serde(default)]
+    pub ciphers: Vec<SyncCipher>,
+    pub domains: Option<SyncDomains>,
+    #[serde(default)]
+    pub sends: Vec<SyncSend>,
+    pub user_decryption: Option<SyncUserDecryption>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncProfile {
+    pub id: String,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncFolder {
+    pub id: String,
+    pub name: Option<String>,
+    pub revision_date: Option<String>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCollection {
+    pub id: String,
+    pub organization_id: Option<String>,
+    pub name: Option<String>,
+    pub revision_date: Option<String>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncPolicy {
+    pub id: String,
+    pub organization_id: Option<String>,
+    pub r#type: Option<i32>,
+    pub enabled: Option<bool>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipher {
+    pub id: String,
+    pub organization_id: Option<String>,
+    pub folder_id: Option<String>,
+    pub r#type: Option<i32>,
+    pub name: Option<String>,
+    pub revision_date: Option<String>,
+    pub deleted_date: Option<String>,
+    pub object: Option<String>,
+    #[serde(default)]
+    pub attachments: Vec<SyncAttachment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncAttachment {
+    pub id: String,
+    pub file_name: Option<String>,
+    pub size: Option<String>,
+    pub url: Option<String>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSend {
+    pub id: String,
+    pub r#type: Option<i32>,
+    pub name: Option<String>,
+    pub revision_date: Option<String>,
+    pub deletion_date: Option<String>,
+    pub object: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncDomains {
+    #[serde(default)]
+    pub equivalent_domains: Vec<Vec<String>>,
+    #[serde(default)]
+    pub global_equivalent_domains: Vec<Vec<String>>,
+    #[serde(default)]
+    pub excluded_global_equivalent_domains: Vec<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncUserDecryption {
+    pub master_password_unlock: Option<SyncMasterPasswordUnlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncMasterPasswordUnlock {
+    pub kdf: Option<SyncKdfParams>,
+    pub master_key_encrypted_user_key: Option<String>,
+    pub master_key_wrapped_user_key: Option<String>,
+    pub salt: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncKdfParams {
+    pub kdf_type: Option<i32>,
+    pub iterations: Option<i32>,
+    pub memory: Option<i32>,
+    pub parallelism: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RevisionDateResponse {
+    Number(i64),
+    Text(String),
+    Object(HashMap<String, RevisionDateScalar>),
+}
+
+impl RevisionDateResponse {
+    pub fn to_revision_ms(&self) -> Option<i64> {
+        match self {
+            Self::Number(value) => Some(*value),
+            Self::Text(value) => value.parse::<i64>().ok(),
+            Self::Object(values) => {
+                if let Some(value) = values
+                    .get("revisionDate")
+                    .or_else(|| values.get("revision_date"))
+                {
+                    return value.to_revision_ms();
+                }
+                None
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RevisionDateScalar {
+    Number(i64),
+    Text(String),
+}
+
+impl RevisionDateScalar {
+    pub fn to_revision_ms(&self) -> Option<i64> {
+        match self {
+            Self::Number(value) => Some(*value),
+            Self::Text(value) => value.parse::<i64>().ok(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

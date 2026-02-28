@@ -1,17 +1,25 @@
 use async_trait::async_trait;
 
 use crate::application::dto::auth::{
-    PasswordLoginCommand, PasswordLoginOutcome, PreloginInfo, PreloginQuery, RefreshTokenCommand,
-    SendEmailLoginCommand, SessionInfo, TwoFactorChallenge, VerifyEmailTokenCommand,
+    MasterPasswordPolicy as AppMasterPasswordPolicy, PasswordLoginCommand, PasswordLoginOutcome,
+    PreloginInfo, PreloginQuery, RefreshTokenCommand, SendEmailLoginCommand, SessionInfo,
+    TwoFactorChallenge, TwoFactorProviderHint as AppTwoFactorProviderHint, VerifyEmailTokenCommand,
+    WebauthnAllowCredential as AppWebauthnAllowCredential,
+    WebauthnRequestExtensions as AppWebauthnRequestExtensions,
+};
+use crate::application::dto::sync::{
+    RevisionDateQuery, SyncVaultCommand, SyncVaultPayload,
 };
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 use super::error::VaultwardenError;
+use super::mapper::map_sync_response;
 use super::models::{
     PasswordLoginRequest, PreloginRequest, RefreshTokenRequest, SendEmailLoginRequest,
-    TokenErrorResponse, TokenResponse, VerifyEmailTokenRequest,
+    TokenErrorResponse, TokenResponse, TwoFactorProviderHint, VerifyEmailTokenRequest,
+    WebauthnAllowCredential, WebauthnRequestExtensions,
 };
 use super::password_hash::derive_master_password_hash;
 use super::VaultwardenClient;
@@ -99,8 +107,10 @@ impl RemoteVaultPort for VaultwardenRemotePort {
                         error: error.error,
                         error_description: error.error_description,
                         providers: error.two_factor_providers.unwrap_or_default(),
-                        providers2: error.two_factor_providers2,
-                        master_password_policy: error.master_password_policy,
+                        providers2: error.two_factor_providers2.map(map_two_factor_provider_map),
+                        master_password_policy: error
+                            .master_password_policy
+                            .map(map_master_password_policy),
                     },
                 ))
             }
@@ -182,6 +192,89 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .map_err(map_vaultwarden_error)?;
 
         Ok(())
+    }
+
+    async fn sync_vault(&self, command: SyncVaultCommand) -> AppResult<SyncVaultPayload> {
+        let response = self
+            .client
+            .sync(
+                &command.base_url,
+                &command.access_token,
+                command.exclude_domains,
+            )
+            .await
+            .map_err(map_vaultwarden_error)?;
+
+        Ok(map_sync_response(response))
+    }
+
+    async fn get_revision_date(&self, query: RevisionDateQuery) -> AppResult<i64> {
+        self.client
+            .revision_date(&query.base_url, &query.access_token)
+            .await
+            .map_err(map_vaultwarden_error)
+    }
+}
+
+fn map_master_password_policy(
+    policy: super::models::MasterPasswordPolicy,
+) -> AppMasterPasswordPolicy {
+    AppMasterPasswordPolicy {
+        min_complexity: policy.min_complexity,
+        min_length: policy.min_length,
+        require_lower: policy.require_lower,
+        require_upper: policy.require_upper,
+        require_numbers: policy.require_numbers,
+        require_special: policy.require_special,
+        enforce_on_login: policy.enforce_on_login,
+        object: policy.object,
+    }
+}
+
+fn map_two_factor_provider_map(
+    providers: std::collections::HashMap<String, Option<TwoFactorProviderHint>>,
+) -> std::collections::HashMap<String, Option<AppTwoFactorProviderHint>> {
+    providers
+        .into_iter()
+        .map(|(key, value)| (key, value.map(map_two_factor_provider_hint)))
+        .collect()
+}
+
+fn map_two_factor_provider_hint(provider: TwoFactorProviderHint) -> AppTwoFactorProviderHint {
+    AppTwoFactorProviderHint {
+        host: provider.host,
+        signature: provider.signature,
+        auth_url: provider.auth_url,
+        nfc: provider.nfc,
+        email: provider.email,
+        challenge: provider.challenge,
+        timeout: provider.timeout,
+        rp_id: provider.rp_id,
+        allow_credentials: provider
+            .allow_credentials
+            .into_iter()
+            .map(map_webauthn_allow_credential)
+            .collect(),
+        user_verification: provider.user_verification,
+        extensions: provider.extensions.map(map_webauthn_request_extensions),
+    }
+}
+
+fn map_webauthn_allow_credential(
+    credential: WebauthnAllowCredential,
+) -> AppWebauthnAllowCredential {
+    AppWebauthnAllowCredential {
+        r#type: credential.r#type,
+        id: credential.id,
+        transports: credential.transports,
+    }
+}
+
+fn map_webauthn_request_extensions(
+    extensions: WebauthnRequestExtensions,
+) -> AppWebauthnRequestExtensions {
+    AppWebauthnRequestExtensions {
+        appid: extensions.appid,
     }
 }
 
