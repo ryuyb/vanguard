@@ -125,9 +125,7 @@ impl SyncVaultUseCase {
                         error
                     );
                     let message = error.message();
-                    let _ = self
-                        .vault_repository
-                        .set_sync_failed(&command.account_id, &command.base_url, message)
+                    self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
                         .await;
                     return Err(error);
                 }
@@ -154,10 +152,13 @@ impl SyncVaultUseCase {
                                 error
                             );
                             let message = error.message();
-                            let _ = self
-                                .vault_repository
-                                .set_sync_failed(&command.account_id, &command.base_url, message)
-                                .await;
+                            self.mark_sync_error_state(
+                                &command.account_id,
+                                &command.base_url,
+                                &error,
+                                message,
+                            )
+                            .await;
                             return Err(error);
                         }
 
@@ -234,9 +235,7 @@ impl SyncVaultUseCase {
                     error
                 );
                 let message = error.message();
-                let _ = self
-                    .vault_repository
-                    .set_sync_failed(&command.account_id, &command.base_url, message)
+                self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
                     .await;
                 Err(error)
             }
@@ -306,6 +305,35 @@ impl SyncVaultUseCase {
             .await?;
         Ok(())
     }
+
+    async fn mark_sync_error_state(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        error: &AppError,
+        message: String,
+    ) {
+        let update_result = if is_server_error_status(error) {
+            self.vault_repository
+                .set_sync_degraded(account_id, base_url, message)
+                .await
+        } else {
+            self.vault_repository
+                .set_sync_failed(account_id, base_url, message)
+                .await
+        };
+
+        if let Err(update_error) = update_result {
+            log::warn!(
+                target: "vanguard::sync",
+                "failed to update sync error state account_id={} endpoint=local-repository status={} error_code={} message={}",
+                account_id,
+                update_error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                update_error.code(),
+                update_error
+            );
+        }
+    }
 }
 
 fn clamp_count(value: usize) -> u32 {
@@ -323,7 +351,15 @@ fn backoff_for_attempt(base_backoff_ms: u64, attempt: usize) -> u64 {
 }
 
 fn is_retryable_error(error: &AppError) -> bool {
-    !matches!(error, AppError::Validation(_))
+    if matches!(error, AppError::Validation(_)) {
+        return false;
+    }
+
+    !matches!(error.status(), Some(401 | 403))
+}
+
+fn is_server_error_status(error: &AppError) -> bool {
+    matches!(error.status(), Some(status) if (500..=599).contains(&status))
 }
 
 fn is_revision_changed(previous: Option<i64>, current: Option<i64>) -> bool {

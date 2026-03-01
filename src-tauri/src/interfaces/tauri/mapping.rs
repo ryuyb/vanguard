@@ -208,6 +208,7 @@ fn to_sync_state_dto(state: SyncState) -> SyncStateDto {
         SyncState::Idle => SyncStateDto::Idle,
         SyncState::Running => SyncStateDto::Running,
         SyncState::Succeeded => SyncStateDto::Succeeded,
+        SyncState::Degraded => SyncStateDto::Degraded,
         SyncState::Failed => SyncStateDto::Failed,
     }
 }

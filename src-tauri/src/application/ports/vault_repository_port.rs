@@ -27,6 +27,13 @@ pub trait VaultRepositoryPort: Send + Sync {
         error_message: String,
     ) -> AppResult<SyncContext>;
 
+    async fn set_sync_degraded(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        error_message: String,
+    ) -> AppResult<SyncContext>;
+
     async fn get_sync_context(&self, account_id: &str) -> AppResult<Option<SyncContext>>;
 
     async fn begin_sync_transaction(&self, account_id: &str) -> AppResult<()>;

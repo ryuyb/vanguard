@@ -78,10 +78,12 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
 
 
 export const events = __makeEvents__<{
+vaultSyncAuthRequired: VaultSyncAuthRequired,
 vaultSyncFailed: VaultSyncFailed,
 vaultSyncStarted: VaultSyncStarted,
 vaultSyncSucceeded: VaultSyncSucceeded
 }>({
+vaultSyncAuthRequired: "vault-sync:auth-required",
 vaultSyncFailed: "vault-sync:failed",
 vaultSyncStarted: "vault-sync:started",
 vaultSyncSucceeded: "vault-sync:succeeded"
@@ -103,11 +105,12 @@ export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; 
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
 export type SyncNowRequestDto = { baseUrl: string; accessToken: string; excludeDomains: boolean | null }
-export type SyncStateDto = "idle" | "running" | "succeeded" | "failed"
+export type SyncStateDto = "idle" | "running" | "succeeded" | "degraded" | "failed"
 export type SyncStatusRequestDto = { baseUrl: string; accessToken: string }
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
 export type VaultSyncFailed = { accountId: string; code: string; message: string }
 export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }

@@ -32,6 +32,7 @@ pub enum SyncStateDto {
     Idle,
     Running,
     Succeeded,
+    Degraded,
     Failed,
 }
 

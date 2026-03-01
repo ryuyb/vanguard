@@ -3,6 +3,7 @@ pub enum SyncState {
     Idle,
     Running,
     Succeeded,
+    Degraded,
     Failed,
 }
 

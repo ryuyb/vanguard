@@ -735,6 +735,38 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         })
     }
 
+    async fn set_sync_degraded(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        error_message: String,
+    ) -> AppResult<SyncContext> {
+        self.with_account_connection(account_id, |connection| {
+            Self::ensure_context_row(connection, account_id)?;
+            connection
+                .execute(
+                    r#"
+                    UPDATE sync_contexts
+                    SET
+                        base_url = ?2,
+                        state = 'degraded',
+                        last_error = ?3
+                    WHERE account_id = ?1
+                    "#,
+                    params![account_id, base_url, error_message],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to set sync degraded: {error}"))
+                })?;
+
+            Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
+                AppError::internal(format!(
+                    "sync context missing after set_sync_degraded for account_id={account_id}"
+                ))
+            })
+        })
+    }
+
     async fn get_sync_context(&self, account_id: &str) -> AppResult<Option<SyncContext>> {
         self.with_account_connection(account_id, |connection| {
             Self::read_sync_context(connection, account_id)
@@ -1182,6 +1214,7 @@ fn parse_sync_state(value: &str) -> AppResult<SyncState> {
         "idle" => Ok(SyncState::Idle),
         "running" => Ok(SyncState::Running),
         "succeeded" => Ok(SyncState::Succeeded),
+        "degraded" => Ok(SyncState::Degraded),
         "failed" => Ok(SyncState::Failed),
         _ => Err(AppError::internal(format!(
             "invalid sync state value in database: {value}"

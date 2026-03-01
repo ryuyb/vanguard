@@ -50,6 +50,7 @@ impl SyncService {
         require_non_empty(&command.account_id, "account_id")?;
         let account_id = command.account_id.clone();
         let endpoint = sync_endpoint(&command.base_url);
+        let trigger = command.trigger;
 
         if let Err(error) = self.enforce_debounce(&account_id) {
             log::warn!(
@@ -85,6 +86,7 @@ impl SyncService {
                 Ok(outcome)
             }
             Err(error) => {
+                self.process_sync_auth_error(&account_id, trigger, &error);
                 log::error!(
                     target: "vanguard::sync",
                     "sync failed account_id={} endpoint={} status={} error_code={} message={}",
@@ -168,8 +170,13 @@ impl SyncService {
                         error.code(),
                         error
                     );
+                    if is_auth_status_error(&error) {
+                        break;
+                    }
                 }
             }
+
+            service.detach_poll_worker(&worker_account_id);
         });
 
         poll_workers.insert(account_id, handle);
@@ -248,7 +255,16 @@ impl SyncService {
                 base_url: base_url.clone(),
                 access_token: access_token.clone(),
             })
-            .await?;
+            .await
+            .inspect_err(|error| {
+                if let Some(status) = auth_status(error) {
+                    if trigger != SyncTrigger::Poll {
+                        let _ = self.stop_revision_polling(&account_id);
+                    }
+                    self.sync_event_port
+                        .emit_auth_required(&account_id, status, &error.message());
+                }
+            })?;
 
         let local_context = self
             .vault_repository
@@ -284,6 +300,38 @@ impl SyncService {
         self.sync_now(command).await?;
         Ok(())
     }
+
+    fn process_sync_auth_error(&self, account_id: &str, trigger: SyncTrigger, error: &AppError) {
+        if let Some(status) = auth_status(error) {
+            if trigger != SyncTrigger::Poll {
+                let _ = self.stop_revision_polling(account_id);
+            }
+            self.sync_event_port
+                .emit_auth_required(account_id, status, &error.message());
+        }
+    }
+
+    fn stop_revision_polling(&self, account_id: &str) -> AppResult<()> {
+        let mut poll_workers = self
+            .poll_workers
+            .lock()
+            .map_err(|_| AppError::internal("failed to lock sync poll workers"))?;
+        if let Some(handle) = poll_workers.remove(account_id) {
+            handle.abort();
+            log::info!(
+                target: "vanguard::sync",
+                "revision polling stopped account_id={}",
+                account_id
+            );
+        }
+        Ok(())
+    }
+
+    fn detach_poll_worker(&self, account_id: &str) {
+        if let Ok(mut poll_workers) = self.poll_workers.lock() {
+            poll_workers.remove(account_id);
+        }
+    }
 }
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
@@ -302,6 +350,18 @@ fn revision_endpoint(base_url: &str) -> String {
         "{}/api/accounts/revision-date",
         base_url.trim_end_matches('/')
     )
+}
+
+fn auth_status(error: &AppError) -> Option<u16> {
+    match error.status() {
+        Some(401) => Some(401),
+        Some(403) => Some(403),
+        _ => None,
+    }
+}
+
+fn is_auth_status_error(error: &AppError) -> bool {
+    auth_status(error).is_some()
 }
 
 struct RunningSlotGuard {

@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import {
   commands,
+  events,
   type PasswordLoginResponseDto,
   type PreloginResponseDto,
   type SessionResponseDto,
@@ -117,6 +118,22 @@ function App() {
       window.removeEventListener("focus", onFocus);
     };
   }, [baseUrl, session?.accessToken, syncAccessTokenOverride]);
+
+  useEffect(() => {
+    const unlistenPromise = events.vaultSyncAuthRequired.listen((event) => {
+      setSession(null);
+      setRefreshTokenInput("");
+      setChallenge(null);
+      addLog(
+        "error",
+        `session invalidated (${event.payload.status}): ${event.payload.message}`,
+      );
+    });
+
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, []);
 
   const handlePrelogin = async () => {
     await run("prelogin", async () => {
