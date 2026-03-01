@@ -6,6 +6,7 @@ import {
   type SessionResponseDto,
   type SyncStatusResponseDto,
   type TwoFactorChallengeDto,
+  type VaultCipherDetailResponseDto,
   type VaultViewDataResponseDto,
 } from "./bindings";
 import "./App.css";
@@ -33,11 +34,14 @@ function App() {
   const [unlockMasterPassword, setUnlockMasterPassword] = useState("");
   const [vaultPageInput, setVaultPageInput] = useState("1");
   const [vaultPageSizeInput, setVaultPageSizeInput] = useState("50");
+  const [vaultCipherIdInput, setVaultCipherIdInput] = useState("");
 
   const [session, setSession] = useState<SessionResponseDto | null>(null);
   const [challenge, setChallenge] = useState<TwoFactorChallengeDto | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponseDto | null>(null);
   const [vaultViewData, setVaultViewData] = useState<VaultViewDataResponseDto | null>(null);
+  const [vaultCipherDetail, setVaultCipherDetail] =
+    useState<VaultCipherDetailResponseDto | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [rawResult, setRawResult] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -249,6 +253,7 @@ function App() {
         throw new Error(result.error || "backend returned an empty error message");
       }
 
+      setVaultCipherDetail(null);
       setRaw({ ok: true });
     });
   };
@@ -266,7 +271,41 @@ function App() {
       }
 
       setVaultViewData(result.data);
+      if (!vaultCipherIdInput.trim() && result.data.ciphers.length > 0) {
+        setVaultCipherIdInput(result.data.ciphers[0].id);
+      }
       setRaw(result.data);
+    });
+  };
+
+  const fetchVaultCipherDetail = async (cipherId: string) => {
+    const result = await commands.vaultGetCipherDetail({
+      cipherId,
+    });
+
+    if (result.status === "error") {
+      setRaw(result);
+      throw new Error(result.error || "backend returned an empty error message");
+    }
+
+    setVaultCipherDetail(result.data);
+    setRaw(result.data);
+  };
+
+  const handleVaultGetCipherDetail = async () => {
+    await run("vault-get-cipher-detail", async () => {
+      const cipherId = vaultCipherIdInput.trim();
+      if (!cipherId) {
+        throw new Error("cipher id is empty");
+      }
+      await fetchVaultCipherDetail(cipherId);
+    });
+  };
+
+  const handleSelectCipherAndGetDetail = async (cipherId: string) => {
+    setVaultCipherIdInput(cipherId);
+    await run("vault-get-cipher-detail", async () => {
+      await fetchVaultCipherDetail(cipherId);
     });
   };
 
@@ -435,6 +474,47 @@ function App() {
         <button type="button" disabled={!!busyAction} onClick={handleVaultGetViewData}>
           Get View Data
         </button>
+
+        <hr />
+
+        <Field label="cipherDetail.cipherId">
+          <input
+            value={vaultCipherIdInput}
+            onChange={(e) => setVaultCipherIdInput(e.currentTarget.value)}
+            placeholder="cipher id"
+          />
+        </Field>
+        <button type="button" disabled={!!busyAction} onClick={handleVaultGetCipherDetail}>
+          Get Cipher Detail
+        </button>
+
+        {vaultViewData && vaultViewData.ciphers.length > 0 ? (
+          <>
+            <p style={{ marginTop: 12, marginBottom: 6, color: "#475467" }}>
+              快速选择一条 cipher 拉详情：
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
+              {vaultViewData.ciphers.map((cipher) => (
+                <button
+                  key={cipher.id}
+                  type="button"
+                  disabled={!!busyAction}
+                  onClick={() => void handleSelectCipherAndGetDetail(cipher.id)}
+                  style={{
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    border: "1px solid #d0d5dd",
+                    borderRadius: 8,
+                    background: "#fff",
+                    cursor: busyAction ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <strong>{cipher.name || "(unnamed)"}</strong> · <code>{cipher.id}</code>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
       </section>
 
       <section style={sectionStyle}>
@@ -444,11 +524,13 @@ function App() {
         <p>Sync Status: {syncStatus ? syncStatus.state : "none"}</p>
         <p>Vault View Data: {vaultViewData ? "loaded" : "none"}</p>
         <p>
-          Decryption Status: {vaultViewData ? vaultViewData.decryptionStatus : "none"}
-        </p>
-        <p>
           Visible Ciphers:{" "}
           {vaultViewData ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}` : "none"}
+        </p>
+        <p>Vault Cipher Detail: {vaultCipherDetail ? "loaded" : "none"}</p>
+        <p>
+          Cipher Detail Name:{" "}
+          {vaultCipherDetail ? (vaultCipherDetail.cipher.name ?? "(null)") : "none"}
         </p>
         <pre style={preStyle}>{rawResult || "No response yet."}</pre>
       </section>

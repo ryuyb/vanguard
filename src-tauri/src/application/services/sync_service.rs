@@ -346,6 +346,18 @@ impl SyncService {
         self.vault_repository.count_live_ciphers(&account_id).await
     }
 
+    pub async fn get_live_cipher(
+        &self,
+        account_id: String,
+        cipher_id: String,
+    ) -> AppResult<Option<SyncCipher>> {
+        require_non_empty(&account_id, "account_id")?;
+        require_non_empty(&cipher_id, "cipher_id")?;
+        self.vault_repository
+            .get_live_cipher(&account_id, &cipher_id)
+            .await
+    }
+
     pub async fn load_live_user_decryption(
         &self,
         account_id: String,

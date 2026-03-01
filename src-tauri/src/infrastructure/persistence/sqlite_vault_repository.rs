@@ -1188,6 +1188,35 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         })
     }
 
+    async fn get_live_cipher(
+        &self,
+        account_id: &str,
+        cipher_id: &str,
+    ) -> AppResult<Option<SyncCipher>> {
+        self.with_account_connection(account_id, |connection| {
+            let payload_json: Option<String> = connection
+                .query_row(
+                    r#"
+                    SELECT payload_json
+                    FROM live_ciphers
+                    WHERE account_id = ?1
+                      AND id = ?2
+                    LIMIT 1
+                    "#,
+                    params![account_id, cipher_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| {
+                    AppError::internal(format!("failed to query live cipher by id: {error}"))
+                })?;
+
+            payload_json
+                .map(|value| Self::from_json(&value, "live sync cipher payload"))
+                .transpose()
+        })
+    }
+
     async fn list_live_ciphers(
         &self,
         account_id: &str,

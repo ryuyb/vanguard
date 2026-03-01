@@ -72,6 +72,12 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32>;
 
+    async fn get_live_cipher(
+        &self,
+        account_id: &str,
+        cipher_id: &str,
+    ) -> AppResult<Option<SyncCipher>>;
+
     async fn list_live_ciphers(
         &self,
         account_id: &str,

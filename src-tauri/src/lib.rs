@@ -22,7 +22,8 @@ pub fn run() {
             interfaces::tauri::commands::sync::vault_sync_check_revision,
             interfaces::tauri::commands::vault::vault_unlock_with_password,
             interfaces::tauri::commands::vault::vault_lock,
-            interfaces::tauri::commands::vault::vault_get_view_data
+            interfaces::tauri::commands::vault::vault_get_view_data,
+            interfaces::tauri::commands::vault::vault_get_cipher_detail
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,

@@ -10,7 +10,8 @@ use crate::application::dto::auth::PreloginQuery;
 use crate::bootstrap::app_state::{AppState, VaultUserKey};
 use crate::infrastructure::vaultwarden::password_hash::derive_master_key;
 use crate::interfaces::tauri::dto::vault::{
-    VaultCipherItemDto, VaultDecryptionStatusDto, VaultFolderItemDto, VaultLockRequestDto,
+    VaultCipherDetailDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto, VaultCipherItemDto,
+    VaultFolderItemDto, VaultLockRequestDto,
     VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::{mapping, session};
@@ -151,52 +152,92 @@ pub async fn vault_get_view_data(
         .await
         .map_err(|error| log_command_error("vault_get_view_data", error))?;
 
-    let mut has_encrypted_fields = false;
-    let mut has_undecrypted_fields = false;
-    let folder_items = folders
+    let folder_items: Result<Vec<VaultFolderItemDto>, AppError> = folders
         .into_iter()
         .map(|folder| {
-            let value = maybe_decrypt_field(folder.name, &user_key);
-            has_encrypted_fields |= value.is_encrypted;
-            has_undecrypted_fields |= value.is_encrypted && !value.is_decrypted;
-            VaultFolderItemDto {
+            Ok(VaultFolderItemDto {
                 id: folder.id,
-                name: value.plaintext,
-            }
+                name: decrypt_field_value(folder.name, &user_key, "folder.name")?,
+            })
         })
         .collect();
-    let cipher_items = ciphers
+    let folder_items =
+        folder_items.map_err(|error| log_command_error("vault_get_view_data", error))?;
+    let cipher_items: Result<Vec<VaultCipherItemDto>, AppError> = ciphers
         .into_iter()
         .map(|cipher| {
-            let value = maybe_decrypt_field(cipher.name, &user_key);
-            has_encrypted_fields |= value.is_encrypted;
-            has_undecrypted_fields |= value.is_encrypted && !value.is_decrypted;
-            VaultCipherItemDto {
+            Ok(VaultCipherItemDto {
                 id: cipher.id,
                 folder_id: cipher.folder_id,
                 organization_id: cipher.organization_id,
                 r#type: cipher.r#type,
-                name: value.plaintext,
+                name: decrypt_field_value(cipher.name, &user_key, "cipher.name")?,
                 revision_date: cipher.revision_date,
                 deleted_date: cipher.deleted_date,
                 attachment_count: cipher.attachments.len().min(u32::MAX as usize) as u32,
-            }
+            })
         })
         .collect();
+    let cipher_items =
+        cipher_items.map_err(|error| log_command_error("vault_get_view_data", error))?;
 
     Ok(VaultViewDataResponseDto {
         account_id,
         sync_status: mapping::to_sync_status_response_dto(context, Some(metrics)),
-        decryption_status: if has_encrypted_fields && has_undecrypted_fields {
-            VaultDecryptionStatusDto::Locked
-        } else {
-            VaultDecryptionStatusDto::Unlocked
-        },
         folders: folder_items,
         ciphers: cipher_items,
         total_ciphers,
         page,
         page_size,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_get_cipher_detail(
+    state: State<'_, AppState>,
+    request: VaultCipherDetailRequestDto,
+) -> Result<VaultCipherDetailResponseDto, String> {
+    let account_id = state
+        .require_auth_session()
+        .map(|value| value.account_id)
+        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+    let cipher_id = request.cipher_id.trim();
+    if cipher_id.is_empty() {
+        return Err(log_command_error(
+            "vault_get_cipher_detail",
+            AppError::validation("cipher_id cannot be empty"),
+        ));
+    }
+
+    let user_key = state
+        .get_vault_user_key(&account_id)
+        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "vault_get_cipher_detail",
+                AppError::validation("vault is locked, please unlock with master password first"),
+            )
+        })?;
+
+    let cipher = state
+        .sync_service()
+        .get_live_cipher(account_id.clone(), String::from(cipher_id))
+        .await
+        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "vault_get_cipher_detail",
+                AppError::validation(format!("cipher not found: {cipher_id}")),
+            )
+        })?;
+
+    let cipher = decrypt_cipher_detail(cipher, &user_key)
+        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+
+    Ok(VaultCipherDetailResponseDto {
+        account_id,
+        cipher,
     })
 }
 
@@ -210,51 +251,122 @@ fn normalize_page_size(page_size: Option<u32>) -> u32 {
         .clamp(1, MAX_PAGE_SIZE)
 }
 
-#[derive(Debug)]
-struct DecryptedField {
-    plaintext: Option<String>,
-    is_encrypted: bool,
-    is_decrypted: bool,
-}
-
-fn maybe_decrypt_field(value: Option<String>, user_key: &VaultUserKey) -> DecryptedField {
+fn decrypt_field_value(
+    value: Option<String>,
+    user_key: &VaultUserKey,
+    field_name: &str,
+) -> Result<Option<String>, AppError> {
     match value {
-        None => DecryptedField {
-            plaintext: None,
-            is_encrypted: false,
-            is_decrypted: false,
-        },
+        None => Ok(None),
         Some(raw) => {
             if !looks_like_cipher_string(&raw) {
-                return DecryptedField {
-                    plaintext: Some(raw),
-                    is_encrypted: false,
-                    is_decrypted: false,
-                };
+                return Ok(Some(raw));
             }
 
-            match decrypt_cipher_string(&raw, user_key) {
-                Ok(plaintext) => DecryptedField {
-                    plaintext: Some(plaintext),
-                    is_encrypted: true,
-                    is_decrypted: true,
-                },
-                Err(error) => {
-                    log::warn!(
-                        target: "vanguard::tauri::vault",
-                        "failed to decrypt field: [{}] {}",
-                        error.code(),
-                        error.log_message()
-                    );
-                    DecryptedField {
-                        plaintext: None,
-                        is_encrypted: true,
-                        is_decrypted: false,
-                    }
-                }
-            }
+            decrypt_cipher_string(&raw, user_key)
+                .map(Some)
+                .map_err(|error| {
+                    AppError::validation(format!(
+                        "failed to decrypt field `{field_name}`: {}",
+                        error.message()
+                    ))
+                })
         }
     }
+}
+
+fn decrypt_cipher_detail(
+    cipher: crate::application::dto::sync::SyncCipher,
+    user_key: &VaultUserKey,
+) -> Result<VaultCipherDetailDto, AppError> {
+    let mut raw = serde_json::to_value(cipher).map_err(|error| {
+        AppError::internal(format!("failed to serialize cipher detail: {error}"))
+    })?;
+    decrypt_strings_in_json_value(&mut raw, user_key, "$")?;
+    convert_json_object_keys_to_camel_case(&mut raw);
+    let detail = serde_json::from_value::<VaultCipherDetailDto>(raw).map_err(|error| {
+        AppError::internal(format!(
+            "failed to deserialize decrypted cipher detail: {error}"
+        ))
+    })?;
+
+    Ok(detail)
+}
+
+fn decrypt_strings_in_json_value(
+    value: &mut serde_json::Value,
+    user_key: &VaultUserKey,
+    path: &str,
+) -> Result<(), AppError> {
+    match value {
+        serde_json::Value::String(raw) => {
+            if looks_like_cipher_string(raw) {
+                let plaintext = decrypt_cipher_string(raw, user_key).map_err(|error| {
+                    AppError::validation(format!(
+                        "failed to decrypt field `{path}`: {}",
+                        error.message()
+                    ))
+                })?;
+                *value = serde_json::Value::String(plaintext);
+            }
+            Ok(())
+        }
+        serde_json::Value::Array(values) => {
+            for (index, item) in values.iter_mut().enumerate() {
+                let child_path = format!("{path}[{index}]");
+                decrypt_strings_in_json_value(item, user_key, &child_path)?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Object(map) => {
+            for (key, entry) in map.iter_mut() {
+                let child_path = if path == "$" {
+                    format!("$.{key}")
+                } else {
+                    format!("{path}.{key}")
+                };
+                decrypt_strings_in_json_value(entry, user_key, &child_path)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn convert_json_object_keys_to_camel_case(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Array(values) => {
+            for item in values {
+                convert_json_object_keys_to_camel_case(item);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            let original = std::mem::take(map);
+            for (key, mut entry) in original {
+                convert_json_object_keys_to_camel_case(&mut entry);
+                map.insert(snake_to_camel_case(&key), entry);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn snake_to_camel_case(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut upper_next = false;
+    for ch in value.chars() {
+        if ch == '_' {
+            upper_next = true;
+            continue;
+        }
+        if upper_next {
+            out.extend(ch.to_uppercase());
+            upper_next = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
 }
 
 fn parse_user_key(raw: &str) -> Result<VaultUserKey, AppError> {
@@ -786,6 +898,105 @@ mod tests {
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
         let error = decrypt_cipher_string(&cipher, &key).expect_err("must fail");
         assert_eq!(error.code(), "validation_error");
+    }
+
+    #[test]
+    fn decrypt_strings_in_json_value_decrypts_nested_strings() {
+        let enc_key = [1u8; 32];
+        let mac_key = [2u8; 32];
+        let user_key = VaultUserKey {
+            enc_key: enc_key.to_vec(),
+            mac_key: Some(mac_key.to_vec()),
+        };
+        let secret = encrypt_type2("nested-secret", &enc_key, &mac_key);
+        let mut payload = serde_json::json!({
+            "plain": "hello",
+            "nested": { "secret": secret },
+            "list": [encrypt_type2("array-secret", &enc_key, &mac_key)]
+        });
+
+        decrypt_strings_in_json_value(&mut payload, &user_key, "$").expect("must decrypt");
+
+        assert_eq!(payload["plain"], serde_json::json!("hello"));
+        assert_eq!(
+            payload["nested"]["secret"],
+            serde_json::json!("nested-secret")
+        );
+        assert_eq!(payload["list"][0], serde_json::json!("array-secret"));
+    }
+
+    #[test]
+    fn decrypt_strings_in_json_value_returns_error_when_decryption_fails() {
+        let enc_key = [1u8; 32];
+        let mac_key = [2u8; 32];
+        let user_key = VaultUserKey {
+            enc_key: [7u8; 32].to_vec(),
+            mac_key: Some([8u8; 32].to_vec()),
+        };
+        let secret = encrypt_type2("nested-secret", &enc_key, &mac_key);
+        let mut payload = serde_json::json!({
+            "nested": { "secret": secret }
+        });
+
+        let error = decrypt_strings_in_json_value(&mut payload, &user_key, "$")
+            .expect_err("must fail on decryption failure");
+        assert_eq!(error.code(), "validation_error");
+    }
+
+    #[test]
+    fn decrypt_cipher_detail_supports_snake_case_fields() {
+        let user_key = VaultUserKey {
+            enc_key: [1u8; 32].to_vec(),
+            mac_key: Some([2u8; 32].to_vec()),
+        };
+        let cipher = crate::application::dto::sync::SyncCipher {
+            id: String::from("cipher-1"),
+            organization_id: None,
+            folder_id: None,
+            r#type: Some(1),
+            name: Some(String::from("demo")),
+            notes: Some(String::from("note")),
+            key: None,
+            favorite: Some(false),
+            edit: Some(true),
+            view_password: Some(true),
+            organization_use_totp: Some(false),
+            creation_date: Some(String::from("2026-03-01T00:00:00Z")),
+            revision_date: Some(String::from("2026-03-01T00:00:00Z")),
+            deleted_date: None,
+            archived_date: None,
+            reprompt: Some(0),
+            permissions: None,
+            object: Some(String::from("cipher")),
+            fields: Vec::new(),
+            password_history: vec![crate::application::dto::sync::SyncCipherPasswordHistory {
+                password: Some(String::from("history-pass")),
+                last_used_date: Some(String::from("2026-03-01T00:00:00Z")),
+            }],
+            collection_ids: Vec::new(),
+            data: None,
+            login: None,
+            secure_note: None,
+            card: None,
+            identity: None,
+            ssh_key: None,
+            attachments: Vec::new(),
+        };
+
+        let detail = decrypt_cipher_detail(cipher, &user_key).expect("detail deserialize");
+        assert_eq!(detail.id, "cipher-1");
+        assert_eq!(detail.password_history.len(), 1);
+        assert_eq!(
+            detail.password_history[0].last_used_date.as_deref(),
+            Some("2026-03-01T00:00:00Z")
+        );
+    }
+
+    #[test]
+    fn snake_to_camel_case_converts_expected_keys() {
+        assert_eq!(snake_to_camel_case("password_history"), "passwordHistory");
+        assert_eq!(snake_to_camel_case("fido2_credentials"), "fido2Credentials");
+        assert_eq!(snake_to_camel_case("id"), "id");
     }
 
     #[test]
