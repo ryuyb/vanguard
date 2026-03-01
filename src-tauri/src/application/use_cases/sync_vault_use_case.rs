@@ -125,8 +125,13 @@ impl SyncVaultUseCase {
                         error
                     );
                     let message = error.message();
-                    self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
-                        .await;
+                    self.mark_sync_error_state(
+                        &command.account_id,
+                        &command.base_url,
+                        &error,
+                        message,
+                    )
+                    .await;
                     return Err(error);
                 }
 

@@ -80,11 +80,13 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
 export const events = __makeEvents__<{
 vaultSyncAuthRequired: VaultSyncAuthRequired,
 vaultSyncFailed: VaultSyncFailed,
+vaultSyncLoggedOut: VaultSyncLoggedOut,
 vaultSyncStarted: VaultSyncStarted,
 vaultSyncSucceeded: VaultSyncSucceeded
 }>({
 vaultSyncAuthRequired: "vault-sync:auth-required",
 vaultSyncFailed: "vault-sync:failed",
+vaultSyncLoggedOut: "vault-sync:logged-out",
 vaultSyncStarted: "vault-sync:started",
 vaultSyncSucceeded: "vault-sync:succeeded"
 })
@@ -112,6 +114,7 @@ export type TwoFactorChallengeDto = { error: string | null; errorDescription: st
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
 export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
 export type VaultSyncFailed = { accountId: string; code: string; message: string }
+export type VaultSyncLoggedOut = { accountId: string; reason: string }
 export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }

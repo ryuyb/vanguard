@@ -4,7 +4,8 @@ use tauri_specta::Event;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::domain::sync::SyncContext;
 use crate::interfaces::tauri::events::sync::{
-    VaultSyncAuthRequired, VaultSyncFailed, VaultSyncStarted, VaultSyncSucceeded,
+    VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut, VaultSyncStarted,
+    VaultSyncSucceeded,
 };
 use crate::interfaces::tauri::mapping;
 
@@ -75,6 +76,20 @@ impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
             log::warn!(
                 target: "vanguard::tauri::sync",
                 "failed to emit vault-sync-auth-required for account_id={account_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_logged_out(&self, account_id: &str, reason: &str) {
+        if let Err(error) = (VaultSyncLoggedOut {
+            account_id: String::from(account_id),
+            reason: String::from(reason),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::sync",
+                "failed to emit vault-sync-logged-out for account_id={account_id}: {error}"
             );
         }
     }

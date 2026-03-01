@@ -773,6 +773,30 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         })
     }
 
+    async fn set_ws_status(&self, account_id: &str, ws_status: WsStatus) -> AppResult<SyncContext> {
+        self.with_account_connection(account_id, |connection| {
+            Self::ensure_context_row(connection, account_id)?;
+            connection
+                .execute(
+                    r#"
+                    UPDATE sync_contexts
+                    SET ws_status = ?2
+                    WHERE account_id = ?1
+                    "#,
+                    params![account_id, ws_status_value(ws_status)],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to set websocket status: {error}"))
+                })?;
+
+            Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
+                AppError::internal(format!(
+                    "sync context missing after set_ws_status for account_id={account_id}"
+                ))
+            })
+        })
+    }
+
     async fn begin_sync_transaction(&self, account_id: &str) -> AppResult<()> {
         self.with_account_connection(account_id, |connection| {
             let tx = Self::begin_sql_transaction(connection)?;
@@ -1230,6 +1254,14 @@ fn parse_ws_status(value: &str) -> AppResult<WsStatus> {
         _ => Err(AppError::internal(format!(
             "invalid ws status value in database: {value}"
         ))),
+    }
+}
+
+fn ws_status_value(value: WsStatus) -> &'static str {
+    match value {
+        WsStatus::Unknown => "unknown",
+        WsStatus::Connected => "connected",
+        WsStatus::Disconnected => "disconnected",
     }
 }
 

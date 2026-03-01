@@ -3,10 +3,12 @@ use std::sync::Arc;
 use tauri::{Manager, Runtime};
 
 use crate::application::policy::sync_policy::SyncPolicy;
+use crate::application::ports::notification_port::NotificationPort;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::auth_service::AuthService;
+use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
@@ -14,7 +16,7 @@ use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
 use crate::infrastructure::persistence::SqliteVaultRepository;
 use crate::infrastructure::vaultwarden::{
-    VaultwardenClient, VaultwardenConfig, VaultwardenRemotePort,
+    VaultwardenClient, VaultwardenConfig, VaultwardenNotificationPort, VaultwardenRemotePort,
 };
 use crate::interfaces::tauri::events::sync_event_adapter::TauriSyncEventAdapter;
 use crate::support::error::AppError;
@@ -24,7 +26,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     let config = AppConfig::load(manager)?;
 
     let mut vaultwarden_config = VaultwardenConfig::new();
-    vaultwarden_config.device_identifier = config.device_identifier;
+    vaultwarden_config.device_identifier = config.device_identifier.clone();
     vaultwarden_config.allow_invalid_certs = config.allow_invalid_certs;
 
     let client = VaultwardenClient::new(vaultwarden_config).map_err(|error| {
@@ -32,6 +34,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     })?;
 
     let remote_vault: Arc<dyn RemoteVaultPort> = Arc::new(VaultwardenRemotePort::new(client));
+    let notification_port: Arc<dyn NotificationPort> = Arc::new(VaultwardenNotificationPort::new());
     let sqlite_dir = resolve_sqlite_dir(manager)?;
     let vault_repository: Arc<dyn VaultRepositoryPort> =
         Arc::new(SqliteVaultRepository::new(sqlite_dir)?);
@@ -51,13 +54,25 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     ));
     let sync_service = Arc::new(SyncService::new(
         sync_vault_use_case,
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+        poll_revision_use_case,
+        sync_policy.clone(),
+    ));
+    let realtime_sync_service = Arc::new(RealtimeSyncService::new(
+        notification_port,
         vault_repository,
         sync_event_port,
-        poll_revision_use_case,
+        Arc::clone(&sync_service),
         sync_policy,
+        config.device_identifier,
     ));
 
-    Ok(AppState::new(auth_service, sync_service))
+    Ok(AppState::new(
+        auth_service,
+        sync_service,
+        realtime_sync_service,
+    ))
 }
 
 fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::path::PathBuf> {

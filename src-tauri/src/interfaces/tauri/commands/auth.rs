@@ -72,6 +72,22 @@ pub async fn auth_login_with_password(
                         error.message()
                     );
                 }
+                if let Err(error) = state
+                    .realtime_sync_service()
+                    .start_for_account(
+                        account_id.clone(),
+                        base_url.clone(),
+                        session.access_token.clone(),
+                    )
+                    .await
+                {
+                    log::warn!(
+                        target: "vanguard::tauri::auth",
+                        "failed to start realtime sync after login: [{}] {}",
+                        error.code(),
+                        error.message()
+                    );
+                }
                 trigger_sync_after_login(
                     state.sync_service(),
                     account_id,
@@ -109,14 +125,28 @@ pub async fn auth_refresh_token(
 
     match account_id::derive_account_id_from_access_token(&base_url, &result.access_token) {
         Ok(account_id) => {
-            if let Err(error) =
-                state
-                    .sync_service()
-                    .start_revision_polling(account_id, base_url, result.access_token.clone())
-            {
+            let polling_account_id = account_id.clone();
+            let polling_base_url = base_url.clone();
+            if let Err(error) = state.sync_service().start_revision_polling(
+                polling_account_id,
+                polling_base_url,
+                result.access_token.clone(),
+            ) {
                 log::warn!(
                     target: "vanguard::tauri::auth",
                     "failed to restart revision polling after refresh: [{}] {}",
+                    error.code(),
+                    error.message()
+                );
+            }
+            if let Err(error) = state
+                .realtime_sync_service()
+                .start_for_account(account_id.clone(), base_url, result.access_token.clone())
+                .await
+            {
+                log::warn!(
+                    target: "vanguard::tauri::auth",
+                    "failed to restart realtime sync after refresh: [{}] {}",
                     error.code(),
                     error.message()
                 );

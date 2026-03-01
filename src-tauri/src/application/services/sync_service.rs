@@ -119,6 +119,21 @@ impl SyncService {
         base_url: String,
         access_token: String,
     ) -> AppResult<()> {
+        self.start_revision_polling_with_interval(
+            account_id,
+            base_url,
+            access_token,
+            self.sync_policy.poll_interval_seconds,
+        )
+    }
+
+    pub fn start_revision_polling_with_interval(
+        &self,
+        account_id: String,
+        base_url: String,
+        access_token: String,
+        interval_seconds: u64,
+    ) -> AppResult<()> {
         require_non_empty(&account_id, "account_id")?;
         require_non_empty(&base_url, "base_url")?;
         require_non_empty(&access_token, "access_token")?;
@@ -137,7 +152,7 @@ impl SyncService {
             );
         }
 
-        let polling_interval_seconds = self.sync_policy.poll_interval_seconds.max(1);
+        let polling_interval_seconds = interval_seconds.max(1);
         let service = self.clone();
         let worker_account_id = account_id.clone();
         let worker_base_url = base_url.clone();
@@ -195,6 +210,11 @@ impl SyncService {
         require_non_empty(&access_token, "access_token")?;
         self.poll_revision_once(account_id, base_url, access_token, trigger)
             .await
+    }
+
+    pub fn stop_polling_for_account(&self, account_id: &str) -> AppResult<()> {
+        require_non_empty(account_id, "account_id")?;
+        self.stop_revision_polling(account_id)
     }
 
     fn acquire_running_slot(&self, account_id: &str) -> AppResult<()> {

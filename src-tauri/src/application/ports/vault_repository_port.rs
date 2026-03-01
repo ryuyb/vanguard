@@ -4,7 +4,7 @@ use crate::application::dto::sync::{
     SyncCipher, SyncCollection, SyncDomains, SyncFolder, SyncPolicy, SyncProfile, SyncSend,
     SyncUserDecryption,
 };
-use crate::domain::sync::{SyncContext, SyncItemCounts, VaultSnapshotMeta};
+use crate::domain::sync::{SyncContext, SyncItemCounts, VaultSnapshotMeta, WsStatus};
 use crate::support::result::AppResult;
 
 #[async_trait]
@@ -35,6 +35,8 @@ pub trait VaultRepositoryPort: Send + Sync {
     ) -> AppResult<SyncContext>;
 
     async fn get_sync_context(&self, account_id: &str) -> AppResult<Option<SyncContext>>;
+
+    async fn set_ws_status(&self, account_id: &str, ws_status: WsStatus) -> AppResult<SyncContext>;
 
     async fn begin_sync_transaction(&self, account_id: &str) -> AppResult<()>;
 

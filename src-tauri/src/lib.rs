@@ -34,7 +34,8 @@ pub fn run() {
             interfaces::tauri::events::sync::VaultSyncStarted,
             interfaces::tauri::events::sync::VaultSyncSucceeded,
             interfaces::tauri::events::sync::VaultSyncFailed,
-            interfaces::tauri::events::sync::VaultSyncAuthRequired
+            interfaces::tauri::events::sync::VaultSyncAuthRequired,
+            interfaces::tauri::events::sync::VaultSyncLoggedOut
         ]);
 
     let invoke_handler = specta_builder.invoke_handler();

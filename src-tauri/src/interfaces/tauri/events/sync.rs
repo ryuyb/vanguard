@@ -47,3 +47,14 @@ pub struct VaultSyncAuthRequired {
 impl tauri_specta::Event for VaultSyncAuthRequired {
     const NAME: &'static str = "vault-sync:auth-required";
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultSyncLoggedOut {
+    pub account_id: String,
+    pub reason: String,
+}
+
+impl tauri_specta::Event for VaultSyncLoggedOut {
+    const NAME: &'static str = "vault-sync:logged-out";
+}

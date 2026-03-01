@@ -5,7 +5,10 @@ use serde_json::Value;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
-pub fn derive_account_id_from_access_token(base_url: &str, access_token: &str) -> AppResult<String> {
+pub fn derive_account_id_from_access_token(
+    base_url: &str,
+    access_token: &str,
+) -> AppResult<String> {
     let normalized_base_url = normalize_base_url(base_url)?;
     let subject = decode_token_subject(access_token)?;
     Ok(format!("{normalized_base_url}::{subject}"))
