@@ -6,7 +6,7 @@ use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
-use crate::domain::sync::{SyncItemCounts, SyncResult};
+use crate::domain::sync::{SyncItemCounts, SyncResult, VaultSnapshotMeta};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::time::{sleep, timeout, Duration};
@@ -162,6 +162,16 @@ impl SyncVaultUseCase {
                         revision_ms,
                         synced_at_ms,
                         counts,
+                    )
+                    .await?;
+                self.vault_repository
+                    .save_snapshot_meta(
+                        &command.account_id,
+                        VaultSnapshotMeta {
+                            snapshot_revision_ms: revision_ms,
+                            snapshot_synced_at_ms: synced_at_ms,
+                            source: command.trigger,
+                        },
                     )
                     .await?;
                 if let Some(error) = revision_error {

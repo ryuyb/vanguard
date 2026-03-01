@@ -64,3 +64,10 @@ impl SyncContext {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct VaultSnapshotMeta {
+    pub snapshot_revision_ms: Option<i64>,
+    pub snapshot_synced_at_ms: i64,
+    pub source: SyncTrigger,
+}

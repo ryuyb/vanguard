@@ -4,7 +4,7 @@ use crate::application::dto::sync::{
     SyncCipher, SyncCollection, SyncDomains, SyncFolder, SyncPolicy, SyncProfile, SyncSend,
     SyncUserDecryption,
 };
-use crate::domain::sync::{SyncContext, SyncItemCounts};
+use crate::domain::sync::{SyncContext, SyncItemCounts, VaultSnapshotMeta};
 use crate::support::result::AppResult;
 
 #[async_trait]
@@ -59,4 +59,12 @@ pub trait VaultRepositoryPort: Send + Sync {
         account_id: &str,
         user_decryption: Option<SyncUserDecryption>,
     ) -> AppResult<()>;
+
+    async fn save_snapshot_meta(
+        &self,
+        account_id: &str,
+        snapshot_meta: VaultSnapshotMeta,
+    ) -> AppResult<()>;
+
+    async fn load_snapshot_meta(&self, account_id: &str) -> AppResult<Option<VaultSnapshotMeta>>;
 }

@@ -12,7 +12,9 @@ use crate::application::dto::sync::{
     SyncUserDecryption,
 };
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
-use crate::domain::sync::{SyncContext, SyncItemCounts, SyncState, WsStatus};
+use crate::domain::sync::{
+    SyncContext, SyncItemCounts, SyncState, SyncTrigger, VaultSnapshotMeta, WsStatus,
+};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -109,6 +111,13 @@ impl SqliteVaultRepository {
                 CREATE TABLE IF NOT EXISTS sync_transactions (
                     account_id TEXT PRIMARY KEY,
                     started_at_ms INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS vault_snapshot_meta (
+                    account_id TEXT PRIMARY KEY,
+                    snapshot_revision_ms INTEGER,
+                    snapshot_synced_at_ms INTEGER NOT NULL,
+                    source TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS live_profile (
@@ -1095,6 +1104,77 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             Ok(())
         })
     }
+
+    async fn save_snapshot_meta(
+        &self,
+        account_id: &str,
+        snapshot_meta: VaultSnapshotMeta,
+    ) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO vault_snapshot_meta (
+                        account_id,
+                        snapshot_revision_ms,
+                        snapshot_synced_at_ms,
+                        source
+                    )
+                    VALUES (?1, ?2, ?3, ?4)
+                    ON CONFLICT(account_id) DO UPDATE SET
+                        snapshot_revision_ms = excluded.snapshot_revision_ms,
+                        snapshot_synced_at_ms = excluded.snapshot_synced_at_ms,
+                        source = excluded.source
+                    "#,
+                    params![
+                        account_id,
+                        snapshot_meta.snapshot_revision_ms,
+                        snapshot_meta.snapshot_synced_at_ms,
+                        sync_trigger_value(snapshot_meta.source)
+                    ],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to save vault snapshot meta: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn load_snapshot_meta(&self, account_id: &str) -> AppResult<Option<VaultSnapshotMeta>> {
+        self.with_account_connection(account_id, |connection| {
+            connection
+                .query_row(
+                    r#"
+                    SELECT
+                        snapshot_revision_ms,
+                        snapshot_synced_at_ms,
+                        source
+                    FROM vault_snapshot_meta
+                    WHERE account_id = ?1
+                    "#,
+                    params![account_id],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<i64>>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, String>(2)?,
+                        ))
+                    },
+                )
+                .optional()
+                .map_err(|error| {
+                    AppError::internal(format!("failed to load vault snapshot meta: {error}"))
+                })?
+                .map(|(snapshot_revision_ms, snapshot_synced_at_ms, source)| {
+                    Ok(VaultSnapshotMeta {
+                        snapshot_revision_ms,
+                        snapshot_synced_at_ms,
+                        source: parse_sync_trigger(&source)?,
+                    })
+                })
+                .transpose()
+        })
+    }
 }
 
 fn parse_sync_state(value: &str) -> AppResult<SyncState> {
@@ -1117,6 +1197,29 @@ fn parse_ws_status(value: &str) -> AppResult<WsStatus> {
         _ => Err(AppError::internal(format!(
             "invalid ws status value in database: {value}"
         ))),
+    }
+}
+
+fn parse_sync_trigger(value: &str) -> AppResult<SyncTrigger> {
+    match value {
+        "startup" => Ok(SyncTrigger::Startup),
+        "manual" => Ok(SyncTrigger::Manual),
+        "poll" => Ok(SyncTrigger::Poll),
+        "websocket" => Ok(SyncTrigger::WebSocket),
+        "foreground" => Ok(SyncTrigger::Foreground),
+        _ => Err(AppError::internal(format!(
+            "invalid sync trigger value in database: {value}"
+        ))),
+    }
+}
+
+fn sync_trigger_value(value: SyncTrigger) -> &'static str {
+    match value {
+        SyncTrigger::Startup => "startup",
+        SyncTrigger::Manual => "manual",
+        SyncTrigger::Poll => "poll",
+        SyncTrigger::WebSocket => "websocket",
+        SyncTrigger::Foreground => "foreground",
     }
 }
 
