@@ -9,10 +9,11 @@ import {
   RefreshCw,
   ShieldAlert,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   commands,
   type RestoreAuthStateResponseDto,
+  type VaultCipherDetailDto,
   type VaultCipherItemDto,
   type VaultFolderItemDto,
   type VaultViewDataResponseDto,
@@ -76,10 +77,36 @@ function formatRevisionDate(value: string | null) {
   return parsed.toLocaleString();
 }
 
+function formatRevisionDateOrNull(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+  return formatRevisionDate(value);
+}
+
 function sortFolders(folders: VaultFolderItemDto[]) {
   return [...folders].sort((left, right) =>
     (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
   );
+}
+
+function isNonEmptyText(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function firstNonEmptyText(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    if (isNonEmptyText(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function compactText(values: Array<string | null | undefined>) {
+  return values.filter(isNonEmptyText);
 }
 
 function VaultPage() {
@@ -90,15 +117,26 @@ function VaultPage() {
     null,
   );
   const [selectedFolderId, setSelectedFolderId] = useState(ALL_FOLDERS_ID);
+  const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
+  const [selectedCipherDetail, setSelectedCipherDetail] =
+    useState<VaultCipherDetailDto | null>(null);
+  const [cipherDetailError, setCipherDetailError] = useState("");
+  const [isCipherDetailLoading, setIsCipherDetailLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const detailRequestSeqRef = useRef(0);
 
   const loadVaultData = useCallback(async () => {
+    detailRequestSeqRef.current += 1;
     setIsRefreshing(true);
     setErrorText("");
     setPageState("loading");
+    setSelectedCipherId(null);
+    setSelectedCipherDetail(null);
+    setCipherDetailError("");
+    setIsCipherDetailLoading(false);
 
     try {
       const restore = await commands.authRestoreState({});
@@ -182,6 +220,47 @@ function VaultPage() {
     }
   };
 
+  const loadCipherDetail = useCallback(async (cipherId: string) => {
+    const normalizedCipherId = cipherId.trim();
+    if (!normalizedCipherId) {
+      return;
+    }
+
+    setSelectedCipherId(normalizedCipherId);
+    setSelectedCipherDetail(null);
+    setCipherDetailError("");
+    setIsCipherDetailLoading(true);
+
+    const requestSeq = detailRequestSeqRef.current + 1;
+    detailRequestSeqRef.current = requestSeq;
+
+    try {
+      const detail = await commands.vaultGetCipherDetail({
+        cipherId: normalizedCipherId,
+      });
+
+      if (requestSeq !== detailRequestSeqRef.current) {
+        return;
+      }
+
+      if (detail.status === "error") {
+        setCipherDetailError(errorToText(detail.error));
+        return;
+      }
+
+      setSelectedCipherDetail(detail.data.cipher);
+    } catch (error) {
+      if (requestSeq !== detailRequestSeqRef.current) {
+        return;
+      }
+      setCipherDetailError(errorToText(error));
+    } finally {
+      if (requestSeq === detailRequestSeqRef.current) {
+        setIsCipherDetailLoading(false);
+      }
+    }
+  }, []);
+
   const sortedFolders = useMemo(
     () => sortFolders(viewData?.folders ?? []),
     [viewData?.folders],
@@ -213,6 +292,23 @@ function VaultPage() {
     }
     return all.filter((cipher) => cipher.folderId === selectedFolderId);
   }, [selectedFolderId, viewData?.ciphers]);
+
+  useEffect(() => {
+    if (!selectedCipherId) {
+      return;
+    }
+    const existsInFilteredList = filteredCiphers.some(
+      (cipher) => cipher.id === selectedCipherId,
+    );
+    if (existsInFilteredList) {
+      return;
+    }
+    detailRequestSeqRef.current += 1;
+    setSelectedCipherId(null);
+    setSelectedCipherDetail(null);
+    setCipherDetailError("");
+    setIsCipherDetailLoading(false);
+  }, [filteredCiphers, selectedCipherId]);
 
   const folderCipherCount = useMemo(() => {
     const map = new Map<string, number>();
@@ -404,15 +500,59 @@ function VaultPage() {
                 </div>
                 <Separator />
 
-                {filteredCiphers.length === 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    当前 folder 下没有 cipher。
-                  </div>
-                )}
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="space-y-2">
+                    {filteredCiphers.length === 0 && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        当前 folder 下没有 cipher。
+                      </div>
+                    )}
 
-                {filteredCiphers.map((cipher) => (
-                  <CipherRow key={cipher.id} cipher={cipher} />
-                ))}
+                    {filteredCiphers.map((cipher) => (
+                      <CipherRow
+                        key={cipher.id}
+                        cipher={cipher}
+                        selected={cipher.id === selectedCipherId}
+                        loading={
+                          isCipherDetailLoading &&
+                          cipher.id === selectedCipherId
+                        }
+                        onClick={() => loadCipherDetail(cipher.id)}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
+                    {!selectedCipherId && (
+                      <div className="text-sm text-slate-600">
+                        点击左侧 cipher 查看详情。
+                      </div>
+                    )}
+
+                    {selectedCipherId && isCipherDetailLoading && (
+                      <div className="flex items-center gap-2 text-sm text-slate-700">
+                        <LoaderCircle className="size-4 animate-spin" />
+                        正在加载 cipher 详情...
+                      </div>
+                    )}
+
+                    {selectedCipherId &&
+                      !isCipherDetailLoading &&
+                      cipherDetailError && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                          <ShieldAlert className="mr-1 inline size-4" />
+                          {cipherDetailError}
+                        </div>
+                      )}
+
+                    {selectedCipherId &&
+                      !isCipherDetailLoading &&
+                      !cipherDetailError &&
+                      selectedCipherDetail && (
+                        <CipherDetailPanel cipher={selectedCipherDetail} />
+                      )}
+                  </div>
+                </div>
               </section>
             </CardContent>
           </Card>
@@ -422,9 +562,28 @@ function VaultPage() {
   );
 }
 
-function CipherRow({ cipher }: { cipher: VaultCipherItemDto }) {
+function CipherRow({
+  cipher,
+  selected,
+  loading,
+  onClick,
+}: {
+  cipher: VaultCipherItemDto;
+  selected: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+    <button
+      type="button"
+      className={[
+        "w-full rounded-lg border p-3 text-left transition-colors",
+        selected
+          ? "border-sky-300 bg-sky-50/70"
+          : "border-slate-200 bg-slate-50/60 hover:border-slate-300",
+      ].join(" ")}
+      onClick={onClick}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-slate-900">
@@ -444,6 +603,321 @@ function CipherRow({ cipher }: { cipher: VaultCipherItemDto }) {
       <div className="mt-2 text-xs text-slate-600">
         revision: {formatRevisionDate(cipher.revisionDate)}
       </div>
+      {loading && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded border border-sky-200 bg-white/70 px-2 py-1 text-xs text-sky-700">
+          <LoaderCircle className="size-3 animate-spin" />
+          正在获取详情
+        </div>
+      )}
+    </button>
+  );
+}
+
+function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
+  const username = firstNonEmptyText(
+    cipher.login?.username,
+    cipher.data?.username,
+  );
+  const password = firstNonEmptyText(
+    cipher.login?.password,
+    cipher.data?.password,
+  );
+  const totp = firstNonEmptyText(cipher.login?.totp, cipher.data?.totp);
+  const singleUri = firstNonEmptyText(cipher.login?.uri, cipher.data?.uri);
+  const uriList = compactText([
+    ...((cipher.login?.uris ?? []).map((item) => item.uri) ?? []),
+    ...((cipher.data?.uris ?? []).map((item) => item.uri) ?? []),
+  ]);
+  const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
+  const customFields = [
+    ...(cipher.fields ?? []),
+    ...(cipher.data?.fields ?? []),
+  ].filter(
+    (field) => isNonEmptyText(field.name) || isNonEmptyText(field.value),
+  );
+  const attachments = cipher.attachments ?? [];
+  const passwordHistory = [
+    ...(cipher.passwordHistory ?? []),
+    ...(cipher.data?.passwordHistory ?? []),
+  ].filter((item) => isNonEmptyText(item.password));
+
+  const cardRows = [
+    {
+      label: "持卡人",
+      value: firstNonEmptyText(
+        cipher.card?.cardholderName,
+        cipher.data?.cardholderName,
+      ),
+    },
+    {
+      label: "品牌",
+      value: firstNonEmptyText(cipher.card?.brand, cipher.data?.brand),
+    },
+    {
+      label: "卡号",
+      value: firstNonEmptyText(cipher.card?.number, cipher.data?.number),
+    },
+    {
+      label: "到期月",
+      value: firstNonEmptyText(cipher.card?.expMonth, cipher.data?.expMonth),
+    },
+    {
+      label: "到期年",
+      value: firstNonEmptyText(cipher.card?.expYear, cipher.data?.expYear),
+    },
+    {
+      label: "安全码",
+      value: firstNonEmptyText(cipher.card?.code, cipher.data?.code),
+    },
+  ];
+
+  const identityRows = [
+    {
+      label: "姓名",
+      value: compactText([
+        cipher.identity?.firstName ?? cipher.data?.firstName,
+        cipher.identity?.middleName ?? cipher.data?.middleName,
+        cipher.identity?.lastName ?? cipher.data?.lastName,
+      ]).join(" "),
+    },
+    {
+      label: "邮箱",
+      value: firstNonEmptyText(cipher.identity?.email, cipher.data?.email),
+    },
+    {
+      label: "电话",
+      value: firstNonEmptyText(cipher.identity?.phone, cipher.data?.phone),
+    },
+    {
+      label: "公司",
+      value: firstNonEmptyText(cipher.identity?.company, cipher.data?.company),
+    },
+    {
+      label: "地址",
+      value: compactText([
+        cipher.identity?.address1 ?? cipher.data?.address1,
+        cipher.identity?.address2 ?? cipher.data?.address2,
+        cipher.identity?.address3 ?? cipher.data?.address3,
+        cipher.identity?.city ?? cipher.data?.city,
+        cipher.identity?.state ?? cipher.data?.state,
+        cipher.identity?.postalCode ?? cipher.data?.postalCode,
+        cipher.identity?.country ?? cipher.data?.country,
+      ]).join(", "),
+    },
+  ];
+
+  const sshPrivateKey = firstNonEmptyText(
+    cipher.sshKey?.privateKey,
+    cipher.data?.privateKey,
+  );
+  const sshPublicKey = firstNonEmptyText(
+    cipher.sshKey?.publicKey,
+    cipher.data?.publicKey,
+  );
+  const sshFingerprint = firstNonEmptyText(
+    cipher.sshKey?.keyFingerprint,
+    cipher.data?.keyFingerprint,
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <div className="text-sm font-semibold text-slate-900">
+          {cipher.name ?? "Untitled Cipher"}
+        </div>
+        <div className="text-xs text-slate-600">id: {cipher.id}</div>
+      </div>
+
+      <DetailGrid
+        items={[
+          { label: "类型", value: toCipherTypeLabel(cipher.type) },
+          { label: "Folder", value: cipher.folderId },
+          { label: "Organization", value: cipher.organizationId },
+          {
+            label: "创建时间",
+            value: formatRevisionDateOrNull(cipher.creationDate),
+          },
+          {
+            label: "更新时间",
+            value: formatRevisionDateOrNull(cipher.revisionDate),
+          },
+          {
+            label: "收藏",
+            value:
+              cipher.favorite == null ? null : cipher.favorite ? "是" : "否",
+          },
+          {
+            label: "附件数",
+            value: String(cipher.attachments.length),
+          },
+          {
+            label: "Collection 数",
+            value: String(cipher.collectionIds.length),
+          },
+        ]}
+      />
+
+      {(username || password || totp || singleUri || uriList.length > 0) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">登录信息</div>
+          <DetailGrid
+            items={[
+              { label: "用户名", value: username },
+              { label: "密码", value: password },
+              { label: "TOTP", value: totp },
+              { label: "主 URI", value: singleUri },
+            ]}
+          />
+          {uriList.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-xs text-slate-600">URI 列表</div>
+              <div className="space-y-1">
+                {uriList.map((uri) => (
+                  <div
+                    key={uri}
+                    className="rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs break-all text-slate-700"
+                  >
+                    {uri}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {notes && (
+        <div className="space-y-1">
+          <div className="text-sm font-medium text-slate-800">备注</div>
+          <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+            {notes}
+          </pre>
+        </div>
+      )}
+
+      {customFields.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">自定义字段</div>
+          <div className="space-y-1.5">
+            {customFields.map((field, index) => (
+              <div
+                key={`${field.name ?? "field"}-${index}`}
+                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+              >
+                <span className="font-medium text-slate-900">
+                  {field.name ?? "Unnamed"}
+                </span>
+                <span>: </span>
+                <span className="break-all">{field.value ?? "—"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {cardRows.some((item) => isNonEmptyText(item.value)) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">银行卡信息</div>
+          <DetailGrid items={cardRows} />
+        </div>
+      )}
+
+      {identityRows.some((item) => isNonEmptyText(item.value)) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">身份信息</div>
+          <DetailGrid items={identityRows} />
+        </div>
+      )}
+
+      {(sshPrivateKey || sshPublicKey || sshFingerprint) && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">SSH Key</div>
+          <DetailGrid
+            items={[{ label: "Fingerprint", value: sshFingerprint }]}
+          />
+          {sshPublicKey && (
+            <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+              {sshPublicKey}
+            </pre>
+          )}
+          {sshPrivateKey && (
+            <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+              {sshPrivateKey}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {attachments.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">附件</div>
+          <div className="space-y-1.5">
+            {attachments.map((attachment) => (
+              <div
+                key={attachment.id}
+                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+              >
+                <div className="font-medium text-slate-900">
+                  {attachment.fileName ?? attachment.id}
+                </div>
+                <div className="mt-1 text-slate-600">
+                  {firstNonEmptyText(attachment.sizeName, attachment.size) ??
+                    "未知大小"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {passwordHistory.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-slate-800">密码历史</div>
+          <div className="space-y-1.5">
+            {passwordHistory.map((item, index) => (
+              <div
+                key={`${item.password ?? "password"}-${index}`}
+                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+              >
+                <div className="font-mono break-all">{item.password}</div>
+                <div className="mt-1 text-slate-600">
+                  {formatRevisionDateOrNull(item.lastUsedDate) ?? "Unknown"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailGrid({
+  items,
+}: {
+  items: Array<{ label: string; value: string | null | undefined }>;
+}) {
+  const visibleItems = items.filter((item) => isNonEmptyText(item.value));
+
+  if (visibleItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-1.5 sm:grid-cols-2">
+      {visibleItems.map((item) => (
+        <div
+          key={item.label}
+          className="rounded border border-slate-200 bg-white px-2 py-1.5"
+        >
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">
+            {item.label}
+          </div>
+          <div className="mt-1 text-xs break-all text-slate-800">
+            {item.value}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
