@@ -133,16 +133,46 @@ impl SyncVaultUseCase {
                 }
 
                 let counts = summarize_counts(&payload);
-                let revision_ms_result = self
+                let revision_ms = match self
                     .poll_revision_use_case
                     .execute(RevisionDateQuery {
                         base_url: command.base_url.clone(),
                         access_token: command.access_token.clone(),
                     })
-                    .await;
-                let (revision_ms, revision_error) = match revision_ms_result {
-                    Ok(value) => (Some(value), None),
-                    Err(error) => (None, Some(error)),
+                    .await
+                {
+                    Ok(value) => Some(value),
+                    Err(error) => {
+                        if previous_context.last_sync_at_ms.is_none() {
+                            log::error!(
+                                target: "vanguard::sync",
+                                "revision-date failed on initial sync account_id={} endpoint={} status={} error_code={} message={}",
+                                command.account_id,
+                                revision_endpoint,
+                                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                                error.code(),
+                                error
+                            );
+                            let message = error.message();
+                            let _ = self
+                                .vault_repository
+                                .set_sync_failed(&command.account_id, &command.base_url, message)
+                                .await;
+                            return Err(error);
+                        }
+
+                        log::warn!(
+                            target: "vanguard::sync",
+                            "revision-date failed account_id={} endpoint={} status={} error_code={} message={} (fallback_to_previous_revision={})",
+                            command.account_id,
+                            revision_endpoint,
+                            error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                            error.code(),
+                            error,
+                            previous_context.last_revision_ms.is_some()
+                        );
+                        previous_context.last_revision_ms
+                    }
                 };
                 let synced_at_ms = now_unix_ms()?;
                 let revision_changed =
@@ -174,17 +204,6 @@ impl SyncVaultUseCase {
                         },
                     )
                     .await?;
-                if let Some(error) = revision_error {
-                    log::warn!(
-                        target: "vanguard::sync",
-                        "revision-date failed account_id={} endpoint={} status={} error_code={} message={}",
-                        command.account_id,
-                        revision_endpoint,
-                        error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                        error.code(),
-                        error
-                    );
-                }
                 log::info!(
                     target: "vanguard::sync",
                     "sync finished account_id={} endpoint={} trigger={:?} duration_ms={} revision_changed={} profile_id={} folders={} collections={} policies={} ciphers={} sends={} domains={} user_decryption={}",
