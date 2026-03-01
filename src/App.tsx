@@ -1,4 +1,17 @@
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import { Badge } from "./components/ui/badge";
+import { Button } from "./components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./components/ui/card";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
+import { Separator } from "./components/ui/separator";
+import { Textarea } from "./components/ui/textarea";
 import {
   commands,
   events,
@@ -9,7 +22,6 @@ import {
   type VaultCipherDetailResponseDto,
   type VaultViewDataResponseDto,
 } from "./bindings";
-import "./App.css";
 
 type LogLevel = "info" | "error";
 
@@ -392,237 +404,333 @@ function App() {
   };
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px" }}>
-      <h1>Vaultwarden 登录流程验证</h1>
-      <p>最小化联调页面：password login / email-2FA / verify-email-token。</p>
-
-      <section style={sectionStyle}>
-        <h2>基础参数</h2>
-        <Field label="Base URL">
-          <input value={baseUrl} onChange={(e) => setBaseUrl(e.currentTarget.value)} />
-        </Field>
-        <Field label="Email">
-          <input value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
-        </Field>
-        <Field label="Password (plaintext)">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.currentTarget.value)}
-          />
-        </Field>
-      </section>
-
-      <section style={sectionStyle}>
-        <h2>2FA 参数（可选）</h2>
-        <Field label="twoFactorProvider">
-          <input
-            value={twoFactorProvider}
-            onChange={(e) => setTwoFactorProvider(e.currentTarget.value)}
-            placeholder="例如 1（Email）"
-          />
-        </Field>
-        <Field label="twoFactorToken">
-          <input
-            value={twoFactorToken}
-            onChange={(e) => setTwoFactorToken(e.currentTarget.value)}
-            placeholder="验证码"
-          />
-        </Field>
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            type="checkbox"
-            checked={twoFactorRemember}
-            onChange={(e) => setTwoFactorRemember(e.currentTarget.checked)}
-          />
-          remember device
-        </label>
-      </section>
-
-      <section style={sectionStyle}>
-        <h2>动作</h2>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <button type="button" disabled={!!busyAction} onClick={handleLogin}>
-            Password Login
-          </button>
-          <button type="button" disabled={!!busyAction} onClick={handleAuthLogout}>
-            Auth Logout
-          </button>
-        </div>
-
-        <hr />
-
-        <Field label="Email 2FA Password Override (plaintext, optional)">
-          <input
-            type="password"
-            value={email2faPasswordOverride}
-            onChange={(e) => setEmail2faPasswordOverride(e.currentTarget.value)}
-          />
-        </Field>
-        <p style={{ marginTop: -6, color: "#475467" }}>
-          留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 master password hash。
+    <main className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Vaultwarden 登录流程验证</h1>
+        <p className="text-muted-foreground text-sm">
+          最小化联调页面：password login / email-2FA / verify-email-token。
         </p>
-        <button type="button" disabled={!!busyAction} onClick={handleSendEmailLogin}>
-          Send Email Login 2FA
-        </button>
+      </header>
 
-        <hr />
+      <Card>
+        <CardHeader>
+          <CardTitle>基础参数</CardTitle>
+          <CardDescription>前端只收集 server url、email、master password。</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <FormField id="base-url" label="Base URL">
+            <Input
+              id="base-url"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.currentTarget.value)}
+            />
+          </FormField>
+          <FormField id="email" label="Email">
+            <Input id="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
+          </FormField>
+          <FormField id="password" label="Password (plaintext)" className="md:col-span-2">
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+            />
+          </FormField>
+        </CardContent>
+      </Card>
 
-        <Field label="verifyEmailToken.userId">
-          <input value={verifyUserId} onChange={(e) => setVerifyUserId(e.currentTarget.value)} />
-        </Field>
-        <Field label="verifyEmailToken.token">
-          <input value={verifyToken} onChange={(e) => setVerifyToken(e.currentTarget.value)} />
-        </Field>
-        <button type="button" disabled={!!busyAction} onClick={handleVerifyEmailToken}>
-          Verify Email Token
-        </button>
+      <Card>
+        <CardHeader>
+          <CardTitle>2FA 参数（可选）</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <FormField id="two-factor-provider" label="twoFactorProvider">
+            <Input
+              id="two-factor-provider"
+              value={twoFactorProvider}
+              onChange={(e) => setTwoFactorProvider(e.currentTarget.value)}
+              placeholder="例如 1（Email）"
+            />
+          </FormField>
+          <FormField id="two-factor-token" label="twoFactorToken">
+            <Input
+              id="two-factor-token"
+              value={twoFactorToken}
+              onChange={(e) => setTwoFactorToken(e.currentTarget.value)}
+              placeholder="验证码"
+            />
+          </FormField>
+          <label className="flex items-center gap-2 text-sm md:col-span-2" htmlFor="two-factor-remember">
+            <input
+              id="two-factor-remember"
+              type="checkbox"
+              checked={twoFactorRemember}
+              onChange={(e) => setTwoFactorRemember(e.currentTarget.checked)}
+              className="border-input size-4 rounded border"
+            />
+            remember device
+          </label>
+        </CardContent>
+      </Card>
 
-        <p style={{ marginTop: 12 }}>
-          <strong>Busy:</strong> {busyAction ?? "idle"}
-        </p>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>动作</CardTitle>
+          <CardDescription>
+            <span className="mr-2">Busy:</span>
+            <Badge variant="outline">{busyAction ?? "idle"}</Badge>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={!!busyAction} onClick={handleLogin}>
+              Password Login
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!!busyAction}
+              onClick={handleAuthLogout}
+            >
+              Auth Logout
+            </Button>
+          </div>
 
-      <section style={sectionStyle}>
-        <h2>Vault Sync 联调</h2>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <input
-            type="checkbox"
-            checked={syncExcludeDomains}
-            onChange={(e) => setSyncExcludeDomains(e.currentTarget.checked)}
-          />
-          exclude domains
-        </label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <button type="button" disabled={!!busyAction} onClick={handleSyncNow}>
-            Sync Now
-          </button>
-          <button type="button" disabled={!!busyAction} onClick={handleSyncStatus}>
-            Sync Status
-          </button>
-        </div>
-      </section>
+          <Separator />
 
-      <section style={sectionStyle}>
-        <h2>Vault 解锁与视图联调</h2>
-        <Field label="unlock.masterPassword">
-          <input
-            type="password"
-            value={unlockMasterPassword}
-            onChange={(e) => setUnlockMasterPassword(e.currentTarget.value)}
-          />
-        </Field>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-          <button type="button" disabled={!!busyAction} onClick={handleVaultUnlock}>
-            Unlock With Password
-          </button>
-          <button type="button" disabled={!!busyAction} onClick={handleVaultLock}>
-            Lock
-          </button>
-        </div>
-        <Field label="viewData.page (optional)">
-          <input
-            value={vaultPageInput}
-            onChange={(e) => setVaultPageInput(e.currentTarget.value)}
-            placeholder="1"
-          />
-        </Field>
-        <Field label="viewData.pageSize (optional)">
-          <input
-            value={vaultPageSizeInput}
-            onChange={(e) => setVaultPageSizeInput(e.currentTarget.value)}
-            placeholder="50"
-          />
-        </Field>
-        <button type="button" disabled={!!busyAction} onClick={handleVaultGetViewData}>
-          Get View Data
-        </button>
+          <FormField
+            id="email-2fa-password"
+            label="Email 2FA Password Override (plaintext, optional)"
+          >
+            <Input
+              id="email-2fa-password"
+              type="password"
+              value={email2faPasswordOverride}
+              onChange={(e) => setEmail2faPasswordOverride(e.currentTarget.value)}
+            />
+          </FormField>
+          <p className="text-muted-foreground text-sm">
+            留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 master password hash。
+          </p>
+          <Button type="button" disabled={!!busyAction} onClick={handleSendEmailLogin}>
+            Send Email Login 2FA
+          </Button>
 
-        <hr />
+          <Separator />
 
-        <Field label="cipherDetail.cipherId">
-          <input
-            value={vaultCipherIdInput}
-            onChange={(e) => setVaultCipherIdInput(e.currentTarget.value)}
-            placeholder="cipher id"
-          />
-        </Field>
-        <button type="button" disabled={!!busyAction} onClick={handleVaultGetCipherDetail}>
-          Get Cipher Detail
-        </button>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField id="verify-user-id" label="verifyEmailToken.userId">
+              <Input
+                id="verify-user-id"
+                value={verifyUserId}
+                onChange={(e) => setVerifyUserId(e.currentTarget.value)}
+              />
+            </FormField>
+            <FormField id="verify-token" label="verifyEmailToken.token">
+              <Input
+                id="verify-token"
+                value={verifyToken}
+                onChange={(e) => setVerifyToken(e.currentTarget.value)}
+              />
+            </FormField>
+          </div>
+          <Button type="button" disabled={!!busyAction} onClick={handleVerifyEmailToken}>
+            Verify Email Token
+          </Button>
+        </CardContent>
+      </Card>
 
-        {vaultViewData && vaultViewData.ciphers.length > 0 ? (
-          <>
-            <p style={{ marginTop: 12, marginBottom: 6, color: "#475467" }}>
-              快速选择一条 cipher 拉详情：
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
-              {vaultViewData.ciphers.map((cipher) => (
-                <button
-                  key={cipher.id}
-                  type="button"
-                  disabled={!!busyAction}
-                  onClick={() => void handleSelectCipherAndGetDetail(cipher.id)}
-                  style={{
-                    textAlign: "left",
-                    padding: "8px 10px",
-                    border: "1px solid #d0d5dd",
-                    borderRadius: 8,
-                    background: "#fff",
-                    cursor: busyAction ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <strong>{cipher.name || "(unnamed)"}</strong> · <code>{cipher.id}</code>
-                </button>
-              ))}
+      <Card>
+        <CardHeader>
+          <CardTitle>Vault Sync 联调</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-2 text-sm" htmlFor="exclude-domains">
+            <input
+              id="exclude-domains"
+              type="checkbox"
+              checked={syncExcludeDomains}
+              onChange={(e) => setSyncExcludeDomains(e.currentTarget.checked)}
+              className="border-input size-4 rounded border"
+            />
+            exclude domains
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={!!busyAction} onClick={handleSyncNow}>
+              Sync Now
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!!busyAction}
+              onClick={handleSyncStatus}
+            >
+              Sync Status
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Vault 解锁与视图联调</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <FormField id="unlock-password" label="unlock.masterPassword">
+            <Input
+              id="unlock-password"
+              type="password"
+              value={unlockMasterPassword}
+              onChange={(e) => setUnlockMasterPassword(e.currentTarget.value)}
+            />
+          </FormField>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={!!busyAction} onClick={handleVaultUnlock}>
+              Unlock With Password
+            </Button>
+            <Button type="button" variant="outline" disabled={!!busyAction} onClick={handleVaultLock}>
+              Lock
+            </Button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField id="view-page" label="viewData.page (optional)">
+              <Input
+                id="view-page"
+                value={vaultPageInput}
+                onChange={(e) => setVaultPageInput(e.currentTarget.value)}
+                placeholder="1"
+              />
+            </FormField>
+            <FormField id="view-page-size" label="viewData.pageSize (optional)">
+              <Input
+                id="view-page-size"
+                value={vaultPageSizeInput}
+                onChange={(e) => setVaultPageSizeInput(e.currentTarget.value)}
+                placeholder="50"
+              />
+            </FormField>
+          </div>
+          <Button type="button" disabled={!!busyAction} onClick={handleVaultGetViewData}>
+            Get View Data
+          </Button>
+
+          <Separator />
+
+          <FormField id="cipher-id" label="cipherDetail.cipherId">
+            <Input
+              id="cipher-id"
+              value={vaultCipherIdInput}
+              onChange={(e) => setVaultCipherIdInput(e.currentTarget.value)}
+              placeholder="cipher id"
+            />
+          </FormField>
+          <Button type="button" disabled={!!busyAction} onClick={handleVaultGetCipherDetail}>
+            Get Cipher Detail
+          </Button>
+
+          {vaultViewData && vaultViewData.ciphers.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-sm">快速选择一条 cipher 拉详情：</p>
+              <div className="max-h-56 space-y-2 overflow-y-auto">
+                {vaultViewData.ciphers.map((cipher) => (
+                  <Button
+                    key={cipher.id}
+                    type="button"
+                    variant="outline"
+                    disabled={!!busyAction}
+                    onClick={() => void handleSelectCipherAndGetDetail(cipher.id)}
+                    className="h-auto w-full justify-start px-3 py-2 text-left"
+                  >
+                    <span className="font-semibold">{cipher.name || "(unnamed)"}</span>
+                    <span className="text-muted-foreground ml-2 truncate font-mono text-xs">
+                      {cipher.id}
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </div>
-          </>
-        ) : null}
-      </section>
+          ) : null}
+        </CardContent>
+      </Card>
 
-      <section style={sectionStyle}>
-        <h2>结果快照</h2>
-        <p>Auth Bootstrap: {authBootstrapStatus}</p>
-        <p>Session: {session ? "authenticated" : "none"}</p>
-        <p>2FA Challenge: {challenge ? "required" : "none"}</p>
-        <p>Sync Status: {syncStatus ? syncStatus.state : "none"}</p>
-        <p>Vault View Data: {vaultViewData ? "loaded" : "none"}</p>
-        <p>
-          Visible Ciphers:{" "}
-          {vaultViewData ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}` : "none"}
-        </p>
-        <p>Vault Cipher Detail: {vaultCipherDetail ? "loaded" : "none"}</p>
-        <p>
-          Cipher Detail Name:{" "}
-          {vaultCipherDetail ? (vaultCipherDetail.cipher.name ?? "(null)") : "none"}
-        </p>
-        <pre style={preStyle}>{rawResult || "No response yet."}</pre>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>结果快照</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-2">
+            <SnapshotRow label="Auth Bootstrap" value={authBootstrapStatus} />
+            <SnapshotRow label="Session" value={session ? "authenticated" : "none"} />
+            <SnapshotRow label="2FA Challenge" value={challenge ? "required" : "none"} />
+            <SnapshotRow label="Sync Status" value={syncStatus ? syncStatus.state : "none"} />
+            <SnapshotRow label="Vault View Data" value={vaultViewData ? "loaded" : "none"} />
+            <SnapshotRow
+              label="Visible Ciphers"
+              value={vaultViewData ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}` : "none"}
+            />
+            <SnapshotRow
+              label="Vault Cipher Detail"
+              value={vaultCipherDetail ? "loaded" : "none"}
+            />
+            <SnapshotRow
+              label="Cipher Detail Name"
+              value={vaultCipherDetail ? (vaultCipherDetail.cipher.name ?? "(null)") : "none"}
+            />
+          </div>
+          <Textarea
+            readOnly
+            className="min-h-80 font-mono text-xs leading-5"
+            value={rawResult || "No response yet."}
+          />
+        </CardContent>
+      </Card>
 
-      <section style={sectionStyle}>
-        <h2>日志</h2>
-        {logs.length === 0 ? (
-          <p>No logs yet.</p>
-        ) : (
-          <ul style={{ margin: 0, paddingLeft: 20 }}>
-            {logs.map((log, index) => (
-              <li key={`${log.at}-${index}`} style={{ color: log.level === "error" ? "#b42318" : "#344054" }}>
-                [{log.at}] {log.message}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>日志</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {logs.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No logs yet.</p>
+          ) : (
+            <ul className="space-y-1">
+              {logs.map((log, index) => (
+                <li
+                  key={`${log.at}-${index}`}
+                  className={log.level === "error" ? "text-destructive" : "text-muted-foreground"}
+                >
+                  [{log.at}] {log.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
 
-function Field(props: { label: string; children: ReactNode }) {
+function FormField(props: {
+  id: string;
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <label style={{ display: "block", marginBottom: 10 }}>
-      <div style={{ marginBottom: 4, fontSize: 13, color: "#475467" }}>{props.label}</div>
+    <div className={props.className ? `space-y-2 ${props.className}` : "space-y-2"}>
+      <Label htmlFor={props.id}>{props.label}</Label>
       {props.children}
-    </label>
+    </div>
+  );
+}
+
+function SnapshotRow(props: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+      <span className="text-muted-foreground">{props.label}</span>
+      <Badge variant="outline">{props.value}</Badge>
+    </div>
   );
 }
 
@@ -653,22 +761,5 @@ function toPositiveNumberOrNull(value: string): number | null {
 
   return Math.floor(parsed);
 }
-
-const sectionStyle: CSSProperties = {
-  border: "1px solid #d0d5dd",
-  borderRadius: 10,
-  padding: 14,
-  marginBottom: 16,
-};
-
-const preStyle: CSSProperties = {
-  margin: 0,
-  overflowX: "auto",
-  maxHeight: 320,
-  background: "#f9fafb",
-  borderRadius: 8,
-  padding: 12,
-  border: "1px solid #eaecf0",
-};
 
 export default App;
