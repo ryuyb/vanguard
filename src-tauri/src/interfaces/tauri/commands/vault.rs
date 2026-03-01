@@ -67,11 +67,9 @@ pub async fn vault_unlock_with_password(
     .await
     .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
 
-    let user_key = decrypt_user_key_with_master_keys(
-        &unlock_material.encrypted_user_keys,
-        &master_keys,
-    )
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
+    let user_key =
+        decrypt_user_key_with_master_keys(&unlock_material.encrypted_user_keys, &master_keys)
+            .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
     state
         .set_vault_user_key(account_id.clone(), user_key)
         .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
@@ -451,7 +449,9 @@ fn decrypt_user_key_with_master_keys(
     master_keys: &[Vec<u8>],
 ) -> Result<VaultUserKey, AppError> {
     if encrypted_user_keys.is_empty() {
-        return Err(AppError::validation("encrypted_user_key list cannot be empty"));
+        return Err(AppError::validation(
+            "encrypted_user_key list cannot be empty",
+        ));
     }
 
     for encrypted_user_key in encrypted_user_keys {
@@ -733,8 +733,9 @@ fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKey, AppError> {
         _ => {}
     }
 
-    let text = std::str::from_utf8(raw)
-        .map_err(|error| AppError::validation(format!("user_key plaintext is not utf-8: {error}")))?;
+    let text = std::str::from_utf8(raw).map_err(|error| {
+        AppError::validation(format!("user_key plaintext is not utf-8: {error}"))
+    })?;
     parse_user_key(text)
 }
 
@@ -798,11 +799,9 @@ mod tests {
         let plain_user_key = STANDARD.encode([3u8; 64]);
         let encrypted_user_key = encrypt_type2(&plain_user_key, &enc_key, &mac_key);
 
-        let parsed = decrypt_user_key_with_master_keys(
-            &[encrypted_user_key],
-            &[master_key.to_vec()],
-        )
-        .expect("unlock with password candidate key");
+        let parsed =
+            decrypt_user_key_with_master_keys(&[encrypted_user_key], &[master_key.to_vec()])
+                .expect("unlock with password candidate key");
         assert_eq!(parsed.enc_key.len(), 32);
         assert_eq!(parsed.mac_key.as_ref().map(Vec::len), Some(32));
     }
@@ -818,11 +817,9 @@ mod tests {
         let plain_user_key = vec![3u8; 64];
         let encrypted_user_key = encrypt_type2_bytes(&plain_user_key, &enc_key, &mac_key);
 
-        let parsed = decrypt_user_key_with_master_keys(
-            &[encrypted_user_key],
-            &[master_key.to_vec()],
-        )
-        .expect("unlock with password candidate key");
+        let parsed =
+            decrypt_user_key_with_master_keys(&[encrypted_user_key], &[master_key.to_vec()])
+                .expect("unlock with password candidate key");
         assert_eq!(parsed.enc_key.len(), 32);
         assert_eq!(parsed.mac_key.as_ref().map(Vec::len), Some(32));
     }

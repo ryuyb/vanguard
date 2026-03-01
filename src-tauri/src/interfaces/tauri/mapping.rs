@@ -8,8 +8,7 @@ use crate::domain::sync::{SyncContext, SyncState, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
     MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
     SendEmailLoginRequestDto, SessionResponseDto, TwoFactorChallengeDto, TwoFactorProviderHintDto,
-    VerifyEmailTokenRequestDto, WebauthnAllowCredentialDto,
-    WebauthnRequestExtensionsDto,
+    VerifyEmailTokenRequestDto, WebauthnAllowCredentialDto, WebauthnRequestExtensionsDto,
 };
 use crate::interfaces::tauri::dto::sync::{
     SyncCountsDto, SyncMetricsDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,

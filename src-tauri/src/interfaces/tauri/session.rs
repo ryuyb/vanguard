@@ -57,7 +57,9 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
         Ok(value) => value,
         Err(error) => {
             if matches!(error.status(), Some(401 | 403)) {
-                let _ = state.sync_service().stop_polling_for_account(&current.account_id);
+                let _ = state
+                    .sync_service()
+                    .stop_polling_for_account(&current.account_id);
                 let _ = state
                     .realtime_sync_service()
                     .stop_for_account(&current.account_id)
@@ -68,8 +70,10 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
         }
     };
 
-    let account_id =
-        account_id::derive_account_id_from_access_token(&current.base_url, &refreshed.access_token)?;
+    let account_id = account_id::derive_account_id_from_access_token(
+        &current.base_url,
+        &refreshed.access_token,
+    )?;
     let next = AuthSession {
         account_id,
         base_url: current.base_url,

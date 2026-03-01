@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use crate::domain::sync::{SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct SyncVaultCommand {
@@ -91,23 +88,183 @@ pub struct SyncCipher {
     pub folder_id: Option<String>,
     pub r#type: Option<i32>,
     pub name: Option<String>,
+    pub notes: Option<String>,
+    pub key: Option<String>,
+    pub favorite: Option<bool>,
+    pub edit: Option<bool>,
+    pub view_password: Option<bool>,
+    pub organization_use_totp: Option<bool>,
+    pub creation_date: Option<String>,
     pub revision_date: Option<String>,
     pub deleted_date: Option<String>,
+    pub archived_date: Option<String>,
+    pub reprompt: Option<i32>,
+    pub permissions: Option<SyncCipherPermissions>,
     pub object: Option<String>,
+    pub fields: Vec<SyncCipherField>,
+    pub password_history: Vec<SyncCipherPasswordHistory>,
+    pub collection_ids: Vec<String>,
+    pub data: Option<SyncCipherData>,
+    pub login: Option<SyncCipherLogin>,
+    pub secure_note: Option<SyncCipherSecureNote>,
+    pub card: Option<SyncCipherCard>,
+    pub identity: Option<SyncCipherIdentity>,
+    pub ssh_key: Option<SyncCipherSshKey>,
     pub attachments: Vec<SyncAttachment>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncAttachment {
     pub id: String,
+    pub key: Option<String>,
     pub file_name: Option<String>,
     pub size: Option<String>,
+    pub size_name: Option<String>,
     pub url: Option<String>,
     pub object: Option<String>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherPermissions {
+    pub delete: Option<bool>,
+    pub restore: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherField {
+    pub name: Option<String>,
+    pub value: Option<String>,
+    pub r#type: Option<i32>,
+    pub linked_id: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherPasswordHistory {
+    pub password: Option<String>,
+    pub last_used_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherData {
+    pub name: Option<String>,
+    pub notes: Option<String>,
+    pub fields: Vec<SyncCipherField>,
+    pub password_history: Vec<SyncCipherPasswordHistory>,
+    pub uri: Option<String>,
+    pub uris: Vec<SyncCipherLoginUri>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
+    pub autofill_on_page_load: Option<bool>,
+    pub fido2_credentials: Vec<SyncCipherLoginFido2Credential>,
+    pub r#type: Option<i32>,
+    pub cardholder_name: Option<String>,
+    pub brand: Option<String>,
+    pub number: Option<String>,
+    pub exp_month: Option<String>,
+    pub exp_year: Option<String>,
+    pub code: Option<String>,
+    pub title: Option<String>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub address1: Option<String>,
+    pub address2: Option<String>,
+    pub address3: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
+    pub company: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub ssn: Option<String>,
+    pub passport_number: Option<String>,
+    pub license_number: Option<String>,
+    pub private_key: Option<String>,
+    pub public_key: Option<String>,
+    pub key_fingerprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherLogin {
+    pub uri: Option<String>,
+    pub uris: Vec<SyncCipherLoginUri>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
+    pub autofill_on_page_load: Option<bool>,
+    pub fido2_credentials: Vec<SyncCipherLoginFido2Credential>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherLoginUri {
+    pub uri: Option<String>,
+    pub r#match: Option<i32>,
+    pub uri_checksum: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherLoginFido2Credential {
+    pub credential_id: Option<String>,
+    pub key_type: Option<String>,
+    pub key_algorithm: Option<String>,
+    pub key_curve: Option<String>,
+    pub key_value: Option<String>,
+    pub rp_id: Option<String>,
+    pub rp_name: Option<String>,
+    pub counter: Option<String>,
+    pub user_handle: Option<String>,
+    pub user_name: Option<String>,
+    pub user_display_name: Option<String>,
+    pub discoverable: Option<String>,
+    pub creation_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherSecureNote {
+    pub r#type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherCard {
+    pub cardholder_name: Option<String>,
+    pub brand: Option<String>,
+    pub number: Option<String>,
+    pub exp_month: Option<String>,
+    pub exp_year: Option<String>,
+    pub code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherIdentity {
+    pub title: Option<String>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub address1: Option<String>,
+    pub address2: Option<String>,
+    pub address3: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
+    pub company: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub ssn: Option<String>,
+    pub username: Option<String>,
+    pub passport_number: Option<String>,
+    pub license_number: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncCipherSshKey {
+    pub private_key: Option<String>,
+    pub public_key: Option<String>,
+    pub key_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

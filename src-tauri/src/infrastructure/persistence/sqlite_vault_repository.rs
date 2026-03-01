@@ -1417,9 +1417,10 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     AppError::internal(format!("failed to load live user decryption row: {error}"))
                 })?;
 
-            match payload.flatten() {
+            match payload {
                 None => Ok(None),
-                Some(json) => Ok(Some(Self::from_json(
+                Some(None) => Ok(None),
+                Some(Some(json)) => Ok(Some(Self::from_json(
                     &json,
                     "live user_decryption payload",
                 )?)),
@@ -1592,18 +1593,37 @@ mod tests {
             folder_id: None,
             r#type: Some(1),
             name: Some(String::from("demo")),
+            notes: None,
+            key: None,
+            favorite: None,
+            edit: None,
+            view_password: None,
+            organization_use_totp: None,
+            creation_date: None,
             revision_date: None,
             deleted_date: None,
+            archived_date: None,
+            reprompt: None,
+            permissions: None,
             object: Some(String::from("cipher")),
+            fields: Vec::new(),
+            password_history: Vec::new(),
+            collection_ids: Vec::new(),
+            data: None,
+            login: None,
+            secure_note: None,
+            card: None,
+            identity: None,
+            ssh_key: None,
             attachments: vec![SyncAttachment {
                 id: String::from("att-1"),
+                key: None,
                 file_name: Some(String::from("a.txt")),
                 size: Some(String::from("12")),
+                size_name: None,
                 url: Some(String::from("https://example.invalid/attachment")),
                 object: Some(String::from("attachment")),
-                extra: std::collections::HashMap::new(),
             }],
-            extra: std::collections::HashMap::new(),
         };
 
         let sanitized = sanitize_cipher_for_persistence(cipher);

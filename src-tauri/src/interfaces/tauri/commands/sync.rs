@@ -39,7 +39,8 @@ pub async fn vault_sync_now(
             let refreshed = session::force_refresh_auth_session(&state)
                 .await
                 .map_err(|refresh_error| log_command_error("vault_sync_now", refresh_error))?;
-            let retry_command = build_sync_command(&refreshed, exclude_domains, SyncTrigger::Manual);
+            let retry_command =
+                build_sync_command(&refreshed, exclude_domains, SyncTrigger::Manual);
             state
                 .sync_service()
                 .sync_now(retry_command)
@@ -103,11 +104,12 @@ pub async fn vault_sync_check_revision(
         .await;
     if let Err(error) = check_result {
         if is_auth_status_error(&error) {
-            let refreshed = session::force_refresh_auth_session(&state)
-                .await
-                .map_err(|refresh_error| {
-                    log_command_error("vault_sync_check_revision", refresh_error)
-                })?;
+            let refreshed =
+                session::force_refresh_auth_session(&state)
+                    .await
+                    .map_err(|refresh_error| {
+                        log_command_error("vault_sync_check_revision", refresh_error)
+                    })?;
             account_id = refreshed.account_id.clone();
             state
                 .sync_service()
@@ -118,7 +120,9 @@ pub async fn vault_sync_check_revision(
                     SyncTrigger::Foreground,
                 )
                 .await
-                .map_err(|retry_error| log_command_error("vault_sync_check_revision", retry_error))?;
+                .map_err(|retry_error| {
+                    log_command_error("vault_sync_check_revision", retry_error)
+                })?;
         } else {
             return Err(log_command_error("vault_sync_check_revision", error));
         }

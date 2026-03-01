@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use serde::de::Error as DeError;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreloginRequest {
@@ -370,25 +368,205 @@ pub struct SyncCipher {
     pub folder_id: Option<String>,
     pub r#type: Option<i32>,
     pub name: Option<String>,
+    pub notes: Option<String>,
+    pub key: Option<String>,
+    pub favorite: Option<bool>,
+    pub edit: Option<bool>,
+    pub view_password: Option<bool>,
+    pub organization_use_totp: Option<bool>,
+    pub creation_date: Option<String>,
     pub revision_date: Option<String>,
     pub deleted_date: Option<String>,
+    pub archived_date: Option<String>,
+    pub reprompt: Option<i32>,
+    pub permissions: Option<SyncCipherPermissions>,
     pub object: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub fields: Vec<SyncCipherField>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub password_history: Vec<SyncCipherPasswordHistory>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub collection_ids: Vec<String>,
+    pub data: Option<SyncCipherData>,
+    pub login: Option<SyncCipherLogin>,
+    pub secure_note: Option<SyncCipherSecureNote>,
+    pub card: Option<SyncCipherCard>,
+    pub identity: Option<SyncCipherIdentity>,
+    pub ssh_key: Option<SyncCipherSshKey>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub attachments: Vec<SyncAttachment>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncAttachment {
     pub id: String,
+    pub key: Option<String>,
     pub file_name: Option<String>,
     pub size: Option<String>,
+    pub size_name: Option<String>,
     pub url: Option<String>,
     pub object: Option<String>,
-    #[serde(flatten)]
-    pub extra: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherPermissions {
+    pub delete: Option<bool>,
+    pub restore: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherField {
+    pub name: Option<String>,
+    pub value: Option<String>,
+    pub r#type: Option<i32>,
+    pub linked_id: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherPasswordHistory {
+    pub password: Option<String>,
+    pub last_used_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherData {
+    pub name: Option<String>,
+    pub notes: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub fields: Vec<SyncCipherField>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub password_history: Vec<SyncCipherPasswordHistory>,
+    pub uri: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub uris: Vec<SyncCipherLoginUri>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
+    pub autofill_on_page_load: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub fido2_credentials: Vec<SyncCipherLoginFido2Credential>,
+    pub r#type: Option<i32>,
+    pub cardholder_name: Option<String>,
+    pub brand: Option<String>,
+    pub number: Option<String>,
+    pub exp_month: Option<String>,
+    pub exp_year: Option<String>,
+    pub code: Option<String>,
+    pub title: Option<String>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub address1: Option<String>,
+    pub address2: Option<String>,
+    pub address3: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
+    pub company: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub ssn: Option<String>,
+    pub passport_number: Option<String>,
+    pub license_number: Option<String>,
+    pub private_key: Option<String>,
+    pub public_key: Option<String>,
+    pub key_fingerprint: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherLogin {
+    pub uri: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub uris: Vec<SyncCipherLoginUri>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
+    pub autofill_on_page_load: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub fido2_credentials: Vec<SyncCipherLoginFido2Credential>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherLoginUri {
+    pub uri: Option<String>,
+    pub r#match: Option<i32>,
+    pub uri_checksum: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherLoginFido2Credential {
+    pub credential_id: Option<String>,
+    pub key_type: Option<String>,
+    pub key_algorithm: Option<String>,
+    pub key_curve: Option<String>,
+    pub key_value: Option<String>,
+    pub rp_id: Option<String>,
+    pub rp_name: Option<String>,
+    pub counter: Option<String>,
+    pub user_handle: Option<String>,
+    pub user_name: Option<String>,
+    pub user_display_name: Option<String>,
+    pub discoverable: Option<String>,
+    pub creation_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherSecureNote {
+    pub r#type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherCard {
+    pub cardholder_name: Option<String>,
+    pub brand: Option<String>,
+    pub number: Option<String>,
+    pub exp_month: Option<String>,
+    pub exp_year: Option<String>,
+    pub code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherIdentity {
+    pub title: Option<String>,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub address1: Option<String>,
+    pub address2: Option<String>,
+    pub address3: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
+    pub company: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub ssn: Option<String>,
+    pub username: Option<String>,
+    pub passport_number: Option<String>,
+    pub license_number: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCipherSshKey {
+    pub private_key: Option<String>,
+    pub public_key: Option<String>,
+    pub key_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -498,61 +676,21 @@ impl RevisionDateScalar {
 fn deserialize_null_seq_or_map_default<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: Deserializer<'de>,
-    T: serde::de::DeserializeOwned,
+    T: Deserialize<'de>,
 {
-    let value = Option::<Value>::deserialize(deserializer)?;
-    match value {
-        None => Ok(Vec::new()),
-        Some(Value::Null) => Ok(Vec::new()),
-        Some(Value::Array(items)) => items
-            .into_iter()
-            .map(|item| parse_vec_item::<T, D::Error>(item))
-            .collect(),
-        Some(Value::Object(map)) => {
-            if map.is_empty() {
-                return Ok(Vec::new());
-            }
-            map.into_values()
-                .map(|item| parse_vec_item::<T, D::Error>(item))
-                .collect()
-        }
-        Some(other) => Err(D::Error::custom(format!(
-            "expected null/sequence/map for vector field, got {}",
-            value_type_name(&other)
-        ))),
-    }
+    let value = Option::<SeqOrMap<T>>::deserialize(deserializer)?;
+    Ok(match value {
+        None => Vec::new(),
+        Some(SeqOrMap::Seq(items)) => items,
+        Some(SeqOrMap::Map(map)) => map.into_values().collect(),
+    })
 }
 
-fn parse_vec_item<T, E>(item: Value) -> Result<T, E>
-where
-    T: serde::de::DeserializeOwned,
-    E: DeError,
-{
-    match serde_json::from_value::<T>(item.clone()) {
-        Ok(parsed) => Ok(parsed),
-        Err(primary_error) => {
-            if let Value::Object(map) = item {
-                let fallback = Value::Array(map.into_values().collect());
-                return serde_json::from_value::<T>(fallback).map_err(|fallback_error| {
-                    E::custom(format!(
-                        "{primary_error}; fallback object-values parse failed: {fallback_error}"
-                    ))
-                });
-            }
-            Err(E::custom(primary_error))
-        }
-    }
-}
-
-fn value_type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "object",
-    }
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum SeqOrMap<T> {
+    Seq(Vec<T>),
+    Map(HashMap<String, T>),
 }
 
 #[derive(Debug, Clone)]
