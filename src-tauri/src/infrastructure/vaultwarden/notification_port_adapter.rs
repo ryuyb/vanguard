@@ -196,41 +196,65 @@ async fn wait_handshake_ack(
     stream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
     handshake_timeout_ms: u64,
 ) -> AppResult<()> {
-    let message = timeout(Duration::from_millis(handshake_timeout_ms), stream.next())
-        .await
-        .map_err(|_| {
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(handshake_timeout_ms);
+
+    loop {
+        let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) else {
+            return Err(AppError::remote(format!(
+                "websocket handshake ack timeout after {}ms",
+                handshake_timeout_ms
+            )));
+        };
+
+        let message = timeout(remaining, stream.next()).await.map_err(|_| {
             AppError::remote(format!(
                 "websocket handshake ack timeout after {}ms",
                 handshake_timeout_ms
             ))
         })?;
 
-    match message {
-        Some(Ok(Message::Text(text))) => {
-            if is_handshake_ack_text(&text) {
-                Ok(())
-            } else {
-                Err(AppError::remote(format!(
+        match message {
+            Some(Ok(Message::Text(text))) => {
+                if is_handshake_ack_text(&text) {
+                    return Ok(());
+                }
+
+                return Err(AppError::remote(format!(
                     "unexpected websocket handshake ack text payload: {text}"
-                )))
+                )));
             }
-        }
-        Some(Ok(Message::Binary(payload))) => {
-            if is_handshake_ack_binary(&payload) {
-                Ok(())
-            } else {
-                Err(AppError::remote(
+            Some(Ok(Message::Binary(payload))) => {
+                if is_handshake_ack_binary(&payload) {
+                    return Ok(());
+                }
+
+                return Err(AppError::remote(
                     "unexpected websocket handshake ack binary payload",
-                ))
+                ));
             }
+            Some(Ok(Message::Ping(payload))) => {
+                stream.send(Message::Pong(payload)).await.map_err(|error| {
+                    AppError::remote(format!(
+                        "failed to send websocket pong during handshake: {error}"
+                    ))
+                })?;
+            }
+            Some(Ok(Message::Pong(_))) => {}
+            Some(Ok(Message::Close(_))) => {
+                return Err(AppError::remote("websocket closed before handshake ack"));
+            }
+            Some(Ok(other)) => {
+                return Err(AppError::remote(format!(
+                    "unexpected websocket handshake ack frame: {other:?}"
+                )));
+            }
+            Some(Err(error)) => {
+                return Err(AppError::remote(format!(
+                    "websocket handshake ack failed: {error}"
+                )));
+            }
+            None => return Err(AppError::remote("websocket closed before handshake ack")),
         }
-        Some(Ok(other)) => Err(AppError::remote(format!(
-            "unexpected websocket handshake ack frame: {other:?}"
-        ))),
-        Some(Err(error)) => Err(AppError::remote(format!(
-            "websocket handshake ack failed: {error}"
-        ))),
-        None => Err(AppError::remote("websocket closed before handshake ack")),
     }
 }
 
