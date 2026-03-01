@@ -41,6 +41,28 @@ fn log_command_error(command: &str, error: AppError) -> String {
 
 #[tauri::command]
 #[specta::specta]
+pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String> {
+    let account_id = match state.active_account_id() {
+        Ok(value) => value,
+        Err(AppError::Validation(_)) => return Ok(false),
+        Err(error) => return Err(log_command_error("vault_can_unlock", error)),
+    };
+
+    let user_decryption = state
+        .sync_service()
+        .load_live_user_decryption(account_id)
+        .await
+        .map_err(|error| log_command_error("vault_can_unlock", error))?;
+
+    match extract_unlock_material(user_decryption) {
+        Ok(_) => Ok(true),
+        Err(error) if is_unlock_material_missing(&error) => Ok(false),
+        Err(error) => Err(log_command_error("vault_can_unlock", error)),
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn vault_unlock_with_password(
     state: State<'_, AppState>,
     request: VaultUnlockWithPasswordRequestDto,
@@ -525,6 +547,16 @@ fn extract_unlock_material(
         kdf,
         salt,
     })
+}
+
+fn is_unlock_material_missing(error: &AppError) -> bool {
+    let AppError::Validation(message) = error else {
+        return false;
+    };
+
+    message.contains("missing local user_decryption data")
+        || message.contains("missing master_password_unlock")
+        || message.contains("encrypted user key is missing")
 }
 
 async fn derive_master_key_candidates_for_unlock(

@@ -22,6 +22,7 @@ pub fn run() {
             interfaces::tauri::commands::sync::vault_sync_now,
             interfaces::tauri::commands::sync::vault_sync_status,
             interfaces::tauri::commands::sync::vault_sync_check_revision,
+            interfaces::tauri::commands::vault::vault_can_unlock,
             interfaces::tauri::commands::vault::vault_unlock_with_password,
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data,

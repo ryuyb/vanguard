@@ -69,6 +69,14 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
     else return { status: "error", error: e  as any };
 }
 },
+async vaultCanUnlock() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultUnlockWithPassword(request: VaultUnlockWithPasswordRequestDto) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_password", { request }) };
