@@ -170,9 +170,9 @@ fn to_webauthn_request_extensions_dto(
     }
 }
 
-pub fn to_sync_vault_command(dto: SyncNowRequestDto) -> SyncVaultCommand {
+pub fn to_sync_vault_command(dto: SyncNowRequestDto, account_id: String) -> SyncVaultCommand {
     SyncVaultCommand {
-        account_id: dto.account_id,
+        account_id,
         base_url: dto.base_url,
         access_token: dto.access_token,
         exclude_domains: dto.exclude_domains.unwrap_or(false),

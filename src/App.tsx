@@ -29,7 +29,6 @@ function App() {
   const [verifyUserId, setVerifyUserId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
   const [refreshTokenInput, setRefreshTokenInput] = useState("");
-  const [syncAccountId, setSyncAccountId] = useState("local-dev-account");
   const [syncAccessTokenOverride, setSyncAccessTokenOverride] = useState("");
   const [syncExcludeDomains, setSyncExcludeDomains] = useState(false);
 
@@ -173,7 +172,6 @@ function App() {
       }
 
       const result = await commands.vaultSyncNow({
-        accountId: syncAccountId,
         baseUrl,
         accessToken,
         excludeDomains: syncExcludeDomains,
@@ -191,8 +189,14 @@ function App() {
 
   const handleSyncStatus = async () => {
     await run("vault-sync-status", async () => {
+      const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
+      if (!accessToken) {
+        throw new Error("access token is empty; please login first or provide a token override");
+      }
+
       const result = await commands.vaultSyncStatus({
-        accountId: syncAccountId,
+        baseUrl,
+        accessToken,
       });
 
       if (result.status === "error") {
@@ -332,13 +336,6 @@ function App() {
 
       <section style={sectionStyle}>
         <h2>Vault Sync 联调</h2>
-        <Field label="sync.accountId">
-          <input
-            value={syncAccountId}
-            onChange={(e) => setSyncAccountId(e.currentTarget.value)}
-            placeholder="例如：user-1"
-          />
-        </Field>
         <Field label="sync.accessToken override (optional)">
           <input
             value={syncAccessTokenOverride}

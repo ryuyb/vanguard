@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::bootstrap::app_state::AppState;
+use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::sync::{
     SyncNowRequestDto, SyncStatusRequestDto, SyncStatusResponseDto,
 };
@@ -24,7 +25,10 @@ pub async fn vault_sync_now(
     state: State<'_, AppState>,
     request: SyncNowRequestDto,
 ) -> Result<SyncStatusResponseDto, String> {
-    let command = mapping::to_sync_vault_command(request);
+    let account_id =
+        account_id::derive_account_id_from_access_token(&request.base_url, &request.access_token)
+            .map_err(|error| log_command_error("vault_sync_now", error))?;
+    let command = mapping::to_sync_vault_command(request, account_id);
     let outcome = state
         .sync_service()
         .sync_now(command)
@@ -40,9 +44,12 @@ pub async fn vault_sync_status(
     state: State<'_, AppState>,
     request: SyncStatusRequestDto,
 ) -> Result<SyncStatusResponseDto, String> {
+    let account_id =
+        account_id::derive_account_id_from_access_token(&request.base_url, &request.access_token)
+            .map_err(|error| log_command_error("vault_sync_status", error))?;
     let context = state
         .sync_service()
-        .sync_status(request.account_id)
+        .sync_status(account_id)
         .await
         .map_err(|error| log_command_error("vault_sync_status", error))?;
 

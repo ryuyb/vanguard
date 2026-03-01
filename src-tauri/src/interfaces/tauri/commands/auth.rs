@@ -1,6 +1,13 @@
+use std::sync::Arc;
+
 use tauri::State;
 
+use crate::application::dto::auth::PasswordLoginOutcome;
+use crate::application::dto::sync::SyncVaultCommand;
+use crate::application::services::sync_service::SyncService;
 use crate::bootstrap::app_state::AppState;
+use crate::domain::sync::SyncTrigger;
+use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
     PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto, PreloginResponseDto,
     RefreshTokenRequestDto, SendEmailLoginRequestDto, SessionResponseDto,
@@ -43,11 +50,33 @@ pub async fn auth_login_with_password(
     request: PasswordLoginRequestDto,
 ) -> Result<PasswordLoginResponseDto, String> {
     let command = mapping::to_password_login_command(request);
+    let base_url = command.base_url.clone();
     let result = state
         .auth_service()
         .login_with_password(command)
         .await
         .map_err(|error| log_command_error("auth_login_with_password", error))?;
+
+    if let PasswordLoginOutcome::Authenticated(session) = &result {
+        match account_id::derive_account_id_from_access_token(&base_url, &session.access_token) {
+            Ok(account_id) => {
+                trigger_sync_after_login(
+                    state.sync_service(),
+                    account_id,
+                    base_url,
+                    session.access_token.clone(),
+                );
+            }
+            Err(error) => {
+                log::warn!(
+                    target: "vanguard::tauri::auth",
+                    "skip auto sync after login: [{}] {}",
+                    error.code(),
+                    error.message()
+                );
+            }
+        }
+    }
 
     Ok(mapping::to_password_login_response_dto(result))
 }
@@ -96,4 +125,45 @@ pub async fn auth_verify_email_token(
         .await
         .map_err(|error| log_command_error("auth_verify_email_token", error))?;
     Ok(())
+}
+
+fn trigger_sync_after_login(
+    sync_service: Arc<SyncService>,
+    account_id: String,
+    base_url: String,
+    access_token: String,
+) {
+    let endpoint = sync_endpoint(&base_url);
+    log::info!(
+        target: "vanguard::tauri::auth",
+        "login succeeded, triggering initial sync account_id={} endpoint={}",
+        account_id,
+        endpoint
+    );
+
+    tokio::spawn(async move {
+        let command = SyncVaultCommand {
+            account_id: account_id.clone(),
+            base_url: base_url.clone(),
+            access_token,
+            exclude_domains: false,
+            trigger: SyncTrigger::Startup,
+        };
+
+        if let Err(error) = sync_service.sync_now(command).await {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "auto sync after login failed account_id={} endpoint={} status={} error_code={} message={}",
+                account_id,
+                sync_endpoint(&base_url),
+                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error
+            );
+        }
+    });
+}
+
+fn sync_endpoint(base_url: &str) -> String {
+    format!("{}/api/sync", base_url.trim_end_matches('/'))
 }
