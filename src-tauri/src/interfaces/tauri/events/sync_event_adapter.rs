@@ -35,7 +35,7 @@ impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
     }
 
     fn emit_sync_succeeded(&self, context: &SyncContext) {
-        let status = mapping::to_sync_status_response_dto(context.clone());
+        let status = mapping::to_sync_status_response_dto(context.clone(), None);
         if let Err(error) = (VaultSyncSucceeded {
             account_id: context.account_id.clone(),
             status,

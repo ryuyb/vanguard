@@ -8,6 +8,7 @@ pub mod interfaces;
 pub mod support;
 
 use tauri::Manager;
+use specta_typescript::BigIntExportBehavior;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -86,7 +87,11 @@ pub fn run() {
 #[cfg(debug_assertions)]
 fn export_specta_bindings(builder: &tauri_specta::Builder<tauri::Wry>) -> std::io::Result<()> {
     let output = builder
-        .export_str(specta_typescript::Typescript::default().header("// @ts-nocheck"))
+        .export_str(
+            specta_typescript::Typescript::default()
+                .bigint(BigIntExportBehavior::Number)
+                .header("// @ts-nocheck"),
+        )
         .map_err(|error| std::io::Error::other(error.to_string()))?;
 
     let target_path = bindings_output_path();

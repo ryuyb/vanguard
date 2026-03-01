@@ -12,15 +12,18 @@ use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::{timeout, Duration};
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 use crate::application::dto::notification::{NotificationConnectCommand, NotificationEvent};
 use crate::application::ports::notification_port::NotificationPort;
 use crate::support::error::AppError;
+use crate::support::redaction::redact_sensitive;
 use crate::support::result::AppResult;
 
-const WS_HANDSHAKE_TIMEOUT_MS: u64 = 5_000;
 const RECORD_SEPARATOR: char = '\u{001e}';
 const INITIAL_HANDSHAKE_PAYLOAD: &str = r#"{"protocol":"messagepack","version":1}"#;
 
@@ -28,6 +31,7 @@ struct ActiveConnection {
     events_rx: Arc<Mutex<mpsc::Receiver<NotificationEvent>>>,
     stop_tx: Option<oneshot::Sender<()>>,
     reader_task: Option<JoinHandle<()>>,
+    shutdown_timeout_ms: u64,
 }
 
 #[derive(Clone, Default)]
@@ -52,13 +56,46 @@ impl NotificationPort for VaultwardenNotificationPort {
                 "queue_limit must be greater than zero",
             ));
         }
+        if command.connect_timeout_ms == 0 {
+            return Err(AppError::validation(
+                "connect_timeout_ms must be greater than zero",
+            ));
+        }
+        if command.handshake_timeout_ms == 0 {
+            return Err(AppError::validation(
+                "handshake_timeout_ms must be greater than zero",
+            ));
+        }
+        if command.shutdown_timeout_ms == 0 {
+            return Err(AppError::validation(
+                "shutdown_timeout_ms must be greater than zero",
+            ));
+        }
 
         self.disconnect(&command.account_id).await?;
 
-        let endpoint = websocket_endpoint(&command.base_url, &command.access_token)?;
-        let (mut stream, _) = connect_async(endpoint.clone())
-            .await
-            .map_err(|error| AppError::remote(format!("failed to connect websocket: {error}")))?;
+        let endpoint = websocket_endpoint(&command.base_url)?;
+        let mut request = endpoint.into_client_request().map_err(|error| {
+            AppError::remote(format!("failed to build websocket request: {error}"))
+        })?;
+        let bearer = format!("Bearer {}", command.access_token);
+        let header_value = HeaderValue::from_str(&bearer).map_err(|error| {
+            AppError::validation(format!("invalid access token header: {error}"))
+        })?;
+        request.headers_mut().insert(AUTHORIZATION, header_value);
+
+        let (mut stream, _) = timeout(
+            Duration::from_millis(command.connect_timeout_ms),
+            connect_async(request),
+        )
+        .await
+        .map_err(|_| {
+            AppError::remote(format!(
+                "websocket connect timeout after {}ms",
+                command.connect_timeout_ms
+            ))
+        })?
+        .map_err(|error| AppError::remote(format!("failed to connect websocket: {error}")))?;
 
         let handshake_message = format!("{INITIAL_HANDSHAKE_PAYLOAD}{RECORD_SEPARATOR}");
         stream
@@ -68,7 +105,7 @@ impl NotificationPort for VaultwardenNotificationPort {
                 AppError::remote(format!("failed to send websocket handshake: {error}"))
             })?;
 
-        if let Err(error) = wait_handshake_ack(&mut stream).await {
+        if let Err(error) = wait_handshake_ack(&mut stream, command.handshake_timeout_ms).await {
             log::warn!(
                 target: "vanguard::sync::ws",
                 "websocket handshake failed account_id={} message={}",
@@ -97,6 +134,7 @@ impl NotificationPort for VaultwardenNotificationPort {
                 events_rx: Arc::new(Mutex::new(events_rx)),
                 stop_tx: Some(stop_tx),
                 reader_task: Some(reader_task),
+                shutdown_timeout_ms: command.shutdown_timeout_ms,
             },
         );
         Ok(())
@@ -133,14 +171,18 @@ impl NotificationPort for VaultwardenNotificationPort {
                 let _ = stop_tx.send(());
             }
             if let Some(reader_task) = connection.reader_task.take() {
-                if timeout(Duration::from_millis(300), reader_task)
-                    .await
-                    .is_err()
+                if timeout(
+                    Duration::from_millis(connection.shutdown_timeout_ms),
+                    reader_task,
+                )
+                .await
+                .is_err()
                 {
                     log::debug!(
                         target: "vanguard::sync::ws",
-                        "websocket reader task shutdown timeout account_id={}",
-                        account_id
+                        "websocket reader task shutdown timeout account_id={} timeout_ms={}",
+                        account_id,
+                        connection.shutdown_timeout_ms
                     );
                 }
             }
@@ -152,13 +194,16 @@ impl NotificationPort for VaultwardenNotificationPort {
 
 async fn wait_handshake_ack(
     stream: &mut WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>,
+    handshake_timeout_ms: u64,
 ) -> AppResult<()> {
-    let message = timeout(
-        Duration::from_millis(WS_HANDSHAKE_TIMEOUT_MS),
-        stream.next(),
-    )
-    .await
-    .map_err(|_| AppError::remote("websocket handshake ack timeout"))?;
+    let message = timeout(Duration::from_millis(handshake_timeout_ms), stream.next())
+        .await
+        .map_err(|_| {
+            AppError::remote(format!(
+                "websocket handshake ack timeout after {}ms",
+                handshake_timeout_ms
+            ))
+        })?;
 
     match message {
         Some(Ok(Message::Text(text))) => {
@@ -219,7 +264,7 @@ async fn read_loop(
                                     target: "vanguard::sync::ws",
                                     "failed to decode websocket message account_id={} message={}",
                                     account_id,
-                                    error
+                                    redact_sensitive(&error.to_string())
                                 );
                             }
                         }
@@ -230,7 +275,7 @@ async fn read_loop(
                                 target: "vanguard::sync::ws",
                                 "failed to send websocket pong account_id={} message={}",
                                 account_id,
-                                error
+                                redact_sensitive(&error.to_string())
                             );
                             break;
                         }
@@ -242,7 +287,7 @@ async fn read_loop(
                                 target: "vanguard::sync::ws",
                                 "ignored websocket text frame account_id={} payload={}",
                                 account_id,
-                                text
+                                redact_sensitive(&text)
                             );
                         }
                     }
@@ -251,7 +296,7 @@ async fn read_loop(
                             target: "vanguard::sync::ws",
                             "websocket closed account_id={} frame={:?}",
                             account_id,
-                            frame
+                            redact_sensitive(&format!("{frame:?}"))
                         );
                         break;
                     }
@@ -261,7 +306,7 @@ async fn read_loop(
                             target: "vanguard::sync::ws",
                             "websocket read failed account_id={} message={}",
                             account_id,
-                            error
+                            redact_sensitive(&error.to_string())
                         );
                         break;
                     }
@@ -296,20 +341,14 @@ async fn enqueue_event(
     }
 }
 
-fn websocket_endpoint(base_url: &str, access_token: &str) -> AppResult<String> {
+fn websocket_endpoint(base_url: &str) -> AppResult<String> {
     let normalized = base_url.trim().trim_end_matches('/');
     let endpoint = format!("{normalized}/notifications/hub");
     if endpoint.starts_with("https://") {
-        return Ok(format!(
-            "{}?access_token={access_token}",
-            endpoint.replacen("https://", "wss://", 1)
-        ));
+        return Ok(endpoint.replacen("https://", "wss://", 1));
     }
     if endpoint.starts_with("http://") {
-        return Ok(format!(
-            "{}?access_token={access_token}",
-            endpoint.replacen("http://", "ws://", 1)
-        ));
+        return Ok(endpoint.replacen("http://", "ws://", 1));
     }
 
     Err(AppError::validation(

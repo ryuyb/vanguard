@@ -4,7 +4,10 @@ use crate::application::dto::sync::{
     SyncVaultPayload,
 };
 
-use super::models::{SyncGlobalEquivalentDomainEntry, SyncResponse};
+use super::models::{
+    SyncCipher as RemoteSyncCipher, SyncFolder as RemoteSyncFolder,
+    SyncGlobalEquivalentDomainEntry, SyncResponse, SyncSend as RemoteSyncSend,
+};
 
 pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
     SyncVaultPayload {
@@ -14,16 +17,7 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
             email: response.profile.email,
             object: response.profile.object,
         },
-        folders: response
-            .folders
-            .into_iter()
-            .map(|folder| SyncFolder {
-                id: folder.id,
-                name: folder.name,
-                revision_date: folder.revision_date,
-                object: folder.object,
-            })
-            .collect(),
+        folders: response.folders.into_iter().map(map_sync_folder).collect(),
         collections: response
             .collections
             .into_iter()
@@ -46,31 +40,7 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
                 object: policy.object,
             })
             .collect(),
-        ciphers: response
-            .ciphers
-            .into_iter()
-            .map(|cipher| SyncCipher {
-                id: cipher.id,
-                organization_id: cipher.organization_id,
-                folder_id: cipher.folder_id,
-                r#type: cipher.r#type,
-                name: cipher.name,
-                revision_date: cipher.revision_date,
-                deleted_date: cipher.deleted_date,
-                object: cipher.object,
-                attachments: cipher
-                    .attachments
-                    .into_iter()
-                    .map(|attachment| SyncAttachment {
-                        id: attachment.id,
-                        file_name: attachment.file_name,
-                        size: attachment.size,
-                        url: attachment.url,
-                        object: attachment.object,
-                    })
-                    .collect(),
-            })
-            .collect(),
+        ciphers: response.ciphers.into_iter().map(map_sync_cipher).collect(),
         domains: response.domains.map(|domains| {
             let mut global_equivalent_domains = Vec::new();
             let mut excluded_from_globals = Vec::new();
@@ -104,18 +74,7 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
                 excluded_global_equivalent_domains,
             }
         }),
-        sends: response
-            .sends
-            .into_iter()
-            .map(|send| SyncSend {
-                id: send.id,
-                r#type: send.r#type,
-                name: send.name,
-                revision_date: send.revision_date,
-                deletion_date: send.deletion_date,
-                object: send.object,
-            })
-            .collect(),
+        sends: response.sends.into_iter().map(map_sync_send).collect(),
         user_decryption: response
             .user_decryption
             .map(|decryption| SyncUserDecryption {
@@ -133,5 +92,49 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
                     }
                 }),
             }),
+    }
+}
+
+pub fn map_sync_folder(folder: RemoteSyncFolder) -> SyncFolder {
+    SyncFolder {
+        id: folder.id,
+        name: folder.name,
+        revision_date: folder.revision_date,
+        object: folder.object,
+    }
+}
+
+pub fn map_sync_cipher(cipher: RemoteSyncCipher) -> SyncCipher {
+    SyncCipher {
+        id: cipher.id,
+        organization_id: cipher.organization_id,
+        folder_id: cipher.folder_id,
+        r#type: cipher.r#type,
+        name: cipher.name,
+        revision_date: cipher.revision_date,
+        deleted_date: cipher.deleted_date,
+        object: cipher.object,
+        attachments: cipher
+            .attachments
+            .into_iter()
+            .map(|attachment| SyncAttachment {
+                id: attachment.id,
+                file_name: attachment.file_name,
+                size: attachment.size,
+                url: attachment.url,
+                object: attachment.object,
+            })
+            .collect(),
+    }
+}
+
+pub fn map_sync_send(send: RemoteSyncSend) -> SyncSend {
+    SyncSend {
+        id: send.id,
+        r#type: send.r#type,
+        name: send.name,
+        revision_date: send.revision_date,
+        deletion_date: send.deletion_date,
+        object: send.object,
     }
 }

@@ -6,6 +6,9 @@ pub struct NotificationConnectCommand {
     pub base_url: String,
     pub access_token: String,
     pub queue_limit: usize,
+    pub connect_timeout_ms: u64,
+    pub handshake_timeout_ms: u64,
+    pub shutdown_timeout_ms: u64,
 }
 
 #[derive(Debug, Clone)]

@@ -8,6 +8,8 @@ pub struct VaultwardenConfig {
     pub device_name: String,
     pub device_type: String,
     pub allow_invalid_certs: bool,
+    pub http_connect_timeout_ms: u64,
+    pub http_request_timeout_ms: u64,
 }
 
 impl VaultwardenConfig {
@@ -19,6 +21,8 @@ impl VaultwardenConfig {
             device_name: String::from("vanguard-desktop"),
             device_type: String::from("23"),
             allow_invalid_certs: false,
+            http_connect_timeout_ms: 5_000,
+            http_request_timeout_ms: 15_000,
         }
     }
 

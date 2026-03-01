@@ -30,6 +30,18 @@ impl VaultwardenEndpoints {
     pub fn revision_date(base_url: &str) -> String {
         format!("{}/api/accounts/revision-date", normalize_base(base_url))
     }
+
+    pub fn cipher(base_url: &str, cipher_id: &str) -> String {
+        format!("{}/api/ciphers/{}", normalize_base(base_url), cipher_id)
+    }
+
+    pub fn folder(base_url: &str, folder_id: &str) -> String {
+        format!("{}/api/folders/{}", normalize_base(base_url), folder_id)
+    }
+
+    pub fn send(base_url: &str, send_id: &str) -> String {
+        format!("{}/api/sends/{}", normalize_base(base_url), send_id)
+    }
 }
 
 fn normalize_base(base_url: &str) -> &str {

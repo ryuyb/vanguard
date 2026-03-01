@@ -28,6 +28,20 @@ pub struct SyncCountsDto {
 
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct SyncMetricsDto {
+    pub window_size: u32,
+    pub sample_count: u32,
+    pub success_count: u32,
+    pub failure_count: u32,
+    pub failure_rate: f64,
+    pub last_duration_ms: Option<i64>,
+    pub average_duration_ms: Option<i64>,
+    pub last_counts: Option<SyncCountsDto>,
+    pub average_counts: Option<SyncCountsDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub enum SyncStateDto {
     Idle,
     Running,
@@ -55,4 +69,5 @@ pub struct SyncStatusResponseDto {
     pub last_sync_at_ms: Option<String>,
     pub last_error: Option<String>,
     pub counts: SyncCountsDto,
+    pub metrics: Option<SyncMetricsDto>,
 }

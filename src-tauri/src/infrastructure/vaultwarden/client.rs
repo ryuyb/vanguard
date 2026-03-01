@@ -3,9 +3,10 @@ use super::endpoints::VaultwardenEndpoints;
 use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
     PasswordLoginRequest, PreloginRequest, PreloginResponse, RefreshTokenRequest,
-    RevisionDateResponse, SendEmailLoginRequest, SyncResponse, TokenErrorResponse, TokenRequest,
-    TokenResponse, VerifyEmailTokenRequest,
+    RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder, SyncResponse, SyncSend,
+    TokenErrorResponse, TokenRequest, TokenResponse, VerifyEmailTokenRequest,
 };
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct VaultwardenClient {
@@ -17,6 +18,8 @@ impl VaultwardenClient {
     pub fn new(config: VaultwardenConfig) -> VaultwardenResult<Self> {
         let http_client = reqwest::Client::builder()
             .danger_accept_invalid_certs(config.allow_invalid_certs)
+            .connect_timeout(Duration::from_millis(config.http_connect_timeout_ms.max(1)))
+            .timeout(Duration::from_millis(config.http_request_timeout_ms.max(1)))
             .build()
             .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
 
@@ -68,6 +71,21 @@ impl VaultwardenClient {
     pub fn revision_date_endpoint(&self, base_url: &str) -> VaultwardenResult<String> {
         let base_url = Self::validated_base_url(base_url)?;
         Ok(VaultwardenEndpoints::revision_date(base_url))
+    }
+
+    pub fn cipher_endpoint(&self, base_url: &str, cipher_id: &str) -> VaultwardenResult<String> {
+        let base_url = Self::validated_base_url(base_url)?;
+        Ok(VaultwardenEndpoints::cipher(base_url, cipher_id))
+    }
+
+    pub fn folder_endpoint(&self, base_url: &str, folder_id: &str) -> VaultwardenResult<String> {
+        let base_url = Self::validated_base_url(base_url)?;
+        Ok(VaultwardenEndpoints::folder(base_url, folder_id))
+    }
+
+    pub fn send_endpoint(&self, base_url: &str, send_id: &str) -> VaultwardenResult<String> {
+        let base_url = Self::validated_base_url(base_url)?;
+        Ok(VaultwardenEndpoints::send(base_url, send_id))
     }
 
     pub fn send_email_login_endpoint(&self, base_url: &str) -> VaultwardenResult<String> {
@@ -307,6 +325,156 @@ impl VaultwardenClient {
                 "invalid revision-date response: expected integer timestamp in milliseconds",
             ))
         })
+    }
+
+    pub async fn get_cipher(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        cipher_id: &str,
+    ) -> VaultwardenResult<SyncCipher> {
+        let endpoint = self.cipher_endpoint(base_url, cipher_id)?;
+
+        let response = self
+            .http_client
+            .get(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        match serde_json::from_str::<SyncCipher>(&body) {
+            Ok(parsed) => Ok(parsed),
+            Err(error) => {
+                let line = error.line();
+                let column = error.column();
+                let snippet = json_error_snippet_redacted(&body, line, column, 220);
+                log::error!(
+                    target: "vanguard::vaultwarden",
+                    "cipher decode failed endpoint={} status={} body_len={} line={} column={} snippet={}",
+                    endpoint,
+                    status,
+                    body.len(),
+                    line,
+                    column,
+                    snippet
+                );
+                Err(VaultwardenError::Decode(format!(
+                    "invalid cipher response: {error}"
+                )))
+            }
+        }
+    }
+
+    pub async fn get_folder(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        folder_id: &str,
+    ) -> VaultwardenResult<SyncFolder> {
+        let endpoint = self.folder_endpoint(base_url, folder_id)?;
+
+        let response = self
+            .http_client
+            .get(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        match serde_json::from_str::<SyncFolder>(&body) {
+            Ok(parsed) => Ok(parsed),
+            Err(error) => {
+                let line = error.line();
+                let column = error.column();
+                let snippet = json_error_snippet_redacted(&body, line, column, 220);
+                log::error!(
+                    target: "vanguard::vaultwarden",
+                    "folder decode failed endpoint={} status={} body_len={} line={} column={} snippet={}",
+                    endpoint,
+                    status,
+                    body.len(),
+                    line,
+                    column,
+                    snippet
+                );
+                Err(VaultwardenError::Decode(format!(
+                    "invalid folder response: {error}"
+                )))
+            }
+        }
+    }
+
+    pub async fn get_send(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+    ) -> VaultwardenResult<SyncSend> {
+        let endpoint = self.send_endpoint(base_url, send_id)?;
+
+        let response = self
+            .http_client
+            .get(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        match serde_json::from_str::<SyncSend>(&body) {
+            Ok(parsed) => Ok(parsed),
+            Err(error) => {
+                let line = error.line();
+                let column = error.column();
+                let snippet = json_error_snippet_redacted(&body, line, column, 220);
+                log::error!(
+                    target: "vanguard::vaultwarden",
+                    "send decode failed endpoint={} status={} body_len={} line={} column={} snippet={}",
+                    endpoint,
+                    status,
+                    body.len(),
+                    line,
+                    column,
+                    snippet
+                );
+                Err(VaultwardenError::Decode(format!(
+                    "invalid send response: {error}"
+                )))
+            }
+        }
     }
 
     fn validated_base_url<'a>(base_url: &'a str) -> VaultwardenResult<&'a str> {

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use serde_json::Value as JsonValue;
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Duration};
 
@@ -156,6 +157,9 @@ impl RealtimeSyncService {
                     base_url: base_url.clone(),
                     access_token: access_token.clone(),
                     queue_limit: self.sync_policy.ws_event_queue_limit,
+                    connect_timeout_ms: self.sync_policy.ws_connect_timeout_ms,
+                    handshake_timeout_ms: self.sync_policy.ws_handshake_timeout_ms,
+                    shutdown_timeout_ms: self.sync_policy.ws_shutdown_timeout_ms,
                 })
                 .await
             {
@@ -346,6 +350,45 @@ impl RealtimeSyncService {
             return self.handle_logout_event(account_id);
         }
 
+        if is_incremental_cipher_event_type(event.event_type) {
+            let cipher_id = extract_payload_id(event.payload.as_ref());
+            return self
+                .trigger_websocket_incremental_cipher_sync(
+                    account_id,
+                    base_url,
+                    access_token,
+                    event.event_type,
+                    cipher_id.as_deref(),
+                )
+                .await;
+        }
+
+        if is_incremental_folder_event_type(event.event_type) {
+            let folder_id = extract_payload_id(event.payload.as_ref());
+            return self
+                .trigger_websocket_incremental_folder_sync(
+                    account_id,
+                    base_url,
+                    access_token,
+                    event.event_type,
+                    folder_id.as_deref(),
+                )
+                .await;
+        }
+
+        if is_incremental_send_event_type(event.event_type) {
+            let send_id = extract_payload_id(event.payload.as_ref());
+            return self
+                .trigger_websocket_incremental_send_sync(
+                    account_id,
+                    base_url,
+                    access_token,
+                    event.event_type,
+                    send_id.as_deref(),
+                )
+                .await;
+        }
+
         if is_sync_event_type(event.event_type) {
             let burst_outcome = self.collect_sync_burst(account_id).await;
             if matches!(burst_outcome, BurstOutcome::Stop) {
@@ -466,6 +509,168 @@ impl RealtimeSyncService {
             }
         }
         EventOutcome::Continue
+    }
+
+    async fn trigger_websocket_incremental_cipher_sync(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        access_token: &str,
+        event_type: i32,
+        cipher_id: Option<&str>,
+    ) -> EventOutcome {
+        let Some(cipher_id) = cipher_id else {
+            log::debug!(
+                target: "vanguard::sync::ws",
+                "incremental websocket sync fallback to full sync due to missing cipher id account_id={} type={}",
+                account_id,
+                event_type
+            );
+            return self
+                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .await;
+        };
+
+        let command = SyncVaultCommand {
+            account_id: String::from(account_id),
+            base_url: String::from(base_url),
+            access_token: String::from(access_token),
+            exclude_domains: false,
+            trigger: SyncTrigger::WebSocket,
+        };
+
+        match self
+            .sync_service
+            .sync_cipher_by_id(command, String::from(cipher_id), event_type)
+            .await
+        {
+            Ok(_) => EventOutcome::Continue,
+            Err(error) => {
+                log::warn!(
+                    target: "vanguard::sync::ws",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} cipher_id={} status={} error_code={} message={}",
+                    account_id,
+                    event_type,
+                    cipher_id,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error
+                );
+                if is_auth_status_error(&error) {
+                    return EventOutcome::Stop;
+                }
+                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                    .await
+            }
+        }
+    }
+
+    async fn trigger_websocket_incremental_folder_sync(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        access_token: &str,
+        event_type: i32,
+        folder_id: Option<&str>,
+    ) -> EventOutcome {
+        let Some(folder_id) = folder_id else {
+            log::debug!(
+                target: "vanguard::sync::ws",
+                "incremental websocket sync fallback to full sync due to missing folder id account_id={} type={}",
+                account_id,
+                event_type
+            );
+            return self
+                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .await;
+        };
+
+        let command = SyncVaultCommand {
+            account_id: String::from(account_id),
+            base_url: String::from(base_url),
+            access_token: String::from(access_token),
+            exclude_domains: false,
+            trigger: SyncTrigger::WebSocket,
+        };
+
+        match self
+            .sync_service
+            .sync_folder_by_id(command, String::from(folder_id), event_type)
+            .await
+        {
+            Ok(_) => EventOutcome::Continue,
+            Err(error) => {
+                log::warn!(
+                    target: "vanguard::sync::ws",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} folder_id={} status={} error_code={} message={}",
+                    account_id,
+                    event_type,
+                    folder_id,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error
+                );
+                if is_auth_status_error(&error) {
+                    return EventOutcome::Stop;
+                }
+                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                    .await
+            }
+        }
+    }
+
+    async fn trigger_websocket_incremental_send_sync(
+        &self,
+        account_id: &str,
+        base_url: &str,
+        access_token: &str,
+        event_type: i32,
+        send_id: Option<&str>,
+    ) -> EventOutcome {
+        let Some(send_id) = send_id else {
+            log::debug!(
+                target: "vanguard::sync::ws",
+                "incremental websocket sync fallback to full sync due to missing send id account_id={} type={}",
+                account_id,
+                event_type
+            );
+            return self
+                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .await;
+        };
+
+        let command = SyncVaultCommand {
+            account_id: String::from(account_id),
+            base_url: String::from(base_url),
+            access_token: String::from(access_token),
+            exclude_domains: false,
+            trigger: SyncTrigger::WebSocket,
+        };
+
+        match self
+            .sync_service
+            .sync_send_by_id(command, String::from(send_id), event_type)
+            .await
+        {
+            Ok(_) => EventOutcome::Continue,
+            Err(error) => {
+                log::warn!(
+                    target: "vanguard::sync::ws",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} send_id={} status={} error_code={} message={}",
+                    account_id,
+                    event_type,
+                    send_id,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error
+                );
+                if is_auth_status_error(&error) {
+                    return EventOutcome::Stop;
+                }
+                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                    .await
+            }
+        }
     }
 
     fn handle_logout_event(&self, account_id: &str) -> EventOutcome {
@@ -599,9 +804,68 @@ fn is_sync_event_type(event_type: i32) -> bool {
     )
 }
 
+fn is_incremental_cipher_event_type(event_type: i32) -> bool {
+    matches!(event_type, 0 | 1 | 2)
+}
+
+fn is_incremental_folder_event_type(event_type: i32) -> bool {
+    matches!(event_type, 3 | 7 | 8)
+}
+
+fn is_incremental_send_event_type(event_type: i32) -> bool {
+    matches!(event_type, 12 | 13 | 14)
+}
+
+fn extract_payload_id(payload: Option<&JsonValue>) -> Option<String> {
+    payload.and_then(|value| extract_payload_id_from_value(value, 0))
+}
+
+fn extract_payload_id_from_value(value: &JsonValue, depth: usize) -> Option<String> {
+    if depth > 4 {
+        return None;
+    }
+
+    match value {
+        JsonValue::String(value) => normalize_cipher_id(value),
+        JsonValue::Object(map) => {
+            for key in ["Id", "id", "CipherId", "cipherId", "CipherID", "cipherID"] {
+                if let Some(JsonValue::String(value)) = map.get(key) {
+                    if let Some(value) = normalize_cipher_id(value) {
+                        return Some(value);
+                    }
+                }
+            }
+
+            for key in ["Cipher", "cipher", "Data", "data", "Payload", "payload"] {
+                if let Some(inner) = map.get(key) {
+                    if let Some(id) = extract_payload_id_from_value(inner, depth + 1) {
+                        return Some(id);
+                    }
+                }
+            }
+
+            map.values()
+                .find_map(|inner| extract_payload_id_from_value(inner, depth + 1))
+        }
+        JsonValue::Array(items) => items
+            .iter()
+            .find_map(|item| extract_payload_id_from_value(item, depth + 1)),
+        _ => None,
+    }
+}
+
+fn normalize_cipher_id(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(String::from(trimmed))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn reconnect_delay_increases_before_hitting_ceiling() {
@@ -626,5 +890,67 @@ mod tests {
             assert!(delay <= max_ms);
             assert!(delay >= base_ms.min(max_ms));
         }
+    }
+
+    #[test]
+    fn extract_payload_id_reads_top_level_id() {
+        let payload = json!({
+            "Id": "cipher-1",
+            "Other": 1
+        });
+
+        let cipher_id = extract_payload_id(Some(&payload));
+        assert_eq!(cipher_id.as_deref(), Some("cipher-1"));
+    }
+
+    #[test]
+    fn extract_payload_id_reads_nested_payload() {
+        let payload = json!({
+            "Payload": {
+                "Cipher": {
+                    "id": "cipher-2"
+                }
+            }
+        });
+
+        let cipher_id = extract_payload_id(Some(&payload));
+        assert_eq!(cipher_id.as_deref(), Some("cipher-2"));
+    }
+
+    #[test]
+    fn extract_payload_id_returns_none_for_missing_id() {
+        let payload = json!({
+            "Payload": {
+                "Type": 0
+            }
+        });
+
+        assert!(extract_payload_id(Some(&payload)).is_none());
+    }
+
+    #[test]
+    fn retryable_ws_error_reconnects_for_transient_disconnects() {
+        assert!(is_retryable_ws_error(&AppError::remote(
+            "connection reset by peer"
+        )));
+        assert!(is_retryable_ws_error(&AppError::remote_status(
+            502,
+            "bad gateway"
+        )));
+    }
+
+    #[test]
+    fn retryable_ws_error_stops_for_auth_and_validation() {
+        assert!(!is_retryable_ws_error(&AppError::remote_status(
+            401,
+            "unauthorized"
+        )));
+        assert!(!is_retryable_ws_error(&AppError::remote_status(
+            403,
+            "forbidden"
+        )));
+        assert!(!is_retryable_ws_error(&AppError::validation(
+            "invalid websocket endpoint"
+        )));
     }
 }

@@ -8,14 +8,16 @@ use crate::interfaces::tauri::dto::sync::{
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
+use crate::support::redaction::redact_sensitive;
 
 fn log_command_error(command: &str, error: AppError) -> String {
     let payload = error.to_payload();
+    let sanitized = redact_sensitive(&payload.message);
     log::error!(
         target: "vanguard::tauri::sync",
         "{command} failed: [{}] {}",
         payload.code,
-        payload.message
+        sanitized
     );
     payload.message
 }
@@ -35,8 +37,15 @@ pub async fn vault_sync_now(
         .sync_now(command)
         .await
         .map_err(|error| log_command_error("vault_sync_now", error))?;
+    let metrics = state
+        .sync_service()
+        .sync_metrics(outcome.context.account_id.clone())
+        .map_err(|error| log_command_error("vault_sync_now", error))?;
 
-    Ok(mapping::to_sync_outcome_dto(outcome))
+    Ok(mapping::to_sync_status_response_dto(
+        outcome.context,
+        Some(metrics),
+    ))
 }
 
 #[tauri::command]
@@ -53,8 +62,12 @@ pub async fn vault_sync_status(
         .sync_status(account_id)
         .await
         .map_err(|error| log_command_error("vault_sync_status", error))?;
+    let metrics = state
+        .sync_service()
+        .sync_metrics(context.account_id.clone())
+        .map_err(|error| log_command_error("vault_sync_status", error))?;
 
-    Ok(mapping::to_sync_status_response_dto(context))
+    Ok(mapping::to_sync_status_response_dto(context, Some(metrics)))
 }
 
 #[tauri::command]
@@ -83,6 +96,10 @@ pub async fn vault_sync_check_revision(
         .sync_status(account_id)
         .await
         .map_err(|error| log_command_error("vault_sync_check_revision", error))?;
+    let metrics = state
+        .sync_service()
+        .sync_metrics(context.account_id.clone())
+        .map_err(|error| log_command_error("vault_sync_check_revision", error))?;
 
-    Ok(mapping::to_sync_status_response_dto(context))
+    Ok(mapping::to_sync_status_response_dto(context, Some(metrics)))
 }

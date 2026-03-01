@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
@@ -22,6 +22,8 @@ pub struct SqliteVaultRepository {
     db_dir: PathBuf,
     connections: Mutex<HashMap<String, Connection>>,
 }
+
+const SQLITE_BUSY_TIMEOUT_MS: u64 = 5_000;
 
 impl SqliteVaultRepository {
     pub fn new<P: AsRef<Path>>(db_dir: P) -> AppResult<Self> {
@@ -81,6 +83,11 @@ impl SqliteVaultRepository {
                 db_path.display()
             ))
         })?;
+        connection
+            .busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))
+            .map_err(|error| {
+                AppError::internal(format!("failed to configure sqlite busy timeout: {error}"))
+            })?;
         Self::initialize_schema(&connection)?;
         Ok(connection)
     }
@@ -937,6 +944,54 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         })
     }
 
+    async fn upsert_folder_live(&self, account_id: &str, folder: SyncFolder) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            let payload_json = Self::to_json(&folder, "live sync folder")?;
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO live_folders (account_id, id, payload_json)
+                    VALUES (?1, ?2, ?3)
+                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    "#,
+                    params![account_id, folder.id, payload_json],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to upsert live folder: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn delete_folder_live(&self, account_id: &str, folder_id: &str) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            connection
+                .execute(
+                    "DELETE FROM live_folders WHERE account_id = ?1 AND id = ?2",
+                    params![account_id, folder_id],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to delete live folder: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn count_live_folders(&self, account_id: &str) -> AppResult<u32> {
+        self.with_account_connection(account_id, |connection| {
+            let count = connection
+                .query_row(
+                    "SELECT COUNT(1) FROM live_folders WHERE account_id = ?1",
+                    params![account_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to count live folders: {error}"))
+                })?;
+            to_u32(count, "live_folders_count")
+        })
+    }
+
     async fn upsert_collections(
         &self,
         account_id: &str,
@@ -1028,9 +1083,10 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         AppError::internal(format!("failed to prepare cipher upsert statement: {error}"))
                     })?;
                 for cipher in ciphers {
-                    let payload_json = Self::to_json(&cipher, "sync cipher")?;
+                    let sanitized = sanitize_cipher_for_persistence(cipher);
+                    let payload_json = Self::to_json(&sanitized, "sync cipher")?;
                     statement
-                        .execute(params![account_id, cipher.id, payload_json])
+                        .execute(params![account_id, sanitized.id, payload_json])
                         .map_err(|error| {
                             AppError::internal(format!("failed to upsert staging cipher: {error}"))
                         })?;
@@ -1040,6 +1096,55 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 AppError::internal(format!("failed to commit upsert ciphers transaction: {error}"))
             })?;
             Ok(())
+        })
+    }
+
+    async fn upsert_cipher_live(&self, account_id: &str, cipher: SyncCipher) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            let sanitized = sanitize_cipher_for_persistence(cipher);
+            let payload_json = Self::to_json(&sanitized, "live sync cipher")?;
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO live_ciphers (account_id, id, payload_json)
+                    VALUES (?1, ?2, ?3)
+                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    "#,
+                    params![account_id, sanitized.id, payload_json],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to upsert live cipher: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            connection
+                .execute(
+                    "DELETE FROM live_ciphers WHERE account_id = ?1 AND id = ?2",
+                    params![account_id, cipher_id],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to delete live cipher: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32> {
+        self.with_account_connection(account_id, |connection| {
+            let count = connection
+                .query_row(
+                    "SELECT COUNT(1) FROM live_ciphers WHERE account_id = ?1",
+                    params![account_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to count live ciphers: {error}"))
+                })?;
+            to_u32(count, "live_ciphers_count")
         })
     }
 
@@ -1072,6 +1177,54 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 AppError::internal(format!("failed to commit upsert sends transaction: {error}"))
             })?;
             Ok(())
+        })
+    }
+
+    async fn upsert_send_live(&self, account_id: &str, send: SyncSend) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            let payload_json = Self::to_json(&send, "live sync send")?;
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO live_sends (account_id, id, payload_json)
+                    VALUES (?1, ?2, ?3)
+                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    "#,
+                    params![account_id, send.id, payload_json],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to upsert live send: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn delete_send_live(&self, account_id: &str, send_id: &str) -> AppResult<()> {
+        self.with_account_connection(account_id, |connection| {
+            connection
+                .execute(
+                    "DELETE FROM live_sends WHERE account_id = ?1 AND id = ?2",
+                    params![account_id, send_id],
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to delete live send: {error}"))
+                })?;
+            Ok(())
+        })
+    }
+
+    async fn count_live_sends(&self, account_id: &str) -> AppResult<u32> {
+        self.with_account_connection(account_id, |connection| {
+            let count = connection
+                .query_row(
+                    "SELECT COUNT(1) FROM live_sends WHERE account_id = ?1",
+                    params![account_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(|error| {
+                    AppError::internal(format!("failed to count live sends: {error}"))
+                })?;
+            to_u32(count, "live_sends_count")
         })
     }
 
@@ -1302,4 +1455,80 @@ fn now_unix_ms() -> AppResult<i64> {
         .duration_since(UNIX_EPOCH)
         .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
+}
+
+fn sanitize_cipher_for_persistence(mut cipher: SyncCipher) -> SyncCipher {
+    for attachment in &mut cipher.attachments {
+        attachment.url = None;
+    }
+    cipher
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_cipher_for_persistence;
+    use crate::application::dto::sync::{SyncAttachment, SyncCipher};
+    use rusqlite::Connection;
+    use std::time::Duration;
+
+    #[test]
+    fn sanitize_cipher_for_persistence_removes_attachment_urls() {
+        let cipher = SyncCipher {
+            id: String::from("cipher-1"),
+            organization_id: None,
+            folder_id: None,
+            r#type: Some(1),
+            name: Some(String::from("demo")),
+            revision_date: None,
+            deleted_date: None,
+            object: Some(String::from("cipher")),
+            attachments: vec![SyncAttachment {
+                id: String::from("att-1"),
+                file_name: Some(String::from("a.txt")),
+                size: Some(String::from("12")),
+                url: Some(String::from("https://example.invalid/attachment")),
+                object: Some(String::from("attachment")),
+            }],
+        };
+
+        let sanitized = sanitize_cipher_for_persistence(cipher);
+        assert_eq!(sanitized.attachments.len(), 1);
+        assert!(sanitized.attachments[0].url.is_none());
+    }
+
+    #[test]
+    fn sqlite_busy_timeout_surfaces_lock_conflict() {
+        let db_path = std::env::temp_dir().join(format!(
+            "vanguard-lock-conflict-{}.sqlite3",
+            uuid::Uuid::new_v4()
+        ));
+
+        let conn1 = Connection::open(&db_path).expect("open conn1");
+        let conn2 = Connection::open(&db_path).expect("open conn2");
+        conn2
+            .busy_timeout(Duration::from_millis(50))
+            .expect("set busy timeout");
+
+        conn1
+            .execute_batch(
+                r#"
+                CREATE TABLE IF NOT EXISTS lock_test (
+                    id INTEGER PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                BEGIN EXCLUSIVE;
+                INSERT INTO lock_test (value) VALUES ('hold-lock');
+                "#,
+            )
+            .expect("prepare exclusive lock");
+
+        let conflict = conn2.execute(
+            "INSERT INTO lock_test (value) VALUES (?1)",
+            rusqlite::params!["contender"],
+        );
+        assert!(conflict.is_err(), "expected sqlite lock conflict");
+
+        conn1.execute_batch("ROLLBACK;").expect("release lock");
+        let _ = std::fs::remove_file(&db_path);
+    }
 }

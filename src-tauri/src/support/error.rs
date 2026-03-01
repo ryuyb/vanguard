@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+use crate::support::redaction::redact_sensitive;
 use serde::Serialize;
 
 #[derive(Debug)]
@@ -63,11 +64,15 @@ impl AppError {
             message: self.message(),
         }
     }
+
+    pub fn log_message(&self) -> String {
+        redact_sensitive(&self.message())
+    }
 }
 
 impl Display for AppError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message())
+        write!(f, "{}", self.log_message())
     }
 }
 

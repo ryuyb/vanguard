@@ -1,4 +1,4 @@
-use crate::domain::sync::{SyncContext, SyncResult, SyncTrigger};
+use crate::domain::sync::{SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
 use serde::Serialize;
 
 #[derive(Debug, Clone)]
@@ -32,6 +32,19 @@ pub struct RevisionDateQuery {
 pub struct SyncOutcome {
     pub context: SyncContext,
     pub result: SyncResult,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SyncMetricsSummary {
+    pub window_size: u32,
+    pub sample_count: u32,
+    pub success_count: u32,
+    pub failure_count: u32,
+    pub failure_rate: f64,
+    pub last_duration_ms: Option<i64>,
+    pub average_duration_ms: Option<i64>,
+    pub last_item_counts: Option<SyncItemCounts>,
+    pub average_item_counts: Option<SyncItemCounts>,
 }
 
 #[derive(Debug, Clone, Serialize)]

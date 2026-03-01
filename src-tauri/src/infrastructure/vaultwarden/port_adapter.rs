@@ -7,13 +7,15 @@ use crate::application::dto::auth::{
     WebauthnAllowCredential as AppWebauthnAllowCredential,
     WebauthnRequestExtensions as AppWebauthnRequestExtensions,
 };
-use crate::application::dto::sync::{RevisionDateQuery, SyncVaultCommand, SyncVaultPayload};
+use crate::application::dto::sync::{
+    RevisionDateQuery, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload,
+};
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 use super::error::VaultwardenError;
-use super::mapper::map_sync_response;
+use super::mapper::{map_sync_cipher, map_sync_folder, map_sync_response, map_sync_send};
 use super::models::{
     PasswordLoginRequest, PreloginRequest, RefreshTokenRequest, SendEmailLoginRequest,
     TokenErrorResponse, TokenResponse, TwoFactorProviderHint, VerifyEmailTokenRequest,
@@ -204,6 +206,41 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .map_err(map_vaultwarden_error)?;
 
         Ok(map_sync_response(response))
+    }
+
+    async fn get_cipher(
+        &self,
+        command: SyncVaultCommand,
+        cipher_id: String,
+    ) -> AppResult<SyncCipher> {
+        let response = self
+            .client
+            .get_cipher(&command.base_url, &command.access_token, &cipher_id)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(map_sync_cipher(response))
+    }
+
+    async fn get_folder(
+        &self,
+        command: SyncVaultCommand,
+        folder_id: String,
+    ) -> AppResult<SyncFolder> {
+        let response = self
+            .client
+            .get_folder(&command.base_url, &command.access_token, &folder_id)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(map_sync_folder(response))
+    }
+
+    async fn get_send(&self, command: SyncVaultCommand, send_id: String) -> AppResult<SyncSend> {
+        let response = self
+            .client
+            .get_send(&command.base_url, &command.access_token, &send_id)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(map_sync_send(response))
     }
 
     async fn get_revision_date(&self, query: RevisionDateQuery) -> AppResult<i64> {

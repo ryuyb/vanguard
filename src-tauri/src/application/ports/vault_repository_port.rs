@@ -48,6 +48,12 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn upsert_folders(&self, account_id: &str, folders: Vec<SyncFolder>) -> AppResult<()>;
 
+    async fn upsert_folder_live(&self, account_id: &str, folder: SyncFolder) -> AppResult<()>;
+
+    async fn delete_folder_live(&self, account_id: &str, folder_id: &str) -> AppResult<()>;
+
+    async fn count_live_folders(&self, account_id: &str) -> AppResult<u32>;
+
     async fn upsert_collections(
         &self,
         account_id: &str,
@@ -58,7 +64,19 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn upsert_ciphers(&self, account_id: &str, ciphers: Vec<SyncCipher>) -> AppResult<()>;
 
+    async fn upsert_cipher_live(&self, account_id: &str, cipher: SyncCipher) -> AppResult<()>;
+
+    async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()>;
+
+    async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32>;
+
     async fn upsert_sends(&self, account_id: &str, sends: Vec<SyncSend>) -> AppResult<()>;
+
+    async fn upsert_send_live(&self, account_id: &str, send: SyncSend) -> AppResult<()>;
+
+    async fn delete_send_live(&self, account_id: &str, send_id: &str) -> AppResult<()>;
+
+    async fn count_live_sends(&self, account_id: &str) -> AppResult<u32>;
 
     async fn upsert_domains(&self, account_id: &str, domains: Option<SyncDomains>)
         -> AppResult<()>;

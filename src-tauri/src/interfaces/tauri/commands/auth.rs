@@ -15,14 +15,16 @@ use crate::interfaces::tauri::dto::auth::{
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
+use crate::support::redaction::redact_sensitive;
 
 fn log_command_error(command: &str, error: AppError) -> String {
     let payload = error.to_payload();
+    let sanitized = redact_sensitive(&payload.message);
     log::error!(
         target: "vanguard::tauri::auth",
         "{command} failed: [{}] {}",
         payload.code,
-        payload.message
+        sanitized
     );
     payload.message
 }
@@ -69,7 +71,7 @@ pub async fn auth_login_with_password(
                         target: "vanguard::tauri::auth",
                         "failed to start revision polling after login: [{}] {}",
                         error.code(),
-                        error.message()
+                        error.log_message()
                     );
                 }
                 if let Err(error) = state
@@ -85,7 +87,7 @@ pub async fn auth_login_with_password(
                         target: "vanguard::tauri::auth",
                         "failed to start realtime sync after login: [{}] {}",
                         error.code(),
-                        error.message()
+                        error.log_message()
                     );
                 }
                 trigger_sync_after_login(
@@ -100,7 +102,7 @@ pub async fn auth_login_with_password(
                     target: "vanguard::tauri::auth",
                     "skip auto sync after login: [{}] {}",
                     error.code(),
-                    error.message()
+                    error.log_message()
                 );
             }
         }
@@ -136,7 +138,7 @@ pub async fn auth_refresh_token(
                     target: "vanguard::tauri::auth",
                     "failed to restart revision polling after refresh: [{}] {}",
                     error.code(),
-                    error.message()
+                    error.log_message()
                 );
             }
             if let Err(error) = state
@@ -148,7 +150,7 @@ pub async fn auth_refresh_token(
                     target: "vanguard::tauri::auth",
                     "failed to restart realtime sync after refresh: [{}] {}",
                     error.code(),
-                    error.message()
+                    error.log_message()
                 );
             }
         }
@@ -157,7 +159,7 @@ pub async fn auth_refresh_token(
                 target: "vanguard::tauri::auth",
                 "failed to derive account id from refreshed token: [{}] {}",
                 error.code(),
-                error.message()
+                error.log_message()
             );
         }
     }

@@ -4,7 +4,7 @@ use crate::application::dto::auth::{
     TwoFactorProviderHint, VerifyEmailTokenCommand, WebauthnAllowCredential,
     WebauthnRequestExtensions,
 };
-use crate::application::dto::sync::{SyncOutcome, SyncVaultCommand};
+use crate::application::dto::sync::{SyncMetricsSummary, SyncOutcome, SyncVaultCommand};
 use crate::domain::sync::{SyncContext, SyncState, SyncTrigger, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
     MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto,
@@ -13,7 +13,8 @@ use crate::interfaces::tauri::dto::auth::{
     WebauthnAllowCredentialDto, WebauthnRequestExtensionsDto,
 };
 use crate::interfaces::tauri::dto::sync::{
-    SyncCountsDto, SyncNowRequestDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
+    SyncCountsDto, SyncMetricsDto, SyncNowRequestDto, SyncStateDto, SyncStatusResponseDto,
+    WsStatusDto,
 };
 use std::collections::HashMap;
 
@@ -180,7 +181,10 @@ pub fn to_sync_vault_command(dto: SyncNowRequestDto, account_id: String) -> Sync
     }
 }
 
-pub fn to_sync_status_response_dto(context: SyncContext) -> SyncStatusResponseDto {
+pub fn to_sync_status_response_dto(
+    context: SyncContext,
+    metrics: Option<SyncMetricsSummary>,
+) -> SyncStatusResponseDto {
     SyncStatusResponseDto {
         account_id: context.account_id,
         base_url: context.base_url,
@@ -196,11 +200,36 @@ pub fn to_sync_status_response_dto(context: SyncContext) -> SyncStatusResponseDt
             ciphers: context.counts.ciphers,
             sends: context.counts.sends,
         },
+        metrics: metrics.map(to_sync_metrics_dto),
     }
 }
 
 pub fn to_sync_outcome_dto(outcome: SyncOutcome) -> SyncStatusResponseDto {
-    to_sync_status_response_dto(outcome.context)
+    to_sync_status_response_dto(outcome.context, None)
+}
+
+fn to_sync_metrics_dto(metrics: SyncMetricsSummary) -> SyncMetricsDto {
+    SyncMetricsDto {
+        window_size: metrics.window_size,
+        sample_count: metrics.sample_count,
+        success_count: metrics.success_count,
+        failure_count: metrics.failure_count,
+        failure_rate: metrics.failure_rate,
+        last_duration_ms: metrics.last_duration_ms,
+        average_duration_ms: metrics.average_duration_ms,
+        last_counts: metrics.last_item_counts.map(to_counts_dto),
+        average_counts: metrics.average_item_counts.map(to_counts_dto),
+    }
+}
+
+fn to_counts_dto(counts: crate::domain::sync::SyncItemCounts) -> SyncCountsDto {
+    SyncCountsDto {
+        folders: counts.folders,
+        collections: counts.collections,
+        policies: counts.policies,
+        ciphers: counts.ciphers,
+        sends: counts.sends,
+    }
 }
 
 fn to_sync_state_dto(state: SyncState) -> SyncStateDto {
