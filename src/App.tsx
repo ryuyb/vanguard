@@ -20,6 +20,9 @@ type LogEntry = {
 };
 
 function App() {
+  const [authBootstrapStatus, setAuthBootstrapStatus] = useState<
+    "unknown" | "needsLogin" | "locked" | "authenticated"
+  >("unknown");
   const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:8080");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -90,6 +93,37 @@ function App() {
   };
 
   useEffect(() => {
+    const restore = async () => {
+      const result = await commands.authRestoreState({});
+      if (result.status === "error") {
+        addLog(
+          "error",
+          `auth-restore-state failed: ${result.error || "backend returned an empty error message"}`,
+        );
+        return;
+      }
+
+      setAuthBootstrapStatus(result.data.status);
+      if (result.data.baseUrl) {
+        setBaseUrl(result.data.baseUrl);
+      }
+      if (result.data.email) {
+        setEmail(result.data.email);
+      }
+      if (result.data.status === "locked") {
+        addLog("info", "restored persisted login context, master password unlock is ready");
+      } else if (result.data.status === "authenticated") {
+        addLog("info", "backend session is active");
+      } else {
+        addLog("info", "no persisted login context found");
+      }
+      setRaw(result.data);
+    };
+
+    void restore();
+  }, []);
+
+  useEffect(() => {
     let lastTriggeredAt = 0;
 
     const maybeTrigger = () => {
@@ -124,6 +158,9 @@ function App() {
     const unlistenPromise = events.vaultSyncAuthRequired.listen((event) => {
       setSession(null);
       setChallenge(null);
+      setVaultViewData(null);
+      setVaultCipherDetail(null);
+      setAuthBootstrapStatus("needsLogin");
       addLog(
         "error",
         `session invalidated (${event.payload.status}): ${event.payload.message}`,
@@ -195,6 +232,25 @@ function App() {
     });
   };
 
+  const handleAuthLogout = async () => {
+    await run("auth-logout", async () => {
+      const result = await commands.authLogout({});
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setSession(null);
+      setChallenge(null);
+      setSyncStatus(null);
+      setVaultViewData(null);
+      setVaultCipherDetail(null);
+      setAuthBootstrapStatus("needsLogin");
+      setRaw({ ok: true });
+    });
+  };
+
   const handleSyncNow = async () => {
     await run("vault-sync-now", async () => {
       const result = await commands.vaultSyncNow({
@@ -240,6 +296,7 @@ function App() {
         throw new Error(result.error || "backend returned an empty error message");
       }
 
+      setAuthBootstrapStatus("authenticated");
       setRaw({ ok: true });
     });
   };
@@ -253,6 +310,7 @@ function App() {
         throw new Error(result.error || "backend returned an empty error message");
       }
 
+      setAuthBootstrapStatus("locked");
       setVaultCipherDetail(null);
       setRaw({ ok: true });
     });
@@ -315,6 +373,7 @@ function App() {
       void status;
       setSession(sessionResult);
       setChallenge(null);
+      setAuthBootstrapStatus("authenticated");
       return;
     }
 
@@ -322,6 +381,7 @@ function App() {
     void status;
     setChallenge(challengeResult);
     setSession(null);
+    setAuthBootstrapStatus("needsLogin");
 
     if (challengeResult.providers.length > 0) {
       const firstProvider = Number(challengeResult.providers[0]);
@@ -384,6 +444,9 @@ function App() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <button type="button" disabled={!!busyAction} onClick={handleLogin}>
             Password Login
+          </button>
+          <button type="button" disabled={!!busyAction} onClick={handleAuthLogout}>
+            Auth Logout
           </button>
         </div>
 
@@ -519,6 +582,7 @@ function App() {
 
       <section style={sectionStyle}>
         <h2>结果快照</h2>
+        <p>Auth Bootstrap: {authBootstrapStatus}</p>
         <p>Session: {session ? "authenticated" : "none"}</p>
         <p>2FA Challenge: {challenge ? "required" : "none"}</p>
         <p>Sync Status: {syncStatus ? syncStatus.state : "none"}</p>

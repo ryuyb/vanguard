@@ -17,6 +17,8 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_login_with_password,
             interfaces::tauri::commands::auth::auth_send_email_login,
             interfaces::tauri::commands::auth::auth_verify_email_token,
+            interfaces::tauri::commands::auth::auth_restore_state,
+            interfaces::tauri::commands::auth::auth_logout,
             interfaces::tauri::commands::sync::vault_sync_now,
             interfaces::tauri::commands::sync::vault_sync_status,
             interfaces::tauri::commands::sync::vault_sync_check_revision,

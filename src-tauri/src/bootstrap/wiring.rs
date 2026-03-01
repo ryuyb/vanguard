@@ -36,6 +36,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     let remote_vault: Arc<dyn RemoteVaultPort> = Arc::new(VaultwardenRemotePort::new(client));
     let notification_port: Arc<dyn NotificationPort> = Arc::new(VaultwardenNotificationPort::new());
     let sqlite_dir = resolve_sqlite_dir(manager)?;
+    let auth_state_path = resolve_auth_state_path(manager)?;
     let vault_repository: Arc<dyn VaultRepositoryPort> =
         Arc::new(SqliteVaultRepository::new(sqlite_dir)?);
     let sync_event_port: Arc<dyn SyncEventPort> =
@@ -72,6 +73,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         auth_service,
         sync_service,
         realtime_sync_service,
+        auth_state_path,
     ))
 }
 
@@ -88,4 +90,20 @@ fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::
         ))
     })?;
     Ok(sqlite_dir)
+}
+
+fn resolve_auth_state_path<R: Runtime, M: Manager<R>>(
+    manager: &M,
+) -> AppResult<std::path::PathBuf> {
+    let app_data_dir = manager
+        .path()
+        .app_data_dir()
+        .map_err(|error| AppError::internal(format!("failed to resolve app data dir: {error}")))?;
+    std::fs::create_dir_all(&app_data_dir).map_err(|error| {
+        AppError::internal(format!(
+            "failed to create app data dir {}: {error}",
+            app_data_dir.display()
+        ))
+    })?;
+    Ok(app_data_dir.join("auth-state.json"))
 }

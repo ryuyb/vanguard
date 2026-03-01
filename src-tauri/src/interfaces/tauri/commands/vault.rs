@@ -7,16 +7,17 @@ use sha2::{Digest, Sha256};
 use tauri::State;
 
 use crate::application::dto::auth::PreloginQuery;
-use crate::bootstrap::app_state::{AppState, VaultUserKey};
+use crate::bootstrap::app_state::{AppState, PersistedAuthContext, VaultUserKey};
 use crate::infrastructure::vaultwarden::password_hash::derive_master_key;
 use crate::interfaces::tauri::dto::vault::{
-    VaultCipherDetailDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto, VaultCipherItemDto,
-    VaultFolderItemDto, VaultLockRequestDto,
-    VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
+    VaultCipherDetailDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
+    VaultCipherItemDto, VaultFolderItemDto, VaultLockRequestDto, VaultUnlockWithPasswordRequestDto,
+    VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::{mapping, session};
 use crate::support::error::AppError;
 use crate::support::redaction::redact_sensitive;
+use crate::support::result::AppResult;
 
 type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
 type HmacSha256 = Hmac<Sha256>;
@@ -44,10 +45,17 @@ pub async fn vault_unlock_with_password(
     state: State<'_, AppState>,
     request: VaultUnlockWithPasswordRequestDto,
 ) -> Result<(), String> {
-    let auth_session = session::ensure_fresh_auth_session(&state)
+    let master_password = request.master_password.trim().to_string();
+    if master_password.is_empty() {
+        return Err(log_command_error(
+            "vault_unlock_with_password",
+            AppError::validation("master_password cannot be empty"),
+        ));
+    }
+    let unlock_context = resolve_unlock_context(&state, &master_password)
         .await
         .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
-    let account_id = auth_session.account_id.clone();
+    let account_id = unlock_context.account_id.clone();
 
     let unlock_material = state
         .sync_service()
@@ -61,8 +69,8 @@ pub async fn vault_unlock_with_password(
 
     let master_keys = derive_master_key_candidates_for_unlock(
         &state,
-        &auth_session,
-        &request.master_password,
+        &unlock_context,
+        &master_password,
         &unlock_material,
     )
     .await
@@ -81,6 +89,28 @@ pub async fn vault_unlock_with_password(
         account_id
     );
 
+    if state
+        .auth_session()
+        .map_err(|error| log_command_error("vault_unlock_with_password", error))?
+        .is_none()
+    {
+        if let Err(error) =
+            session::restore_auth_session_with_master_password(&state, &master_password).await
+        {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "vault unlock completed but auth session restore failed account_id={} status={} error_code={} message={}",
+                unlock_context.account_id,
+                error
+                    .status()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error.log_message()
+            );
+        }
+    }
+
     Ok(())
 }
 
@@ -91,8 +121,7 @@ pub async fn vault_lock(
     _request: VaultLockRequestDto,
 ) -> Result<(), String> {
     let account_id = state
-        .require_auth_session()
-        .map(|value| value.account_id)
+        .active_account_id()
         .map_err(|error| log_command_error("vault_lock", error))?;
 
     state
@@ -108,8 +137,7 @@ pub async fn vault_get_view_data(
     request: VaultViewDataRequestDto,
 ) -> Result<VaultViewDataResponseDto, String> {
     let account_id = state
-        .require_auth_session()
-        .map(|value| value.account_id)
+        .active_account_id()
         .map_err(|error| log_command_error("vault_get_view_data", error))?;
 
     let page = normalize_page(request.page);
@@ -199,8 +227,7 @@ pub async fn vault_get_cipher_detail(
     request: VaultCipherDetailRequestDto,
 ) -> Result<VaultCipherDetailResponseDto, String> {
     let account_id = state
-        .require_auth_session()
-        .map(|value| value.account_id)
+        .active_account_id()
         .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
     let cipher_id = request.cipher_id.trim();
     if cipher_id.is_empty() {
@@ -235,10 +262,7 @@ pub async fn vault_get_cipher_detail(
     let cipher = decrypt_cipher_detail(cipher, &user_key)
         .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
 
-    Ok(VaultCipherDetailResponseDto {
-        account_id,
-        cipher,
-    })
+    Ok(VaultCipherDetailResponseDto { account_id, cipher })
 }
 
 fn normalize_page(page: Option<u32>) -> u32 {
@@ -416,6 +440,43 @@ struct UnlockMaterial {
     salt: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct UnlockContext {
+    account_id: String,
+    base_url: String,
+    email: String,
+    kdf: Option<i32>,
+    kdf_iterations: Option<i32>,
+    kdf_memory: Option<i32>,
+    kdf_parallelism: Option<i32>,
+}
+
+impl UnlockContext {
+    fn from_auth_session(value: &crate::bootstrap::app_state::AuthSession) -> Self {
+        Self {
+            account_id: value.account_id.clone(),
+            base_url: value.base_url.clone(),
+            email: value.email.clone(),
+            kdf: value.kdf,
+            kdf_iterations: value.kdf_iterations,
+            kdf_memory: value.kdf_memory,
+            kdf_parallelism: value.kdf_parallelism,
+        }
+    }
+
+    fn from_persisted_context(value: &PersistedAuthContext) -> Self {
+        Self {
+            account_id: value.account_id.clone(),
+            base_url: value.base_url.clone(),
+            email: value.email.clone(),
+            kdf: value.kdf,
+            kdf_iterations: value.kdf_iterations,
+            kdf_memory: value.kdf_memory,
+            kdf_parallelism: value.kdf_parallelism,
+        }
+    }
+}
+
 fn extract_unlock_material(
     value: Option<crate::application::dto::sync::SyncUserDecryption>,
 ) -> Result<UnlockMaterial, AppError> {
@@ -468,7 +529,7 @@ fn extract_unlock_material(
 
 async fn derive_master_key_candidates_for_unlock(
     state: &AppState,
-    auth_session: &crate::bootstrap::app_state::AuthSession,
+    unlock_context: &UnlockContext,
     master_password: &str,
     unlock_material: &UnlockMaterial,
 ) -> Result<Vec<Vec<u8>>, AppError> {
@@ -478,7 +539,7 @@ async fn derive_master_key_candidates_for_unlock(
         let salt = unlock_material
             .salt
             .clone()
-            .unwrap_or_else(|| auth_session.email.clone());
+            .unwrap_or_else(|| unlock_context.email.clone());
         maybe_push_master_key(
             &mut candidates,
             &salt,
@@ -490,34 +551,51 @@ async fn derive_master_key_candidates_for_unlock(
         )?;
     }
 
-    if let (Some(kdf), Some(iterations)) = (auth_session.kdf, auth_session.kdf_iterations) {
+    if let (Some(kdf), Some(iterations)) = (unlock_context.kdf, unlock_context.kdf_iterations) {
         maybe_push_master_key(
             &mut candidates,
-            &auth_session.email,
+            &unlock_context.email,
             master_password,
             kdf,
             iterations,
-            auth_session.kdf_memory,
-            auth_session.kdf_parallelism,
+            unlock_context.kdf_memory,
+            unlock_context.kdf_parallelism,
         )?;
     }
 
-    let prelogin = state
+    match state
         .auth_service()
         .prelogin(PreloginQuery {
-            base_url: auth_session.base_url.clone(),
-            email: auth_session.email.clone(),
+            base_url: unlock_context.base_url.clone(),
+            email: unlock_context.email.clone(),
         })
-        .await?;
-    maybe_push_master_key(
-        &mut candidates,
-        &auth_session.email,
-        master_password,
-        prelogin.kdf,
-        prelogin.kdf_iterations,
-        prelogin.kdf_memory,
-        prelogin.kdf_parallelism,
-    )?;
+        .await
+    {
+        Ok(prelogin) => {
+            maybe_push_master_key(
+                &mut candidates,
+                &unlock_context.email,
+                master_password,
+                prelogin.kdf,
+                prelogin.kdf_iterations,
+                prelogin.kdf_memory,
+                prelogin.kdf_parallelism,
+            )?;
+        }
+        Err(error) => {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "skip prelogin master key candidate account_id={} status={} error_code={} message={}",
+                unlock_context.account_id,
+                error
+                    .status()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error.log_message()
+            );
+        }
+    }
 
     if candidates.is_empty() {
         return Err(AppError::validation(
@@ -526,6 +604,39 @@ async fn derive_master_key_candidates_for_unlock(
     }
 
     Ok(candidates)
+}
+
+async fn resolve_unlock_context(
+    state: &AppState,
+    master_password: &str,
+) -> AppResult<UnlockContext> {
+    if let Some(auth_session) = state.auth_session()? {
+        return Ok(UnlockContext::from_auth_session(&auth_session));
+    }
+
+    let persisted_context = state.persisted_auth_context()?.ok_or_else(|| {
+        AppError::validation(
+            "no authenticated or persisted account state found, please login first",
+        )
+    })?;
+
+    match session::restore_auth_session_with_master_password(state, master_password).await {
+        Ok(auth_session) => Ok(UnlockContext::from_auth_session(&auth_session)),
+        Err(error) => {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "fallback to persisted account context for local unlock account_id={} status={} error_code={} message={}",
+                persisted_context.account_id,
+                error
+                    .status()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error.log_message()
+            );
+            Ok(UnlockContext::from_persisted_context(&persisted_context))
+        }
+    }
 }
 
 fn maybe_push_master_key(

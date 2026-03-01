@@ -36,6 +36,75 @@ pub async fn force_refresh_auth_session(state: &AppState) -> AppResult<AuthSessi
     refresh_auth_session(state, true).await
 }
 
+pub async fn restore_auth_session_with_master_password(
+    state: &AppState,
+    master_password: &str,
+) -> AppResult<AuthSession> {
+    let persisted = state
+        .decrypt_persisted_auth_secret(master_password)?
+        .ok_or_else(|| {
+            AppError::validation("no persisted login state found in backend, please login first")
+        })?;
+    let refresh_token = persisted.refresh_token.clone();
+    let refreshed = match state
+        .auth_service()
+        .refresh_token(RefreshTokenCommand {
+            base_url: persisted.context.base_url.clone(),
+            refresh_token,
+        })
+        .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            if matches!(error.status(), Some(401 | 403)) {
+                let _ = state
+                    .sync_service()
+                    .stop_polling_for_account(&persisted.context.account_id);
+                let _ = state
+                    .realtime_sync_service()
+                    .stop_for_account(&persisted.context.account_id)
+                    .await;
+                let _ = state.clear_all_auth_state();
+            }
+            return Err(error);
+        }
+    };
+
+    let account_id = account_id::derive_account_id_from_access_token(
+        &persisted.context.base_url,
+        &refreshed.access_token,
+    )?;
+    let next = AuthSession {
+        account_id,
+        base_url: persisted.context.base_url,
+        email: persisted.context.email,
+        access_token: refreshed.access_token,
+        refresh_token: refreshed.refresh_token.or(Some(persisted.refresh_token)),
+        expires_at_ms: calc_expires_at_ms(refreshed.expires_in)?,
+        kdf: refreshed.kdf.or(persisted.context.kdf),
+        kdf_iterations: refreshed
+            .kdf_iterations
+            .or(persisted.context.kdf_iterations),
+        kdf_memory: refreshed.kdf_memory.or(persisted.context.kdf_memory),
+        kdf_parallelism: refreshed
+            .kdf_parallelism
+            .or(persisted.context.kdf_parallelism),
+    };
+
+    state.set_auth_session(next.clone())?;
+    if let Err(error) = state.persist_auth_state(&next, master_password) {
+        log::warn!(
+            target: "vanguard::tauri::session",
+            "failed to refresh persisted auth state account_id={}: [{}] {}",
+            next.account_id,
+            error.code(),
+            error.log_message()
+        );
+    }
+    start_background_sync(state, &next).await;
+    Ok(next)
+}
+
 async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSession> {
     let current = state.require_auth_session()?;
     if !force && !current.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
@@ -64,7 +133,7 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
                     .realtime_sync_service()
                     .stop_for_account(&current.account_id)
                     .await;
-                let _ = state.clear_auth_session();
+                let _ = state.clear_all_auth_state();
             }
             return Err(error);
         }
@@ -88,6 +157,15 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
     };
 
     state.set_auth_session(next.clone())?;
+    if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
+        log::warn!(
+            target: "vanguard::tauri::session",
+            "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
+            next.account_id,
+            error.code(),
+            error.log_message()
+        );
+    }
     start_background_sync(state, &next).await;
     Ok(next)
 }

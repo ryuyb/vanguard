@@ -33,6 +33,14 @@ pub struct VerifyEmailTokenRequestDto {
     pub token: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreAuthStateRequestDto {}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LogoutRequestDto {}
+
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponseDto {
@@ -65,6 +73,23 @@ pub struct TwoFactorChallengeDto {
 pub enum PasswordLoginResponseDto {
     Authenticated(SessionResponseDto),
     TwoFactorRequired(TwoFactorChallengeDto),
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreAuthStateResponseDto {
+    pub status: RestoreAuthStateStatusDto,
+    pub account_id: Option<String>,
+    pub base_url: Option<String>,
+    pub email: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum RestoreAuthStateStatusDto {
+    NeedsLogin,
+    Locked,
+    Authenticated,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]

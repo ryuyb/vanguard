@@ -29,6 +29,22 @@ async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result
     else return { status: "error", error: e  as any };
 }
 },
+async authRestoreState(request: RestoreAuthStateRequestDto) : Promise<Result<RestoreAuthStateResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("auth_restore_state", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async authLogout(request: LogoutRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("auth_logout", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_now", { request }) };
@@ -110,9 +126,13 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
+export type RestoreAuthStateRequestDto = Record<string, never>
+export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }
+export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
