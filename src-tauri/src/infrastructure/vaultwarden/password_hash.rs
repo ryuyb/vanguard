@@ -38,13 +38,37 @@ pub fn derive_master_password_hash(
     plaintext_password: &str,
     prelogin: &PreloginResponse,
 ) -> Result<String, PasswordHashError> {
+    let master_key = derive_master_key(
+        email,
+        plaintext_password,
+        prelogin.kdf,
+        prelogin.kdf_iterations,
+        prelogin.kdf_memory,
+        prelogin.kdf_parallelism,
+    )?;
+    let hash = pbkdf2_hmac_array::<Sha256, MASTER_KEY_LEN>(
+        &master_key,
+        plaintext_password.as_bytes(),
+        SERVER_AUTHORIZATION_ROUNDS,
+    );
+    Ok(base64::engine::general_purpose::STANDARD.encode(hash))
+}
+
+pub fn derive_master_key(
+    email: &str,
+    plaintext_password: &str,
+    kdf: i32,
+    kdf_iterations: i32,
+    kdf_memory: Option<i32>,
+    kdf_parallelism: Option<i32>,
+) -> Result<Vec<u8>, PasswordHashError> {
     let normalized_email = email.trim().to_lowercase();
     let normalized_email_bytes = normalized_email.as_bytes();
     let password_bytes = plaintext_password.as_bytes();
 
-    let master_key = match prelogin.kdf {
+    let master_key = match kdf {
         KDF_PBKDF2 => {
-            let iterations = to_u32(prelogin.kdf_iterations, "kdfIterations")?;
+            let iterations = to_u32(kdf_iterations, "kdfIterations")?;
             pbkdf2_hmac_array::<Sha256, MASTER_KEY_LEN>(
                 password_bytes,
                 normalized_email_bytes,
@@ -52,17 +76,14 @@ pub fn derive_master_password_hash(
             )
         }
         KDF_ARGON2ID => {
-            let iterations = to_u32(prelogin.kdf_iterations, "kdfIterations")?;
-            let memory_mib = prelogin
-                .kdf_memory
-                .ok_or(PasswordHashError::MissingKdfParameter("kdfMemory"))?;
+            let iterations = to_u32(kdf_iterations, "kdfIterations")?;
+            let memory_mib =
+                kdf_memory.ok_or(PasswordHashError::MissingKdfParameter("kdfMemory"))?;
             let memory_kib = to_u32(memory_mib, "kdfMemory")?
                 .checked_mul(1024)
                 .ok_or(PasswordHashError::InvalidKdfParameter("kdfMemory"))?;
             let parallelism = to_u32(
-                prelogin
-                    .kdf_parallelism
-                    .ok_or(PasswordHashError::MissingKdfParameter("kdfParallelism"))?,
+                kdf_parallelism.ok_or(PasswordHashError::MissingKdfParameter("kdfParallelism"))?,
                 "kdfParallelism",
             )?;
 
@@ -80,12 +101,7 @@ pub fn derive_master_password_hash(
         kdf => return Err(PasswordHashError::UnsupportedKdf(kdf)),
     };
 
-    let hash = pbkdf2_hmac_array::<Sha256, MASTER_KEY_LEN>(
-        &master_key,
-        password_bytes,
-        SERVER_AUTHORIZATION_ROUNDS,
-    );
-    Ok(base64::engine::general_purpose::STANDARD.encode(hash))
+    Ok(master_key.to_vec())
 }
 
 fn to_u32(value: i32, name: &'static str) -> Result<u32, PasswordHashError> {

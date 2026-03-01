@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::application::dto::sync::{
-    RevisionDateQuery, SyncMetricsSummary, SyncOutcome, SyncVaultCommand,
+    RevisionDateQuery, SyncCipher, SyncFolder, SyncMetricsSummary, SyncOutcome, SyncUserDecryption,
+    SyncVaultCommand,
 };
 use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::sync_event_port::SyncEventPort;
@@ -318,6 +319,41 @@ impl SyncService {
             .get_sync_context(&account_id)
             .await?
             .unwrap_or_else(|| SyncContext::new(account_id)))
+    }
+
+    pub async fn list_live_folders(&self, account_id: String) -> AppResult<Vec<SyncFolder>> {
+        require_non_empty(&account_id, "account_id")?;
+        self.vault_repository.list_live_folders(&account_id).await
+    }
+
+    pub async fn list_live_ciphers(
+        &self,
+        account_id: String,
+        offset: u32,
+        limit: u32,
+    ) -> AppResult<Vec<SyncCipher>> {
+        require_non_empty(&account_id, "account_id")?;
+        if limit == 0 {
+            return Err(AppError::validation("limit must be greater than 0"));
+        }
+        self.vault_repository
+            .list_live_ciphers(&account_id, offset, limit)
+            .await
+    }
+
+    pub async fn count_live_ciphers(&self, account_id: String) -> AppResult<u32> {
+        require_non_empty(&account_id, "account_id")?;
+        self.vault_repository.count_live_ciphers(&account_id).await
+    }
+
+    pub async fn load_live_user_decryption(
+        &self,
+        account_id: String,
+    ) -> AppResult<Option<SyncUserDecryption>> {
+        require_non_empty(&account_id, "account_id")?;
+        self.vault_repository
+            .load_live_user_decryption(&account_id)
+            .await
     }
 
     pub fn start_revision_polling(

@@ -628,6 +628,11 @@ impl SqliteVaultRepository {
         serde_json::to_string(value)
             .map_err(|error| AppError::internal(format!("failed to serialize {label}: {error}")))
     }
+
+    fn from_json<T: serde::de::DeserializeOwned>(value: &str, label: &str) -> AppResult<T> {
+        serde_json::from_str(value)
+            .map_err(|error| AppError::internal(format!("failed to deserialize {label}: {error}")))
+    }
 }
 
 #[async_trait]
@@ -992,6 +997,41 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         })
     }
 
+    async fn list_live_folders(&self, account_id: &str) -> AppResult<Vec<SyncFolder>> {
+        self.with_account_connection(account_id, |connection| {
+            let mut statement = connection
+                .prepare(
+                    r#"
+                    SELECT payload_json
+                    FROM live_folders
+                    WHERE account_id = ?1
+                    ORDER BY id ASC
+                    "#,
+                )
+                .map_err(|error| {
+                    AppError::internal(format!(
+                        "failed to prepare list live folders statement: {error}"
+                    ))
+                })?;
+
+            let mut rows = statement.query(params![account_id]).map_err(|error| {
+                AppError::internal(format!("failed to query live folders: {error}"))
+            })?;
+
+            let mut folders = Vec::new();
+            while let Some(row) = rows.next().map_err(|error| {
+                AppError::internal(format!("failed to iterate live folders: {error}"))
+            })? {
+                let payload_json: String = row.get(0).map_err(|error| {
+                    AppError::internal(format!("failed to read live folder payload: {error}"))
+                })?;
+                folders.push(Self::from_json(&payload_json, "live sync folder payload")?);
+            }
+
+            Ok(folders)
+        })
+    }
+
     async fn upsert_collections(
         &self,
         account_id: &str,
@@ -1145,6 +1185,49 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     AppError::internal(format!("failed to count live ciphers: {error}"))
                 })?;
             to_u32(count, "live_ciphers_count")
+        })
+    }
+
+    async fn list_live_ciphers(
+        &self,
+        account_id: &str,
+        offset: u32,
+        limit: u32,
+    ) -> AppResult<Vec<SyncCipher>> {
+        self.with_account_connection(account_id, |connection| {
+            let mut statement = connection
+                .prepare(
+                    r#"
+                    SELECT payload_json
+                    FROM live_ciphers
+                    WHERE account_id = ?1
+                    ORDER BY id ASC
+                    LIMIT ?2 OFFSET ?3
+                    "#,
+                )
+                .map_err(|error| {
+                    AppError::internal(format!(
+                        "failed to prepare list live ciphers statement: {error}"
+                    ))
+                })?;
+
+            let mut rows = statement
+                .query(params![account_id, i64::from(limit), i64::from(offset)])
+                .map_err(|error| {
+                    AppError::internal(format!("failed to query live ciphers: {error}"))
+                })?;
+
+            let mut ciphers = Vec::new();
+            while let Some(row) = rows.next().map_err(|error| {
+                AppError::internal(format!("failed to iterate live ciphers: {error}"))
+            })? {
+                let payload_json: String = row.get(0).map_err(|error| {
+                    AppError::internal(format!("failed to read live cipher payload: {error}"))
+                })?;
+                ciphers.push(Self::from_json(&payload_json, "live sync cipher payload")?);
+            }
+
+            Ok(ciphers)
         })
     }
 
@@ -1311,6 +1394,36 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })?;
             Ok(())
+        })
+    }
+
+    async fn load_live_user_decryption(
+        &self,
+        account_id: &str,
+    ) -> AppResult<Option<SyncUserDecryption>> {
+        self.with_account_connection(account_id, |connection| {
+            let payload = connection
+                .query_row(
+                    r#"
+                    SELECT user_decryption_json
+                    FROM live_meta
+                    WHERE account_id = ?1
+                    "#,
+                    params![account_id],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()
+                .map_err(|error| {
+                    AppError::internal(format!("failed to load live user decryption row: {error}"))
+                })?;
+
+            match payload.flatten() {
+                None => Ok(None),
+                Some(json) => Ok(Some(Self::from_json(
+                    &json,
+                    "live user_decryption payload",
+                )?)),
+            }
         })
     }
 

@@ -71,6 +71,38 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async vaultUnlockWithUserKey(request: VaultUnlockWithUserKeyRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_user_key", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultUnlockWithPassword(request: VaultUnlockWithPasswordRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_password", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultLock(request: VaultLockRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_lock", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultGetViewData(request: VaultViewDataRequestDto) : Promise<Result<VaultViewDataResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_get_view_data", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -113,11 +145,19 @@ export type SyncStatusRequestDto = { baseUrl: string; accessToken: string }
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+export type VaultCipherItemDto = { id: string; folderId: string | null; organizationId: string | null; type: number | null; name: string | null; encryptedName: string | null; isNameEncrypted: boolean; revisionDate: string | null; deletedDate: string | null; attachmentCount: number }
+export type VaultDecryptionStatusDto = "unlocked" | "locked"
+export type VaultFolderItemDto = { id: string; name: string | null; encryptedName: string | null; isNameEncrypted: boolean }
+export type VaultLockRequestDto = { baseUrl: string; accessToken: string }
 export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
 export type VaultSyncFailed = { accountId: string; code: string; message: string }
 export type VaultSyncLoggedOut = { accountId: string; reason: string }
 export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
+export type VaultUnlockWithPasswordRequestDto = { baseUrl: string; accessToken: string; email: string; password: string }
+export type VaultUnlockWithUserKeyRequestDto = { baseUrl: string; accessToken: string; userKey: string }
+export type VaultViewDataRequestDto = { baseUrl: string; accessToken: string; page: number | null; pageSize: number | null }
+export type VaultViewDataResponseDto = { accountId: string; syncStatus: SyncStatusResponseDto; decryptionStatus: VaultDecryptionStatusDto; folders: VaultFolderItemDto[]; ciphers: VaultCipherItemDto[]; totalCiphers: number; page: number; pageSize: number }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }
 export type WebauthnAllowCredentialDto = { type: string | null; id: string | null; transports: string[] }
 export type WebauthnRequestExtensionsDto = { appid: string | null }

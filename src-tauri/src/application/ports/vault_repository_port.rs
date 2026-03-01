@@ -54,6 +54,8 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn count_live_folders(&self, account_id: &str) -> AppResult<u32>;
 
+    async fn list_live_folders(&self, account_id: &str) -> AppResult<Vec<SyncFolder>>;
+
     async fn upsert_collections(
         &self,
         account_id: &str,
@@ -69,6 +71,13 @@ pub trait VaultRepositoryPort: Send + Sync {
     async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()>;
 
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32>;
+
+    async fn list_live_ciphers(
+        &self,
+        account_id: &str,
+        offset: u32,
+        limit: u32,
+    ) -> AppResult<Vec<SyncCipher>>;
 
     async fn upsert_sends(&self, account_id: &str, sends: Vec<SyncSend>) -> AppResult<()>;
 
@@ -86,6 +95,11 @@ pub trait VaultRepositoryPort: Send + Sync {
         account_id: &str,
         user_decryption: Option<SyncUserDecryption>,
     ) -> AppResult<()>;
+
+    async fn load_live_user_decryption(
+        &self,
+        account_id: &str,
+    ) -> AppResult<Option<SyncUserDecryption>>;
 
     async fn save_snapshot_meta(
         &self,
