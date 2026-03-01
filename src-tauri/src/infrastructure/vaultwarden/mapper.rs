@@ -123,8 +123,10 @@ pub fn map_sync_cipher(cipher: RemoteSyncCipher) -> SyncCipher {
                 size: attachment.size,
                 url: attachment.url,
                 object: attachment.object,
+                extra: attachment.extra,
             })
             .collect(),
+        extra: cipher.extra,
     }
 }
 
@@ -136,5 +138,56 @@ pub fn map_sync_send(send: RemoteSyncSend) -> SyncSend {
         revision_date: send.revision_date,
         deletion_date: send.deletion_date,
         object: send.object,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::map_sync_cipher;
+    use crate::infrastructure::vaultwarden::models::{
+        SyncAttachment as RemoteSyncAttachment, SyncCipher as RemoteSyncCipher,
+    };
+    use serde_json::{json, Value};
+
+    #[test]
+    fn map_sync_cipher_preserves_unknown_fields_for_full_persistence() {
+        let mut cipher_extra: HashMap<String, Value> = HashMap::new();
+        cipher_extra.insert(
+            String::from("login"),
+            json!({
+                "username": "user@example.com",
+                "password": "2.iv|cipher|mac"
+            }),
+        );
+
+        let mut attachment_extra: HashMap<String, Value> = HashMap::new();
+        attachment_extra.insert(String::from("key"), json!("2.iv|cipher|mac"));
+
+        let remote = RemoteSyncCipher {
+            id: String::from("cipher-1"),
+            organization_id: None,
+            folder_id: None,
+            r#type: Some(1),
+            name: Some(String::from("2.iv|cipher|mac")),
+            revision_date: None,
+            deleted_date: None,
+            object: Some(String::from("cipher")),
+            attachments: vec![RemoteSyncAttachment {
+                id: String::from("att-1"),
+                file_name: Some(String::from("a.txt")),
+                size: Some(String::from("12")),
+                url: Some(String::from("https://example.invalid/attachment")),
+                object: Some(String::from("attachment")),
+                extra: attachment_extra,
+            }],
+            extra: cipher_extra,
+        };
+
+        let mapped = map_sync_cipher(remote);
+        assert!(mapped.extra.contains_key("login"));
+        assert_eq!(mapped.attachments.len(), 1);
+        assert!(mapped.attachments[0].extra.contains_key("key"));
     }
 }

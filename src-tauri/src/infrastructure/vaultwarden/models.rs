@@ -375,6 +375,8 @@ pub struct SyncCipher {
     pub object: Option<String>,
     #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub attachments: Vec<SyncAttachment>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -385,6 +387,8 @@ pub struct SyncAttachment {
     pub size: Option<String>,
     pub url: Option<String>,
     pub object: Option<String>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

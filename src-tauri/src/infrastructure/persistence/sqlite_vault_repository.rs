@@ -1601,7 +1601,9 @@ mod tests {
                 size: Some(String::from("12")),
                 url: Some(String::from("https://example.invalid/attachment")),
                 object: Some(String::from("attachment")),
+                extra: std::collections::HashMap::new(),
             }],
+            extra: std::collections::HashMap::new(),
         };
 
         let sanitized = sanitize_cipher_for_persistence(cipher);

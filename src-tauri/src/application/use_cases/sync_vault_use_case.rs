@@ -9,7 +9,7 @@ use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
-use crate::domain::sync::{SyncItemCounts, SyncResult, VaultSnapshotMeta};
+use crate::domain::sync::{SyncItemCounts, SyncResult, SyncTrigger, VaultSnapshotMeta};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::time::{sleep, timeout, Duration};
@@ -601,6 +601,7 @@ impl SyncVaultUseCase {
                     }
                 };
                 let skip_payload_persist = should_skip_payload_persist(
+                    command.trigger,
                     previous_context.last_sync_at_ms,
                     previous_context.last_revision_ms,
                     revision_ms,
@@ -1123,10 +1124,15 @@ fn is_revision_changed(previous: Option<i64>, current: Option<i64>) -> bool {
 }
 
 fn should_skip_payload_persist(
+    trigger: SyncTrigger,
     last_sync_at_ms: Option<i64>,
     previous_revision_ms: Option<i64>,
     current_revision_ms: Option<i64>,
 ) -> bool {
+    if matches!(trigger, SyncTrigger::Manual) {
+        return false;
+    }
+
     if last_sync_at_ms.is_none() {
         return false;
     }
@@ -1195,11 +1201,23 @@ fn send_endpoint(base_url: &str, send_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{is_retryable_error, should_skip_payload_persist};
+    use crate::domain::sync::SyncTrigger;
     use crate::support::error::AppError;
 
     #[test]
     fn payload_persist_is_skipped_when_revision_unchanged_and_synced_before() {
         assert!(should_skip_payload_persist(
+            SyncTrigger::Poll,
+            Some(1_700_000_000_000),
+            Some(42),
+            Some(42)
+        ));
+    }
+
+    #[test]
+    fn payload_persist_is_not_skipped_for_manual_sync_when_revision_unchanged() {
+        assert!(!should_skip_payload_persist(
+            SyncTrigger::Manual,
             Some(1_700_000_000_000),
             Some(42),
             Some(42)
@@ -1208,17 +1226,24 @@ mod tests {
 
     #[test]
     fn payload_persist_is_not_skipped_on_first_sync() {
-        assert!(!should_skip_payload_persist(None, Some(42), Some(42)));
+        assert!(!should_skip_payload_persist(
+            SyncTrigger::Poll,
+            None,
+            Some(42),
+            Some(42)
+        ));
     }
 
     #[test]
     fn payload_persist_is_not_skipped_when_revision_unknown() {
         assert!(!should_skip_payload_persist(
+            SyncTrigger::Poll,
             Some(1_700_000_000_000),
             Some(42),
             None
         ));
         assert!(!should_skip_payload_persist(
+            SyncTrigger::Poll,
             Some(1_700_000_000_000),
             None,
             Some(42)

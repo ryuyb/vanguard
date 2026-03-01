@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use crate::domain::sync::{SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct SyncVaultCommand {
@@ -92,6 +95,8 @@ pub struct SyncCipher {
     pub deleted_date: Option<String>,
     pub object: Option<String>,
     pub attachments: Vec<SyncAttachment>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,6 +106,8 @@ pub struct SyncAttachment {
     pub size: Option<String>,
     pub url: Option<String>,
     pub object: Option<String>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
