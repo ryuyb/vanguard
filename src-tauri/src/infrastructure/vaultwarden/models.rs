@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::de::Error as DeError;
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreloginRequest {
@@ -307,16 +309,16 @@ pub struct VerifyEmailTokenRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SyncResponse {
     pub profile: SyncProfile,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub folders: Vec<SyncFolder>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub collections: Vec<SyncCollection>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub policies: Vec<SyncPolicy>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub ciphers: Vec<SyncCipher>,
     pub domains: Option<SyncDomains>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub sends: Vec<SyncSend>,
     pub user_decryption: Option<SyncUserDecryption>,
     pub object: Option<String>,
@@ -371,7 +373,7 @@ pub struct SyncCipher {
     pub revision_date: Option<String>,
     pub deleted_date: Option<String>,
     pub object: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub attachments: Vec<SyncAttachment>,
 }
 
@@ -399,12 +401,28 @@ pub struct SyncSend {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncDomains {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub equivalent_domains: Vec<Vec<String>>,
-    #[serde(default)]
-    pub global_equivalent_domains: Vec<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub global_equivalent_domains: Vec<SyncGlobalEquivalentDomainEntry>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
     pub excluded_global_equivalent_domains: Vec<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SyncGlobalEquivalentDomainEntry {
+    Legacy(Vec<String>),
+    Detailed(SyncGlobalEquivalentDomain),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncGlobalEquivalentDomain {
+    pub r#type: Option<i32>,
+    #[serde(default, deserialize_with = "deserialize_null_seq_or_map_default")]
+    pub domains: Vec<String>,
+    pub excluded: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -470,6 +488,66 @@ impl RevisionDateScalar {
             Self::Number(value) => Some(*value),
             Self::Text(value) => value.parse::<i64>().ok(),
         }
+    }
+}
+
+fn deserialize_null_seq_or_map_default<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    let value = Option::<Value>::deserialize(deserializer)?;
+    match value {
+        None => Ok(Vec::new()),
+        Some(Value::Null) => Ok(Vec::new()),
+        Some(Value::Array(items)) => items
+            .into_iter()
+            .map(|item| parse_vec_item::<T, D::Error>(item))
+            .collect(),
+        Some(Value::Object(map)) => {
+            if map.is_empty() {
+                return Ok(Vec::new());
+            }
+            map.into_values()
+                .map(|item| parse_vec_item::<T, D::Error>(item))
+                .collect()
+        }
+        Some(other) => Err(D::Error::custom(format!(
+            "expected null/sequence/map for vector field, got {}",
+            value_type_name(&other)
+        ))),
+    }
+}
+
+fn parse_vec_item<T, E>(item: Value) -> Result<T, E>
+where
+    T: serde::de::DeserializeOwned,
+    E: DeError,
+{
+    match serde_json::from_value::<T>(item.clone()) {
+        Ok(parsed) => Ok(parsed),
+        Err(primary_error) => {
+            if let Value::Object(map) = item {
+                let fallback = Value::Array(map.into_values().collect());
+                return serde_json::from_value::<T>(fallback).map_err(|fallback_error| {
+                    E::custom(format!(
+                        "{primary_error}; fallback object-values parse failed: {fallback_error}"
+                    ))
+                });
+            }
+            Err(E::custom(primary_error))
+        }
+    }
+}
+
+fn value_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::domain::sync::{SyncContext, SyncResult, SyncTrigger};
+use serde::Serialize;
 
 #[derive(Debug, Clone)]
 pub struct SyncVaultCommand {
@@ -9,7 +10,7 @@ pub struct SyncVaultCommand {
     pub trigger: SyncTrigger,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncVaultPayload {
     pub profile: SyncProfile,
     pub folders: Vec<SyncFolder>,
@@ -33,7 +34,7 @@ pub struct SyncOutcome {
     pub result: SyncResult,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncProfile {
     pub id: String,
     pub name: Option<String>,
@@ -41,7 +42,7 @@ pub struct SyncProfile {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncFolder {
     pub id: String,
     pub name: Option<String>,
@@ -49,7 +50,7 @@ pub struct SyncFolder {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncCollection {
     pub id: String,
     pub organization_id: Option<String>,
@@ -58,7 +59,7 @@ pub struct SyncCollection {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncPolicy {
     pub id: String,
     pub organization_id: Option<String>,
@@ -67,7 +68,7 @@ pub struct SyncPolicy {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncCipher {
     pub id: String,
     pub organization_id: Option<String>,
@@ -80,7 +81,7 @@ pub struct SyncCipher {
     pub attachments: Vec<SyncAttachment>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncAttachment {
     pub id: String,
     pub file_name: Option<String>,
@@ -89,7 +90,7 @@ pub struct SyncAttachment {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncSend {
     pub id: String,
     pub r#type: Option<i32>,
@@ -99,19 +100,19 @@ pub struct SyncSend {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncDomains {
     pub equivalent_domains: Vec<Vec<String>>,
     pub global_equivalent_domains: Vec<Vec<String>>,
     pub excluded_global_equivalent_domains: Vec<i32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncUserDecryption {
     pub master_password_unlock: Option<SyncMasterPasswordUnlock>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncMasterPasswordUnlock {
     pub kdf: Option<SyncKdfParams>,
     pub master_key_encrypted_user_key: Option<String>,
@@ -119,7 +120,7 @@ pub struct SyncMasterPasswordUnlock {
     pub salt: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SyncKdfParams {
     pub kdf_type: Option<i32>,
     pub iterations: Option<i32>,

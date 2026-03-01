@@ -68,10 +68,7 @@ impl SyncService {
             );
             return Err(error);
         }
-        let _guard = RunningSlotGuard::new(
-            Arc::clone(&self.running_accounts),
-            account_id.clone(),
-        );
+        let _guard = RunningSlotGuard::new(Arc::clone(&self.running_accounts), account_id.clone());
         self.sync_event_port.emit_sync_started(&account_id);
 
         match self.sync_vault_use_case.execute(command).await {

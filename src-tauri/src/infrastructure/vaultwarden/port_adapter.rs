@@ -7,9 +7,7 @@ use crate::application::dto::auth::{
     WebauthnAllowCredential as AppWebauthnAllowCredential,
     WebauthnRequestExtensions as AppWebauthnRequestExtensions,
 };
-use crate::application::dto::sync::{
-    RevisionDateQuery, SyncVaultCommand, SyncVaultPayload,
-};
+use crate::application::dto::sync::{RevisionDateQuery, SyncVaultCommand, SyncVaultPayload};
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;

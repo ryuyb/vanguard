@@ -232,7 +232,7 @@ impl VaultwardenClient {
 
         let response = self
             .http_client
-            .get(endpoint)
+            .get(endpoint.as_str())
             .bearer_auth(access_token)
             .header("Bitwarden-Client-Version", "2024.12.0")
             .query(&[(
@@ -253,8 +253,27 @@ impl VaultwardenClient {
             return Err(Self::api_error(status, body));
         }
 
-        serde_json::from_str::<SyncResponse>(&body)
-            .map_err(|error| VaultwardenError::Decode(format!("invalid sync response: {error}")))
+        match serde_json::from_str::<SyncResponse>(&body) {
+            Ok(parsed) => Ok(parsed),
+            Err(error) => {
+                let line = error.line();
+                let column = error.column();
+                let snippet = json_error_snippet_redacted(&body, line, column, 220);
+                log::error!(
+                    target: "vanguard::vaultwarden",
+                    "sync decode failed endpoint={} status={} body_len={} line={} column={} snippet={}",
+                    endpoint,
+                    status,
+                    body.len(),
+                    line,
+                    column,
+                    snippet
+                );
+                Err(VaultwardenError::Decode(format!(
+                    "invalid sync response: {error}"
+                )))
+            }
+        }
     }
 
     pub async fn revision_date(
@@ -328,6 +347,86 @@ impl VaultwardenClient {
 fn parse_revision_date(body: &str) -> Option<i64> {
     let parsed: RevisionDateResponse = serde_json::from_str(body).ok()?;
     parsed.to_revision_ms()
+}
+
+fn json_error_snippet_redacted(body: &str, line: usize, column: usize, radius: usize) -> String {
+    if body.is_empty() {
+        return String::from("<empty>");
+    }
+    let offset = line_col_to_byte_offset(body, line, column).unwrap_or(body.len());
+    let start = offset.saturating_sub(radius);
+    let end = (offset + radius).min(body.len());
+    let snippet = &body[start..end];
+    let redacted = redact_json_string_contents(snippet);
+    redacted.replace('\n', "\\n").replace('\r', "\\r")
+}
+
+fn line_col_to_byte_offset(body: &str, line: usize, column: usize) -> Option<usize> {
+    let target_line = line.max(1);
+    let target_column = column.max(1);
+
+    let mut current_line = 1usize;
+    let mut line_start = 0usize;
+    for (idx, ch) in body.char_indices() {
+        if current_line == target_line {
+            line_start = idx;
+            break;
+        }
+        if ch == '\n' {
+            current_line += 1;
+            line_start = idx + 1;
+        }
+    }
+    if current_line != target_line {
+        return None;
+    }
+
+    let line_slice = &body[line_start..];
+    let mut current_column = 1usize;
+    for (idx, _) in line_slice.char_indices() {
+        if current_column == target_column {
+            return Some(line_start + idx);
+        }
+        current_column += 1;
+    }
+
+    Some(body.len())
+}
+
+fn redact_json_string_contents(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for ch in input.chars() {
+        if in_string {
+            if escaped {
+                escaped = false;
+                output.push('*');
+                continue;
+            }
+            match ch {
+                '\\' => {
+                    escaped = true;
+                    output.push('*');
+                }
+                '"' => {
+                    in_string = false;
+                    output.push('"');
+                }
+                _ => output.push('*'),
+            }
+        } else if ch == '"' {
+            in_string = true;
+            output.push('"');
+        } else if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+            output.push(' ');
+        } else {
+            output.push(ch);
+        }
+    }
+
+    output
 }
 
 #[derive(serde::Deserialize)]

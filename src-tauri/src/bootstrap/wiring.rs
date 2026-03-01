@@ -2,21 +2,21 @@ use std::sync::Arc;
 
 use tauri::{Manager, Runtime};
 
+use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
-use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
-use crate::infrastructure::persistence::InMemoryVaultRepository;
-use crate::interfaces::tauri::events::sync_event_adapter::TauriSyncEventAdapter;
+use crate::infrastructure::persistence::SqliteVaultRepository;
 use crate::infrastructure::vaultwarden::{
     VaultwardenClient, VaultwardenConfig, VaultwardenRemotePort,
 };
+use crate::interfaces::tauri::events::sync_event_adapter::TauriSyncEventAdapter;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -32,7 +32,9 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     })?;
 
     let remote_vault: Arc<dyn RemoteVaultPort> = Arc::new(VaultwardenRemotePort::new(client));
-    let vault_repository: Arc<dyn VaultRepositoryPort> = Arc::new(InMemoryVaultRepository::new());
+    let sqlite_dir = resolve_sqlite_dir(manager)?;
+    let vault_repository: Arc<dyn VaultRepositoryPort> =
+        Arc::new(SqliteVaultRepository::new(sqlite_dir)?);
     let sync_event_port: Arc<dyn SyncEventPort> =
         Arc::new(TauriSyncEventAdapter::new(manager.app_handle().clone()));
     let auth_service = Arc::new(AuthService::new(Arc::clone(&remote_vault)));
@@ -52,4 +54,19 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     ));
 
     Ok(AppState::new(auth_service, sync_service))
+}
+
+fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::path::PathBuf> {
+    let app_data_dir = manager
+        .path()
+        .app_data_dir()
+        .map_err(|error| AppError::internal(format!("failed to resolve app data dir: {error}")))?;
+    let sqlite_dir = app_data_dir.join("vault-repositories");
+    std::fs::create_dir_all(&sqlite_dir).map_err(|error| {
+        AppError::internal(format!(
+            "failed to create app data dir {}: {error}",
+            sqlite_dir.display()
+        ))
+    })?;
+    Ok(sqlite_dir)
 }

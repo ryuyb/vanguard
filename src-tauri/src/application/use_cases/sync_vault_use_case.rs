@@ -224,12 +224,22 @@ impl SyncVaultUseCase {
             .await?;
 
         if let Err(error) = self.persist_sync_payload_inner(account_id, payload).await {
-            let _ = self.vault_repository.rollback_sync_transaction(account_id).await;
+            let _ = self
+                .vault_repository
+                .rollback_sync_transaction(account_id)
+                .await;
             return Err(error);
         }
 
-        if let Err(error) = self.vault_repository.commit_sync_transaction(account_id).await {
-            let _ = self.vault_repository.rollback_sync_transaction(account_id).await;
+        if let Err(error) = self
+            .vault_repository
+            .commit_sync_transaction(account_id)
+            .await
+        {
+            let _ = self
+                .vault_repository
+                .rollback_sync_transaction(account_id)
+                .await;
             return Err(error);
         }
 
@@ -324,5 +334,8 @@ fn sync_endpoint(base_url: &str) -> String {
 }
 
 fn revision_endpoint(base_url: &str) -> String {
-    format!("{}/api/accounts/revision-date", base_url.trim_end_matches('/'))
+    format!(
+        "{}/api/accounts/revision-date",
+        base_url.trim_end_matches('/')
+    )
 }

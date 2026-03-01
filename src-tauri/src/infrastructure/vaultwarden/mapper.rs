@@ -4,7 +4,7 @@ use crate::application::dto::sync::{
     SyncVaultPayload,
 };
 
-use super::models::SyncResponse;
+use super::models::{SyncGlobalEquivalentDomainEntry, SyncResponse};
 
 pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
     SyncVaultPayload {
@@ -71,10 +71,38 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
                     .collect(),
             })
             .collect(),
-        domains: response.domains.map(|domains| SyncDomains {
-            equivalent_domains: domains.equivalent_domains,
-            global_equivalent_domains: domains.global_equivalent_domains,
-            excluded_global_equivalent_domains: domains.excluded_global_equivalent_domains,
+        domains: response.domains.map(|domains| {
+            let mut global_equivalent_domains = Vec::new();
+            let mut excluded_from_globals = Vec::new();
+
+            for entry in domains.global_equivalent_domains {
+                match entry {
+                    SyncGlobalEquivalentDomainEntry::Legacy(domains) => {
+                        global_equivalent_domains.push(domains);
+                    }
+                    SyncGlobalEquivalentDomainEntry::Detailed(global) => {
+                        if global.excluded.unwrap_or(false) {
+                            if let Some(global_type) = global.r#type {
+                                excluded_from_globals.push(global_type);
+                            }
+                        }
+                        global_equivalent_domains.push(global.domains);
+                    }
+                }
+            }
+
+            let excluded_global_equivalent_domains =
+                if domains.excluded_global_equivalent_domains.is_empty() {
+                    excluded_from_globals
+                } else {
+                    domains.excluded_global_equivalent_domains
+                };
+
+            SyncDomains {
+                equivalent_domains: domains.equivalent_domains,
+                global_equivalent_domains,
+                excluded_global_equivalent_domains,
+            }
         }),
         sends: response
             .sends
@@ -88,20 +116,22 @@ pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
                 object: send.object,
             })
             .collect(),
-        user_decryption: response.user_decryption.map(|decryption| SyncUserDecryption {
-            master_password_unlock: decryption.master_password_unlock.map(|unlock| {
-                SyncMasterPasswordUnlock {
-                    kdf: unlock.kdf.map(|kdf| SyncKdfParams {
-                        kdf_type: kdf.kdf_type,
-                        iterations: kdf.iterations,
-                        memory: kdf.memory,
-                        parallelism: kdf.parallelism,
-                    }),
-                    master_key_encrypted_user_key: unlock.master_key_encrypted_user_key,
-                    master_key_wrapped_user_key: unlock.master_key_wrapped_user_key,
-                    salt: unlock.salt,
-                }
+        user_decryption: response
+            .user_decryption
+            .map(|decryption| SyncUserDecryption {
+                master_password_unlock: decryption.master_password_unlock.map(|unlock| {
+                    SyncMasterPasswordUnlock {
+                        kdf: unlock.kdf.map(|kdf| SyncKdfParams {
+                            kdf_type: kdf.kdf_type,
+                            iterations: kdf.iterations,
+                            memory: kdf.memory,
+                            parallelism: kdf.parallelism,
+                        }),
+                        master_key_encrypted_user_key: unlock.master_key_encrypted_user_key,
+                        master_key_wrapped_user_key: unlock.master_key_wrapped_user_key,
+                        salt: unlock.salt,
+                    }
+                }),
             }),
-        }),
     }
 }

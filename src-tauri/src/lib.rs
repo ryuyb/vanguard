@@ -18,8 +18,8 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let specta_builder =
-        tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+    let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![
             greet,
             interfaces::tauri::commands::auth::auth_prelogin,
             interfaces::tauri::commands::auth::auth_login_with_password,
@@ -50,6 +50,22 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             specta_builder.mount_events(app);
+            match app.path().app_data_dir() {
+                Ok(path) => {
+                    log::info!(
+                        target: "vanguard::bootstrap",
+                        "app_data_dir={}",
+                        path.display()
+                    );
+                }
+                Err(error) => {
+                    log::warn!(
+                        target: "vanguard::bootstrap",
+                        "failed to resolve app_data_dir: {}",
+                        error
+                    );
+                }
+            }
             let app_state = bootstrap::wiring::build_app_state(app).map_err(
                 |error| -> Box<dyn std::error::Error> {
                     log::error!("failed to wire application state: {error}");

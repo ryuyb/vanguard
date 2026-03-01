@@ -45,11 +45,7 @@ pub trait VaultRepositoryPort: Send + Sync {
         collections: Vec<SyncCollection>,
     ) -> AppResult<()>;
 
-    async fn upsert_policies(
-        &self,
-        account_id: &str,
-        policies: Vec<SyncPolicy>,
-    ) -> AppResult<()>;
+    async fn upsert_policies(&self, account_id: &str, policies: Vec<SyncPolicy>) -> AppResult<()>;
 
     async fn upsert_ciphers(&self, account_id: &str, ciphers: Vec<SyncCipher>) -> AppResult<()>;
 
