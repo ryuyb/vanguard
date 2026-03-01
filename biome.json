@@ -10,6 +10,7 @@
       "**",
       "!!**/dist",
       "!src/components/ui",
+      "!src/routeTree.gen.ts",
       "!src/bindings.ts",
       "!src-tauri"
     ]
