@@ -169,6 +169,7 @@ pub struct TokenResponse {
 pub struct TokenErrorResponse {
     pub error: Option<String>,
     pub error_description: Option<String>,
+    pub message: Option<String>,
     #[serde(rename = "TwoFactorProviders")]
     pub two_factor_providers: Option<Vec<String>>,
     #[serde(rename = "TwoFactorProviders2")]

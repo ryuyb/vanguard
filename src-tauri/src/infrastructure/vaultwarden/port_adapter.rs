@@ -352,11 +352,18 @@ fn map_vaultwarden_error(error: VaultwardenError) -> AppError {
             status, message, ..
         } => AppError::remote_status(status, message),
         VaultwardenError::TokenRejected { status, error } => {
-            let message = error
-                .error_description
-                .or(error.error)
-                .unwrap_or_else(|| String::from("token rejected"));
+            let message =
+                first_non_empty(vec![error.error_description, error.error, error.message])
+                    .unwrap_or_else(|| String::from("token rejected"));
             AppError::remote_status(status, message)
         }
     }
+}
+
+fn first_non_empty(values: Vec<Option<String>>) -> Option<String> {
+    values
+        .into_iter()
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
 }

@@ -505,11 +505,20 @@ impl VaultwardenClient {
         }
 
         let payload: BasicErrorPayload = serde_json::from_str(body).ok()?;
-        payload
-            .error_description
-            .or(payload.error)
-            .or(payload.message)
+        first_non_empty(vec![
+            payload.error_description,
+            payload.error,
+            payload.message,
+        ])
     }
+}
+
+fn first_non_empty(values: Vec<Option<String>>) -> Option<String> {
+    values
+        .into_iter()
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
 }
 
 fn parse_revision_date(body: &str) -> Option<i64> {
