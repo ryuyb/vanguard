@@ -38,18 +38,22 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     let sync_event_port: Arc<dyn SyncEventPort> =
         Arc::new(TauriSyncEventAdapter::new(manager.app_handle().clone()));
     let auth_service = Arc::new(AuthService::new(Arc::clone(&remote_vault)));
-    let sync_policy = SyncPolicy::default();
+    let sync_policy = SyncPolicy {
+        poll_interval_seconds: config.sync_poll_interval_seconds,
+        ..SyncPolicy::default()
+    };
     let poll_revision_use_case = Arc::new(PollRevisionUseCase::new(Arc::clone(&remote_vault)));
     let sync_vault_use_case = Arc::new(SyncVaultUseCase::new(
         Arc::clone(&remote_vault),
         Arc::clone(&vault_repository),
-        poll_revision_use_case,
+        Arc::clone(&poll_revision_use_case),
         sync_policy.clone(),
     ));
     let sync_service = Arc::new(SyncService::new(
         sync_vault_use_case,
         vault_repository,
         sync_event_port,
+        poll_revision_use_case,
         sync_policy,
     ));
 

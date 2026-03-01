@@ -27,7 +27,8 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_send_email_login,
             interfaces::tauri::commands::auth::auth_verify_email_token,
             interfaces::tauri::commands::sync::vault_sync_now,
-            interfaces::tauri::commands::sync::vault_sync_status
+            interfaces::tauri::commands::sync::vault_sync_status,
+            interfaces::tauri::commands::sync::vault_sync_check_revision
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,

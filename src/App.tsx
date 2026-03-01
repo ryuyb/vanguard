@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import {
   commands,
   type PasswordLoginResponseDto,
@@ -63,6 +63,60 @@ function App() {
       setBusyAction(null);
     }
   };
+
+  const runForegroundRevisionCheck = async () => {
+    const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
+    if (!accessToken) {
+      return;
+    }
+
+    const result = await commands.vaultSyncCheckRevision({
+      baseUrl,
+      accessToken,
+    });
+
+    if (result.status === "error") {
+      addLog(
+        "error",
+        `foreground-revision-check failed: ${result.error || "backend returned an empty error message"}`,
+      );
+      return;
+    }
+
+    setSyncStatus(result.data);
+    addLog("info", "foreground-revision-check success");
+  };
+
+  useEffect(() => {
+    let lastTriggeredAt = 0;
+
+    const maybeTrigger = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastTriggeredAt < 1500) {
+        return;
+      }
+      lastTriggeredAt = now;
+      void runForegroundRevisionCheck();
+    };
+
+    const onVisibilityChange = () => {
+      maybeTrigger();
+    };
+    const onFocus = () => {
+      maybeTrigger();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [baseUrl, session?.accessToken, syncAccessTokenOverride]);
 
   const handlePrelogin = async () => {
     await run("prelogin", async () => {

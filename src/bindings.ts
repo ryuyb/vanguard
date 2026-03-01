@@ -63,6 +63,14 @@ async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatus
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_sync_check_revision", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 

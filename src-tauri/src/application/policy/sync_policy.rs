@@ -4,6 +4,7 @@ pub struct SyncPolicy {
     pub backoff_ms: u64,
     pub debounce_ms: u64,
     pub timeout_ms: u64,
+    pub poll_interval_seconds: u64,
 }
 
 impl Default for SyncPolicy {
@@ -13,6 +14,7 @@ impl Default for SyncPolicy {
             backoff_ms: 500,
             debounce_ms: 300,
             timeout_ms: 15_000,
+            poll_interval_seconds: 60,
         }
     }
 }

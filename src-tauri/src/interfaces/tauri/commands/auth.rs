@@ -60,6 +60,18 @@ pub async fn auth_login_with_password(
     if let PasswordLoginOutcome::Authenticated(session) = &result {
         match account_id::derive_account_id_from_access_token(&base_url, &session.access_token) {
             Ok(account_id) => {
+                if let Err(error) = state.sync_service().start_revision_polling(
+                    account_id.clone(),
+                    base_url.clone(),
+                    session.access_token.clone(),
+                ) {
+                    log::warn!(
+                        target: "vanguard::tauri::auth",
+                        "failed to start revision polling after login: [{}] {}",
+                        error.code(),
+                        error.message()
+                    );
+                }
                 trigger_sync_after_login(
                     state.sync_service(),
                     account_id,
@@ -88,11 +100,37 @@ pub async fn auth_refresh_token(
     request: RefreshTokenRequestDto,
 ) -> Result<SessionResponseDto, String> {
     let command = mapping::to_refresh_token_command(request);
+    let base_url = command.base_url.clone();
     let result = state
         .auth_service()
         .refresh_token(command)
         .await
         .map_err(|error| log_command_error("auth_refresh_token", error))?;
+
+    match account_id::derive_account_id_from_access_token(&base_url, &result.access_token) {
+        Ok(account_id) => {
+            if let Err(error) =
+                state
+                    .sync_service()
+                    .start_revision_polling(account_id, base_url, result.access_token.clone())
+            {
+                log::warn!(
+                    target: "vanguard::tauri::auth",
+                    "failed to restart revision polling after refresh: [{}] {}",
+                    error.code(),
+                    error.message()
+                );
+            }
+        }
+        Err(error) => {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "failed to derive account id from refreshed token: [{}] {}",
+                error.code(),
+                error.message()
+            );
+        }
+    }
 
     Ok(mapping::to_session_response_dto(result))
 }

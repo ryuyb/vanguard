@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::bootstrap::app_state::AppState;
+use crate::domain::sync::SyncTrigger;
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::sync::{
     SyncNowRequestDto, SyncStatusRequestDto, SyncStatusResponseDto,
@@ -52,6 +53,36 @@ pub async fn vault_sync_status(
         .sync_status(account_id)
         .await
         .map_err(|error| log_command_error("vault_sync_status", error))?;
+
+    Ok(mapping::to_sync_status_response_dto(context))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_sync_check_revision(
+    state: State<'_, AppState>,
+    request: SyncStatusRequestDto,
+) -> Result<SyncStatusResponseDto, String> {
+    let account_id =
+        account_id::derive_account_id_from_access_token(&request.base_url, &request.access_token)
+            .map_err(|error| log_command_error("vault_sync_check_revision", error))?;
+
+    state
+        .sync_service()
+        .check_revision_now(
+            account_id.clone(),
+            request.base_url,
+            request.access_token,
+            SyncTrigger::Foreground,
+        )
+        .await
+        .map_err(|error| log_command_error("vault_sync_check_revision", error))?;
+
+    let context = state
+        .sync_service()
+        .sync_status(account_id)
+        .await
+        .map_err(|error| log_command_error("vault_sync_check_revision", error))?;
 
     Ok(mapping::to_sync_status_response_dto(context))
 }
