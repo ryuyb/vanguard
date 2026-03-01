@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "biome:check": "biome check .",
+    "biome:write": "biome check --write .",
+    "biome:format": "biome format --write ."
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

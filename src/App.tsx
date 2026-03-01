@@ -1,4 +1,14 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  commands,
+  events,
+  type PasswordLoginResponseDto,
+  type SessionResponseDto,
+  type SyncStatusResponseDto,
+  type TwoFactorChallengeDto,
+  type VaultCipherDetailResponseDto,
+  type VaultViewDataResponseDto,
+} from "./bindings";
 import { Badge } from "./components/ui/badge";
 import { Button } from "./components/ui/button";
 import {
@@ -12,16 +22,6 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Separator } from "./components/ui/separator";
 import { Textarea } from "./components/ui/textarea";
-import {
-  commands,
-  events,
-  type PasswordLoginResponseDto,
-  type SessionResponseDto,
-  type SyncStatusResponseDto,
-  type TwoFactorChallengeDto,
-  type VaultCipherDetailResponseDto,
-  type VaultViewDataResponseDto,
-} from "./bindings";
 
 type LogLevel = "info" | "error";
 
@@ -52,25 +52,30 @@ function App() {
   const [vaultCipherIdInput, setVaultCipherIdInput] = useState("");
 
   const [session, setSession] = useState<SessionResponseDto | null>(null);
-  const [challenge, setChallenge] = useState<TwoFactorChallengeDto | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatusResponseDto | null>(null);
-  const [vaultViewData, setVaultViewData] = useState<VaultViewDataResponseDto | null>(null);
+  const [challenge, setChallenge] = useState<TwoFactorChallengeDto | null>(
+    null,
+  );
+  const [syncStatus, setSyncStatus] = useState<SyncStatusResponseDto | null>(
+    null,
+  );
+  const [vaultViewData, setVaultViewData] =
+    useState<VaultViewDataResponseDto | null>(null);
   const [vaultCipherDetail, setVaultCipherDetail] =
     useState<VaultCipherDetailResponseDto | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [rawResult, setRawResult] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
-  const addLog = (level: LogLevel, message: string) => {
+  const addLog = useCallback((level: LogLevel, message: string) => {
     setLogs((prev) => [
       { at: new Date().toLocaleTimeString(), level, message },
       ...prev.slice(0, 19),
     ]);
-  };
+  }, []);
 
-  const setRaw = (payload: unknown) => {
+  const setRaw = useCallback((payload: unknown) => {
     setRawResult(JSON.stringify(payload, null, 2));
-  };
+  }, []);
 
   const run = async (name: string, fn: () => Promise<void>) => {
     setBusyAction(name);
@@ -85,7 +90,7 @@ function App() {
     }
   };
 
-  const runForegroundRevisionCheck = async () => {
+  const runForegroundRevisionCheck = useCallback(async () => {
     if (!session) {
       return;
     }
@@ -102,7 +107,7 @@ function App() {
 
     setSyncStatus(result.data);
     addLog("info", "foreground-revision-check success");
-  };
+  }, [session, addLog]);
 
   useEffect(() => {
     const restore = async () => {
@@ -123,7 +128,10 @@ function App() {
         setEmail(result.data.email);
       }
       if (result.data.status === "locked") {
-        addLog("info", "restored persisted login context, master password unlock is ready");
+        addLog(
+          "info",
+          "restored persisted login context, master password unlock is ready",
+        );
       } else if (result.data.status === "authenticated") {
         addLog("info", "backend session is active");
       } else {
@@ -133,7 +141,7 @@ function App() {
     };
 
     void restore();
-  }, []);
+  }, [addLog, setRaw]);
 
   useEffect(() => {
     let lastTriggeredAt = 0;
@@ -164,7 +172,7 @@ function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [session]);
+  }, [runForegroundRevisionCheck]);
 
   useEffect(() => {
     const unlistenPromise = events.vaultSyncAuthRequired.listen((event) => {
@@ -182,7 +190,7 @@ function App() {
     return () => {
       void unlistenPromise.then((unlisten) => unlisten());
     };
-  }, []);
+  }, [addLog]);
 
   const handleLogin = async () => {
     await run("password-login", async () => {
@@ -198,7 +206,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       handleLoginPayload(result.data);
@@ -220,7 +230,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setRaw({ ok: true });
@@ -237,7 +249,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setRaw({ ok: true });
@@ -250,7 +264,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setSession(null);
@@ -271,7 +287,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setSyncStatus(result.data);
@@ -285,7 +303,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setSyncStatus(result.data);
@@ -305,7 +325,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setAuthBootstrapStatus("authenticated");
@@ -319,7 +341,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setAuthBootstrapStatus("locked");
@@ -337,7 +361,9 @@ function App() {
 
       if (result.status === "error") {
         setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
+        throw new Error(
+          result.error || "backend returned an empty error message",
+        );
       }
 
       setVaultViewData(result.data);
@@ -355,7 +381,9 @@ function App() {
 
     if (result.status === "error") {
       setRaw(result);
-      throw new Error(result.error || "backend returned an empty error message");
+      throw new Error(
+        result.error || "backend returned an empty error message",
+      );
     }
 
     setVaultCipherDetail(result.data);
@@ -406,7 +434,9 @@ function App() {
   return (
     <main className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Vaultwarden 登录流程验证</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Vaultwarden 登录流程验证
+        </h1>
         <p className="text-muted-foreground text-sm">
           最小化联调页面：password login / email-2FA / verify-email-token。
         </p>
@@ -415,7 +445,9 @@ function App() {
       <Card>
         <CardHeader>
           <CardTitle>基础参数</CardTitle>
-          <CardDescription>前端只收集 server url、email、master password。</CardDescription>
+          <CardDescription>
+            前端只收集 server url、email、master password。
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           <FormField id="base-url" label="Base URL">
@@ -426,9 +458,17 @@ function App() {
             />
           </FormField>
           <FormField id="email" label="Email">
-            <Input id="email" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
+            <Input
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+            />
           </FormField>
-          <FormField id="password" label="Password (plaintext)" className="md:col-span-2">
+          <FormField
+            id="password"
+            label="Password (plaintext)"
+            className="md:col-span-2"
+          >
             <Input
               id="password"
               type="password"
@@ -460,7 +500,10 @@ function App() {
               placeholder="验证码"
             />
           </FormField>
-          <label className="flex items-center gap-2 text-sm md:col-span-2" htmlFor="two-factor-remember">
+          <label
+            className="flex items-center gap-2 text-sm md:col-span-2"
+            htmlFor="two-factor-remember"
+          >
             <input
               id="two-factor-remember"
               type="checkbox"
@@ -506,13 +549,20 @@ function App() {
               id="email-2fa-password"
               type="password"
               value={email2faPasswordOverride}
-              onChange={(e) => setEmail2faPasswordOverride(e.currentTarget.value)}
+              onChange={(e) =>
+                setEmail2faPasswordOverride(e.currentTarget.value)
+              }
             />
           </FormField>
           <p className="text-muted-foreground text-sm">
-            留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 master password hash。
+            留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 master
+            password hash。
           </p>
-          <Button type="button" disabled={!!busyAction} onClick={handleSendEmailLogin}>
+          <Button
+            type="button"
+            disabled={!!busyAction}
+            onClick={handleSendEmailLogin}
+          >
             Send Email Login 2FA
           </Button>
 
@@ -534,7 +584,11 @@ function App() {
               />
             </FormField>
           </div>
-          <Button type="button" disabled={!!busyAction} onClick={handleVerifyEmailToken}>
+          <Button
+            type="button"
+            disabled={!!busyAction}
+            onClick={handleVerifyEmailToken}
+          >
             Verify Email Token
           </Button>
         </CardContent>
@@ -545,7 +599,10 @@ function App() {
           <CardTitle>Vault Sync 联调</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="flex items-center gap-2 text-sm" htmlFor="exclude-domains">
+          <label
+            className="flex items-center gap-2 text-sm"
+            htmlFor="exclude-domains"
+          >
             <input
               id="exclude-domains"
               type="checkbox"
@@ -556,7 +613,11 @@ function App() {
             exclude domains
           </label>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={!!busyAction} onClick={handleSyncNow}>
+            <Button
+              type="button"
+              disabled={!!busyAction}
+              onClick={handleSyncNow}
+            >
               Sync Now
             </Button>
             <Button
@@ -585,10 +646,19 @@ function App() {
             />
           </FormField>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={!!busyAction} onClick={handleVaultUnlock}>
+            <Button
+              type="button"
+              disabled={!!busyAction}
+              onClick={handleVaultUnlock}
+            >
               Unlock With Password
             </Button>
-            <Button type="button" variant="outline" disabled={!!busyAction} onClick={handleVaultLock}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!!busyAction}
+              onClick={handleVaultLock}
+            >
               Lock
             </Button>
           </div>
@@ -611,7 +681,11 @@ function App() {
               />
             </FormField>
           </div>
-          <Button type="button" disabled={!!busyAction} onClick={handleVaultGetViewData}>
+          <Button
+            type="button"
+            disabled={!!busyAction}
+            onClick={handleVaultGetViewData}
+          >
             Get View Data
           </Button>
 
@@ -625,13 +699,19 @@ function App() {
               placeholder="cipher id"
             />
           </FormField>
-          <Button type="button" disabled={!!busyAction} onClick={handleVaultGetCipherDetail}>
+          <Button
+            type="button"
+            disabled={!!busyAction}
+            onClick={handleVaultGetCipherDetail}
+          >
             Get Cipher Detail
           </Button>
 
           {vaultViewData && vaultViewData.ciphers.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-muted-foreground text-sm">快速选择一条 cipher 拉详情：</p>
+              <p className="text-muted-foreground text-sm">
+                快速选择一条 cipher 拉详情：
+              </p>
               <div className="max-h-56 space-y-2 overflow-y-auto">
                 {vaultViewData.ciphers.map((cipher) => (
                   <Button
@@ -639,10 +719,14 @@ function App() {
                     type="button"
                     variant="outline"
                     disabled={!!busyAction}
-                    onClick={() => void handleSelectCipherAndGetDetail(cipher.id)}
+                    onClick={() =>
+                      void handleSelectCipherAndGetDetail(cipher.id)
+                    }
                     className="h-auto w-full justify-start px-3 py-2 text-left"
                   >
-                    <span className="font-semibold">{cipher.name || "(unnamed)"}</span>
+                    <span className="font-semibold">
+                      {cipher.name || "(unnamed)"}
+                    </span>
                     <span className="text-muted-foreground ml-2 truncate font-mono text-xs">
                       {cipher.id}
                     </span>
@@ -661,13 +745,29 @@ function App() {
         <CardContent className="space-y-4">
           <div className="grid gap-2 md:grid-cols-2">
             <SnapshotRow label="Auth Bootstrap" value={authBootstrapStatus} />
-            <SnapshotRow label="Session" value={session ? "authenticated" : "none"} />
-            <SnapshotRow label="2FA Challenge" value={challenge ? "required" : "none"} />
-            <SnapshotRow label="Sync Status" value={syncStatus ? syncStatus.state : "none"} />
-            <SnapshotRow label="Vault View Data" value={vaultViewData ? "loaded" : "none"} />
+            <SnapshotRow
+              label="Session"
+              value={session ? "authenticated" : "none"}
+            />
+            <SnapshotRow
+              label="2FA Challenge"
+              value={challenge ? "required" : "none"}
+            />
+            <SnapshotRow
+              label="Sync Status"
+              value={syncStatus ? syncStatus.state : "none"}
+            />
+            <SnapshotRow
+              label="Vault View Data"
+              value={vaultViewData ? "loaded" : "none"}
+            />
             <SnapshotRow
               label="Visible Ciphers"
-              value={vaultViewData ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}` : "none"}
+              value={
+                vaultViewData
+                  ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}`
+                  : "none"
+              }
             />
             <SnapshotRow
               label="Vault Cipher Detail"
@@ -675,7 +775,11 @@ function App() {
             />
             <SnapshotRow
               label="Cipher Detail Name"
-              value={vaultCipherDetail ? (vaultCipherDetail.cipher.name ?? "(null)") : "none"}
+              value={
+                vaultCipherDetail
+                  ? (vaultCipherDetail.cipher.name ?? "(null)")
+                  : "none"
+              }
             />
           </div>
           <Textarea
@@ -698,7 +802,11 @@ function App() {
               {logs.map((log, index) => (
                 <li
                   key={`${log.at}-${index}`}
-                  className={log.level === "error" ? "text-destructive" : "text-muted-foreground"}
+                  className={
+                    log.level === "error"
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                  }
                 >
                   [{log.at}] {log.message}
                 </li>
@@ -718,7 +826,9 @@ function FormField(props: {
   className?: string;
 }) {
   return (
-    <div className={props.className ? `space-y-2 ${props.className}` : "space-y-2"}>
+    <div
+      className={props.className ? `space-y-2 ${props.className}` : "space-y-2"}
+    >
       <Label htmlFor={props.id}>{props.label}</Label>
       {props.children}
     </div>
