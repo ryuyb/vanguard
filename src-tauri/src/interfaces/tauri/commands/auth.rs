@@ -9,11 +9,11 @@ use crate::bootstrap::app_state::AppState;
 use crate::domain::sync::SyncTrigger;
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
-    PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto, PreloginResponseDto,
-    RefreshTokenRequestDto, SendEmailLoginRequestDto, SessionResponseDto,
+    PasswordLoginRequestDto, PasswordLoginResponseDto, SendEmailLoginRequestDto,
     VerifyEmailTokenRequestDto,
 };
 use crate::interfaces::tauri::mapping;
+use crate::interfaces::tauri::session;
 use crate::support::error::AppError;
 use crate::support::redaction::redact_sensitive;
 
@@ -31,71 +31,63 @@ fn log_command_error(command: &str, error: AppError) -> String {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn auth_prelogin(
-    state: State<'_, AppState>,
-    request: PreloginRequestDto,
-) -> Result<PreloginResponseDto, String> {
-    let query = mapping::to_prelogin_query(request);
-    let result = state
-        .auth_service()
-        .prelogin(query)
-        .await
-        .map_err(|error| log_command_error("auth_prelogin", error))?;
-
-    Ok(mapping::to_prelogin_response_dto(result))
-}
-
-#[tauri::command]
-#[specta::specta]
 pub async fn auth_login_with_password(
     state: State<'_, AppState>,
     request: PasswordLoginRequestDto,
 ) -> Result<PasswordLoginResponseDto, String> {
+    let base_url = request.base_url.clone();
+    let email = request.email.clone();
     let command = mapping::to_password_login_command(request);
-    let base_url = command.base_url.clone();
     let result = state
         .auth_service()
         .login_with_password(command)
         .await
         .map_err(|error| log_command_error("auth_login_with_password", error))?;
 
+    if !matches!(result, PasswordLoginOutcome::Authenticated(_)) {
+        let _ = state.clear_auth_session();
+    }
+
     if let PasswordLoginOutcome::Authenticated(session) = &result {
         match account_id::derive_account_id_from_access_token(&base_url, &session.access_token) {
             Ok(account_id) => {
-                if let Err(error) = state.sync_service().start_revision_polling(
-                    account_id.clone(),
+                let auth_session = session::build_auth_session(
                     base_url.clone(),
-                    session.access_token.clone(),
-                ) {
-                    log::warn!(
-                        target: "vanguard::tauri::auth",
-                        "failed to start revision polling after login: [{}] {}",
-                        error.code(),
-                        error.log_message()
-                    );
+                    email.clone(),
+                    account_id.clone(),
+                    session.clone(),
+                )
+                .and_then(|value| {
+                    state
+                        .set_auth_session(value.clone())
+                        .map(|_| value)
+                        .map_err(|error| {
+                            AppError::internal(format!(
+                                "failed to store authenticated session: {}",
+                                error.log_message()
+                            ))
+                        })
+                });
+
+                match auth_session {
+                    Ok(auth_session) => {
+                        session::start_background_sync(&state, &auth_session).await;
+                        trigger_sync_after_login(
+                            state.sync_service(),
+                            auth_session.account_id,
+                            auth_session.base_url,
+                            auth_session.access_token,
+                        );
+                    }
+                    Err(error) => {
+                        log::warn!(
+                            target: "vanguard::tauri::auth",
+                            "failed to initialize authenticated session state: [{}] {}",
+                            error.code(),
+                            error.log_message()
+                        );
+                    }
                 }
-                if let Err(error) = state
-                    .realtime_sync_service()
-                    .start_for_account(
-                        account_id.clone(),
-                        base_url.clone(),
-                        session.access_token.clone(),
-                    )
-                    .await
-                {
-                    log::warn!(
-                        target: "vanguard::tauri::auth",
-                        "failed to start realtime sync after login: [{}] {}",
-                        error.code(),
-                        error.log_message()
-                    );
-                }
-                trigger_sync_after_login(
-                    state.sync_service(),
-                    account_id,
-                    base_url,
-                    session.access_token.clone(),
-                );
             }
             Err(error) => {
                 log::warn!(
@@ -109,62 +101,6 @@ pub async fn auth_login_with_password(
     }
 
     Ok(mapping::to_password_login_response_dto(result))
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn auth_refresh_token(
-    state: State<'_, AppState>,
-    request: RefreshTokenRequestDto,
-) -> Result<SessionResponseDto, String> {
-    let command = mapping::to_refresh_token_command(request);
-    let base_url = command.base_url.clone();
-    let result = state
-        .auth_service()
-        .refresh_token(command)
-        .await
-        .map_err(|error| log_command_error("auth_refresh_token", error))?;
-
-    match account_id::derive_account_id_from_access_token(&base_url, &result.access_token) {
-        Ok(account_id) => {
-            let polling_account_id = account_id.clone();
-            let polling_base_url = base_url.clone();
-            if let Err(error) = state.sync_service().start_revision_polling(
-                polling_account_id,
-                polling_base_url,
-                result.access_token.clone(),
-            ) {
-                log::warn!(
-                    target: "vanguard::tauri::auth",
-                    "failed to restart revision polling after refresh: [{}] {}",
-                    error.code(),
-                    error.log_message()
-                );
-            }
-            if let Err(error) = state
-                .realtime_sync_service()
-                .start_for_account(account_id.clone(), base_url, result.access_token.clone())
-                .await
-            {
-                log::warn!(
-                    target: "vanguard::tauri::auth",
-                    "failed to restart realtime sync after refresh: [{}] {}",
-                    error.code(),
-                    error.log_message()
-                );
-            }
-        }
-        Err(error) => {
-            log::warn!(
-                target: "vanguard::tauri::auth",
-                "failed to derive account id from refreshed token: [{}] {}",
-                error.code(),
-                error.log_message()
-            );
-        }
-    }
-
-    Ok(mapping::to_session_response_dto(result))
 }
 
 #[tauri::command]

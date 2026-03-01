@@ -4,17 +4,12 @@ use specta::Type;
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncNowRequestDto {
-    pub base_url: String,
-    pub access_token: String,
     pub exclude_domains: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct SyncStatusRequestDto {
-    pub base_url: String,
-    pub access_token: String,
-}
+pub struct SyncStatusRequestDto {}
 
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

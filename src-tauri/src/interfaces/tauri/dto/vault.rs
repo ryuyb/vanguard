@@ -6,35 +6,19 @@ use crate::interfaces::tauri::dto::sync::SyncStatusResponseDto;
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultViewDataRequestDto {
-    pub base_url: String,
-    pub access_token: String,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct VaultUnlockWithUserKeyRequestDto {
-    pub base_url: String,
-    pub access_token: String,
-    pub user_key: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
 pub struct VaultUnlockWithPasswordRequestDto {
-    pub base_url: String,
-    pub access_token: String,
-    pub email: String,
-    pub password: String,
+    pub master_password: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct VaultLockRequestDto {
-    pub base_url: String,
-    pub access_token: String,
-}
+pub struct VaultLockRequestDto {}
 
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -48,8 +32,6 @@ pub enum VaultDecryptionStatusDto {
 pub struct VaultFolderItemDto {
     pub id: String,
     pub name: Option<String>,
-    pub encrypted_name: Option<String>,
-    pub is_name_encrypted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -60,8 +42,6 @@ pub struct VaultCipherItemDto {
     pub organization_id: Option<String>,
     pub r#type: Option<i32>,
     pub name: Option<String>,
-    pub encrypted_name: Option<String>,
-    pub is_name_encrypted: bool,
     pub revision_date: Option<String>,
     pub deleted_date: Option<String>,
     pub attachment_count: u32,

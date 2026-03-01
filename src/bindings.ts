@@ -5,28 +5,9 @@
 
 
 export const commands = {
-async greet(name: string) : Promise<string> {
-    return await TAURI_INVOKE("greet", { name });
-},
-async authPrelogin(request: PreloginRequestDto) : Promise<Result<PreloginResponseDto, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("auth_prelogin", { request }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async authLoginWithPassword(request: PasswordLoginRequestDto) : Promise<Result<PasswordLoginResponseDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_login_with_password", { request }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async authRefreshToken(request: RefreshTokenRequestDto) : Promise<Result<SessionResponseDto, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("auth_refresh_token", { request }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -67,14 +48,6 @@ async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatus
 async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_check_revision", { request }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async vaultUnlockWithUserKey(request: VaultUnlockWithUserKeyRequestDto) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_user_key", { request }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -130,33 +103,29 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 /** user-defined types **/
 
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
-export type PasswordLoginRequestDto = { baseUrl: string; username: string; password: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
+export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
-export type PreloginRequestDto = { baseUrl: string; email: string }
-export type PreloginResponseDto = { kdf: number; kdfIterations: number; kdfMemory: number | null; kdfParallelism: number | null }
-export type RefreshTokenRequestDto = { baseUrl: string; refreshToken: string }
-export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPasswordHash: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
+export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
 export type SyncMetricsDto = { windowSize: number; sampleCount: number; successCount: number; failureCount: number; failureRate: number; lastDurationMs: number | null; averageDurationMs: number | null; lastCounts: SyncCountsDto | null; averageCounts: SyncCountsDto | null }
-export type SyncNowRequestDto = { baseUrl: string; accessToken: string; excludeDomains: boolean | null }
+export type SyncNowRequestDto = { excludeDomains: boolean | null }
 export type SyncStateDto = "idle" | "running" | "succeeded" | "degraded" | "failed"
-export type SyncStatusRequestDto = { baseUrl: string; accessToken: string }
+export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
-export type VaultCipherItemDto = { id: string; folderId: string | null; organizationId: string | null; type: number | null; name: string | null; encryptedName: string | null; isNameEncrypted: boolean; revisionDate: string | null; deletedDate: string | null; attachmentCount: number }
+export type VaultCipherItemDto = { id: string; folderId: string | null; organizationId: string | null; type: number | null; name: string | null; revisionDate: string | null; deletedDate: string | null; attachmentCount: number }
 export type VaultDecryptionStatusDto = "unlocked" | "locked"
-export type VaultFolderItemDto = { id: string; name: string | null; encryptedName: string | null; isNameEncrypted: boolean }
-export type VaultLockRequestDto = { baseUrl: string; accessToken: string }
+export type VaultFolderItemDto = { id: string; name: string | null }
+export type VaultLockRequestDto = Record<string, never>
 export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
 export type VaultSyncFailed = { accountId: string; code: string; message: string }
 export type VaultSyncLoggedOut = { accountId: string; reason: string }
 export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
-export type VaultUnlockWithPasswordRequestDto = { baseUrl: string; accessToken: string; email: string; password: string }
-export type VaultUnlockWithUserKeyRequestDto = { baseUrl: string; accessToken: string; userKey: string }
-export type VaultViewDataRequestDto = { baseUrl: string; accessToken: string; page: number | null; pageSize: number | null }
+export type VaultUnlockWithPasswordRequestDto = { masterPassword: string }
+export type VaultViewDataRequestDto = { page: number | null; pageSize: number | null }
 export type VaultViewDataResponseDto = { accountId: string; syncStatus: SyncStatusResponseDto; decryptionStatus: VaultDecryptionStatusDto; folders: VaultFolderItemDto[]; ciphers: VaultCipherItemDto[]; totalCiphers: number; page: number; pageSize: number }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }
 export type WebauthnAllowCredentialDto = { type: string | null; id: string | null; transports: string[] }

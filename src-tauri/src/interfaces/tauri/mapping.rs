@@ -1,44 +1,26 @@
 use crate::application::dto::auth::{
-    MasterPasswordPolicy, PasswordLoginCommand, PasswordLoginOutcome, PreloginInfo, PreloginQuery,
-    RefreshTokenCommand, SendEmailLoginCommand, SessionInfo, TwoFactorChallenge,
-    TwoFactorProviderHint, VerifyEmailTokenCommand, WebauthnAllowCredential,
-    WebauthnRequestExtensions,
+    MasterPasswordPolicy, PasswordLoginCommand, PasswordLoginOutcome, SendEmailLoginCommand,
+    SessionInfo, TwoFactorChallenge, TwoFactorProviderHint, VerifyEmailTokenCommand,
+    WebauthnAllowCredential, WebauthnRequestExtensions,
 };
-use crate::application::dto::sync::{SyncMetricsSummary, SyncOutcome, SyncVaultCommand};
-use crate::domain::sync::{SyncContext, SyncState, SyncTrigger, WsStatus};
+use crate::application::dto::sync::{SyncMetricsSummary, SyncOutcome};
+use crate::domain::sync::{SyncContext, SyncState, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
-    MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto, PreloginRequestDto,
-    PreloginResponseDto, RefreshTokenRequestDto, SendEmailLoginRequestDto, SessionResponseDto,
-    TwoFactorChallengeDto, TwoFactorProviderHintDto, VerifyEmailTokenRequestDto,
-    WebauthnAllowCredentialDto, WebauthnRequestExtensionsDto,
+    MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
+    SendEmailLoginRequestDto, SessionResponseDto, TwoFactorChallengeDto, TwoFactorProviderHintDto,
+    VerifyEmailTokenRequestDto, WebauthnAllowCredentialDto,
+    WebauthnRequestExtensionsDto,
 };
 use crate::interfaces::tauri::dto::sync::{
-    SyncCountsDto, SyncMetricsDto, SyncNowRequestDto, SyncStateDto, SyncStatusResponseDto,
-    WsStatusDto,
+    SyncCountsDto, SyncMetricsDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
 };
 use std::collections::HashMap;
-
-pub fn to_prelogin_query(dto: PreloginRequestDto) -> PreloginQuery {
-    PreloginQuery {
-        base_url: dto.base_url,
-        email: dto.email,
-    }
-}
-
-pub fn to_prelogin_response_dto(info: PreloginInfo) -> PreloginResponseDto {
-    PreloginResponseDto {
-        kdf: info.kdf,
-        kdf_iterations: info.kdf_iterations,
-        kdf_memory: info.kdf_memory,
-        kdf_parallelism: info.kdf_parallelism,
-    }
-}
 
 pub fn to_password_login_command(dto: PasswordLoginRequestDto) -> PasswordLoginCommand {
     PasswordLoginCommand {
         base_url: dto.base_url,
-        username: dto.username,
-        password: dto.password,
+        username: dto.email,
+        password: dto.master_password,
         two_factor_provider: dto.two_factor_provider,
         two_factor_token: dto.two_factor_token,
         two_factor_remember: dto.two_factor_remember,
@@ -57,18 +39,11 @@ pub fn to_password_login_response_dto(outcome: PasswordLoginOutcome) -> Password
     }
 }
 
-pub fn to_refresh_token_command(dto: RefreshTokenRequestDto) -> RefreshTokenCommand {
-    RefreshTokenCommand {
-        base_url: dto.base_url,
-        refresh_token: dto.refresh_token,
-    }
-}
-
 pub fn to_send_email_login_command(dto: SendEmailLoginRequestDto) -> SendEmailLoginCommand {
     SendEmailLoginCommand {
         base_url: dto.base_url,
         email: dto.email,
-        plaintext_password: dto.master_password_hash,
+        plaintext_password: dto.master_password,
         auth_request_id: dto.auth_request_id,
         auth_request_access_code: dto.auth_request_access_code,
     }
@@ -168,16 +143,6 @@ fn to_webauthn_request_extensions_dto(
 ) -> WebauthnRequestExtensionsDto {
     WebauthnRequestExtensionsDto {
         appid: extensions.appid,
-    }
-}
-
-pub fn to_sync_vault_command(dto: SyncNowRequestDto, account_id: String) -> SyncVaultCommand {
-    SyncVaultCommand {
-        account_id,
-        base_url: dto.base_url,
-        access_token: dto.access_token,
-        exclude_domains: dto.exclude_domains.unwrap_or(false),
-        trigger: SyncTrigger::Manual,
     }
 }
 

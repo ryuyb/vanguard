@@ -3,10 +3,10 @@ import {
   commands,
   events,
   type PasswordLoginResponseDto,
-  type PreloginResponseDto,
   type SessionResponseDto,
   type SyncStatusResponseDto,
   type TwoFactorChallengeDto,
+  type VaultViewDataResponseDto,
 } from "./bindings";
 import "./App.css";
 
@@ -29,14 +29,15 @@ function App() {
   const [email2faPasswordOverride, setEmail2faPasswordOverride] = useState("");
   const [verifyUserId, setVerifyUserId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
-  const [refreshTokenInput, setRefreshTokenInput] = useState("");
-  const [syncAccessTokenOverride, setSyncAccessTokenOverride] = useState("");
   const [syncExcludeDomains, setSyncExcludeDomains] = useState(false);
+  const [unlockMasterPassword, setUnlockMasterPassword] = useState("");
+  const [vaultPageInput, setVaultPageInput] = useState("1");
+  const [vaultPageSizeInput, setVaultPageSizeInput] = useState("50");
 
-  const [prelogin, setPrelogin] = useState<PreloginResponseDto | null>(null);
   const [session, setSession] = useState<SessionResponseDto | null>(null);
   const [challenge, setChallenge] = useState<TwoFactorChallengeDto | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponseDto | null>(null);
+  const [vaultViewData, setVaultViewData] = useState<VaultViewDataResponseDto | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [rawResult, setRawResult] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -66,15 +67,11 @@ function App() {
   };
 
   const runForegroundRevisionCheck = async () => {
-    const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
-    if (!accessToken) {
+    if (!session) {
       return;
     }
 
-    const result = await commands.vaultSyncCheckRevision({
-      baseUrl,
-      accessToken,
-    });
+    const result = await commands.vaultSyncCheckRevision({});
 
     if (result.status === "error") {
       addLog(
@@ -117,12 +114,11 @@ function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onFocus);
     };
-  }, [baseUrl, session?.accessToken, syncAccessTokenOverride]);
+  }, [session]);
 
   useEffect(() => {
     const unlistenPromise = events.vaultSyncAuthRequired.listen((event) => {
       setSession(null);
-      setRefreshTokenInput("");
       setChallenge(null);
       addLog(
         "error",
@@ -135,29 +131,12 @@ function App() {
     };
   }, []);
 
-  const handlePrelogin = async () => {
-    await run("prelogin", async () => {
-      const result = await commands.authPrelogin({
-        baseUrl,
-        email,
-      });
-
-      if (result.status === "error") {
-        setRaw(result);
-        throw new Error(result.error);
-      }
-
-      setPrelogin(result.data);
-      setRaw(result.data);
-    });
-  };
-
   const handleLogin = async () => {
     await run("password-login", async () => {
       const result = await commands.authLoginWithPassword({
         baseUrl,
-        username: email,
-        password,
+        email,
+        masterPassword: password,
         twoFactorProvider: emptyToNullNumber(twoFactorProvider),
         twoFactorToken: emptyToNull(twoFactorToken),
         twoFactorRemember: twoFactorToken.trim() ? twoFactorRemember : null,
@@ -174,35 +153,12 @@ function App() {
     });
   };
 
-  const handleRefreshToken = async () => {
-    await run("refresh-token", async () => {
-      const token = refreshTokenInput.trim();
-      if (!token) {
-        throw new Error("refresh token is empty");
-      }
-
-      const result = await commands.authRefreshToken({
-        baseUrl,
-        refreshToken: token,
-      });
-
-      if (result.status === "error") {
-        setRaw(result);
-        throw new Error(result.error || "backend returned an empty error message");
-      }
-
-      setSession(result.data);
-      setChallenge(null);
-      setRaw(result.data);
-    });
-  };
-
   const handleSendEmailLogin = async () => {
     await run("send-email-login", async () => {
       const result = await commands.authSendEmailLogin({
         baseUrl,
         email: emptyToNull(email),
-        masterPasswordHash: emptyToNull(
+        masterPassword: emptyToNull(
           email2faPasswordOverride.trim() ? email2faPasswordOverride : password,
         ),
         authRequestId: null,
@@ -237,14 +193,7 @@ function App() {
 
   const handleSyncNow = async () => {
     await run("vault-sync-now", async () => {
-      const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
-      if (!accessToken) {
-        throw new Error("access token is empty; please login first or provide a token override");
-      }
-
       const result = await commands.vaultSyncNow({
-        baseUrl,
-        accessToken,
         excludeDomains: syncExcludeDomains,
       });
 
@@ -260,15 +209,7 @@ function App() {
 
   const handleSyncStatus = async () => {
     await run("vault-sync-status", async () => {
-      const accessToken = syncAccessTokenOverride.trim() || session?.accessToken || "";
-      if (!accessToken) {
-        throw new Error("access token is empty; please login first or provide a token override");
-      }
-
-      const result = await commands.vaultSyncStatus({
-        baseUrl,
-        accessToken,
-      });
+      const result = await commands.vaultSyncStatus({});
 
       if (result.status === "error") {
         setRaw(result);
@@ -280,13 +221,61 @@ function App() {
     });
   };
 
+  const handleVaultUnlock = async () => {
+    await run("vault-unlock-with-password", async () => {
+      if (!unlockMasterPassword.trim()) {
+        throw new Error("unlock master password is empty");
+      }
+
+      const result = await commands.vaultUnlockWithPassword({
+        masterPassword: unlockMasterPassword,
+      });
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setRaw({ ok: true });
+    });
+  };
+
+  const handleVaultLock = async () => {
+    await run("vault-lock", async () => {
+      const result = await commands.vaultLock({});
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setRaw({ ok: true });
+    });
+  };
+
+  const handleVaultGetViewData = async () => {
+    await run("vault-get-view-data", async () => {
+      const result = await commands.vaultGetViewData({
+        page: toPositiveNumberOrNull(vaultPageInput),
+        pageSize: toPositiveNumberOrNull(vaultPageSizeInput),
+      });
+
+      if (result.status === "error") {
+        setRaw(result);
+        throw new Error(result.error || "backend returned an empty error message");
+      }
+
+      setVaultViewData(result.data);
+      setRaw(result.data);
+    });
+  };
+
   const handleLoginPayload = (payload: PasswordLoginResponseDto) => {
     if (payload.status === "authenticated") {
       const { status, ...sessionResult } = payload;
       void status;
       setSession(sessionResult);
       setChallenge(null);
-      setRefreshTokenInput(sessionResult.refreshToken ?? "");
       return;
     }
 
@@ -306,7 +295,7 @@ function App() {
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px" }}>
       <h1>Vaultwarden 登录流程验证</h1>
-      <p>最小化联调页面：prelogin / password login / refresh / email-2FA / verify-email-token。</p>
+      <p>最小化联调页面：password login / email-2FA / verify-email-token。</p>
 
       <section style={sectionStyle}>
         <h2>基础参数</h2>
@@ -354,23 +343,10 @@ function App() {
       <section style={sectionStyle}>
         <h2>动作</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <button type="button" disabled={!!busyAction} onClick={handlePrelogin}>
-            1) Prelogin
-          </button>
           <button type="button" disabled={!!busyAction} onClick={handleLogin}>
-            2) Password Login
-          </button>
-          <button type="button" disabled={!!busyAction} onClick={handleRefreshToken}>
-            3) Refresh Token
+            Password Login
           </button>
         </div>
-
-        <Field label="Refresh Token">
-          <input
-            value={refreshTokenInput}
-            onChange={(e) => setRefreshTokenInput(e.currentTarget.value)}
-          />
-        </Field>
 
         <hr />
 
@@ -382,7 +358,7 @@ function App() {
           />
         </Field>
         <p style={{ marginTop: -6, color: "#475467" }}>
-          留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 masterPasswordHash。
+          留空时默认使用上方 Password；Rust 端会自动 prelogin 并计算 master password hash。
         </p>
         <button type="button" disabled={!!busyAction} onClick={handleSendEmailLogin}>
           Send Email Login 2FA
@@ -407,13 +383,6 @@ function App() {
 
       <section style={sectionStyle}>
         <h2>Vault Sync 联调</h2>
-        <Field label="sync.accessToken override (optional)">
-          <input
-            value={syncAccessTokenOverride}
-            onChange={(e) => setSyncAccessTokenOverride(e.currentTarget.value)}
-            placeholder="留空将使用当前 Session.accessToken"
-          />
-        </Field>
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
           <input
             type="checkbox"
@@ -433,11 +402,54 @@ function App() {
       </section>
 
       <section style={sectionStyle}>
+        <h2>Vault 解锁与视图联调</h2>
+        <Field label="unlock.masterPassword">
+          <input
+            type="password"
+            value={unlockMasterPassword}
+            onChange={(e) => setUnlockMasterPassword(e.currentTarget.value)}
+          />
+        </Field>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <button type="button" disabled={!!busyAction} onClick={handleVaultUnlock}>
+            Unlock With Password
+          </button>
+          <button type="button" disabled={!!busyAction} onClick={handleVaultLock}>
+            Lock
+          </button>
+        </div>
+        <Field label="viewData.page (optional)">
+          <input
+            value={vaultPageInput}
+            onChange={(e) => setVaultPageInput(e.currentTarget.value)}
+            placeholder="1"
+          />
+        </Field>
+        <Field label="viewData.pageSize (optional)">
+          <input
+            value={vaultPageSizeInput}
+            onChange={(e) => setVaultPageSizeInput(e.currentTarget.value)}
+            placeholder="50"
+          />
+        </Field>
+        <button type="button" disabled={!!busyAction} onClick={handleVaultGetViewData}>
+          Get View Data
+        </button>
+      </section>
+
+      <section style={sectionStyle}>
         <h2>结果快照</h2>
-        <p>Prelogin: {prelogin ? "done" : "none"}</p>
         <p>Session: {session ? "authenticated" : "none"}</p>
         <p>2FA Challenge: {challenge ? "required" : "none"}</p>
         <p>Sync Status: {syncStatus ? syncStatus.state : "none"}</p>
+        <p>Vault View Data: {vaultViewData ? "loaded" : "none"}</p>
+        <p>
+          Decryption Status: {vaultViewData ? vaultViewData.decryptionStatus : "none"}
+        </p>
+        <p>
+          Visible Ciphers:{" "}
+          {vaultViewData ? `${vaultViewData.ciphers.length}/${vaultViewData.totalCiphers}` : "none"}
+        </p>
         <pre style={preStyle}>{rawResult || "No response yet."}</pre>
       </section>
 
@@ -480,6 +492,20 @@ function emptyToNullNumber(value: string): number | null {
   }
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toPositiveNumberOrNull(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return Math.floor(parsed);
 }
 
 const sectionStyle: CSSProperties = {

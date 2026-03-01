@@ -10,27 +10,16 @@ pub mod support;
 use specta_typescript::BigIntExportBehavior;
 use tauri::Manager;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-#[specta::specta]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let specta_builder = tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
-            greet,
-            interfaces::tauri::commands::auth::auth_prelogin,
             interfaces::tauri::commands::auth::auth_login_with_password,
-            interfaces::tauri::commands::auth::auth_refresh_token,
             interfaces::tauri::commands::auth::auth_send_email_login,
             interfaces::tauri::commands::auth::auth_verify_email_token,
             interfaces::tauri::commands::sync::vault_sync_now,
             interfaces::tauri::commands::sync::vault_sync_status,
             interfaces::tauri::commands::sync::vault_sync_check_revision,
-            interfaces::tauri::commands::vault::vault_unlock_with_user_key,
             interfaces::tauri::commands::vault::vault_unlock_with_password,
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data
