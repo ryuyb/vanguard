@@ -286,6 +286,95 @@ fn find_monitor_from_logical_point<R: Runtime>(
     matches.into_iter().next()
 }
 
+fn find_monitor_from_cursor_flexible<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    cursor: PhysicalPosition<f64>,
+) -> Option<Monitor> {
+    let monitors = app_handle.available_monitors().ok()?;
+    let mut scale_factors = vec![1.0_f64];
+    for monitor in &monitors {
+        let scale = monitor.scale_factor();
+        if !scale_factors
+            .iter()
+            .any(|current| (current - scale).abs() < 0.001)
+        {
+            scale_factors.push(scale);
+        }
+    }
+    scale_factors
+        .sort_by(|left, right| right.partial_cmp(left).unwrap_or(std::cmp::Ordering::Equal));
+
+    for factor in scale_factors {
+        if factor <= 0.0 {
+            continue;
+        }
+        let normalized_cursor = PhysicalPosition::new(cursor.x / factor, cursor.y / factor);
+        let mut matches: Vec<(Monitor, f64)> = monitors
+            .iter()
+            .filter_map(|monitor| {
+                let position = monitor.position();
+                let size = monitor.size();
+                let scale = monitor.scale_factor();
+                let logical_width = size.width as f64 / scale;
+                let logical_height = size.height as f64 / scale;
+                let contains = normalized_cursor.x >= position.x as f64
+                    && normalized_cursor.x < position.x as f64 + logical_width
+                    && normalized_cursor.y >= position.y as f64
+                    && normalized_cursor.y < position.y as f64 + logical_height;
+                if !contains {
+                    return None;
+                }
+
+                let center_x = position.x as f64 + logical_width / 2.0;
+                let center_y = position.y as f64 + logical_height / 2.0;
+                let distance = (normalized_cursor.x - center_x).powi(2)
+                    + (normalized_cursor.y - center_y).powi(2);
+                Some((monitor.clone(), distance))
+            })
+            .collect();
+
+        if matches.is_empty() {
+            continue;
+        }
+
+        matches.sort_by(|left, right| {
+            left.1
+                .partial_cmp(&right.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        if let Some((monitor, _)) = matches.into_iter().next() {
+            return Some(monitor);
+        }
+    }
+
+    let mut mixed_matches: Vec<(Monitor, f64)> = monitors
+        .iter()
+        .filter_map(|monitor| {
+            let position = monitor.position();
+            let size = monitor.size();
+            let contains = cursor.x >= position.x as f64
+                && cursor.x < position.x as f64 + size.width as f64
+                && cursor.y >= position.y as f64
+                && cursor.y < position.y as f64 + size.height as f64;
+            if !contains {
+                return None;
+            }
+
+            let center_x = position.x as f64 + size.width as f64 / 2.0;
+            let center_y = position.y as f64 + size.height as f64 / 2.0;
+            let distance = (cursor.x - center_x).powi(2) + (cursor.y - center_y).powi(2);
+            Some((monitor.clone(), distance))
+        })
+        .collect();
+
+    mixed_matches.sort_by(|left, right| {
+        left.1
+            .partial_cmp(&right.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    mixed_matches.into_iter().next().map(|entry| entry.0)
+}
+
 fn find_monitor_from_tray_click_snapshot<R: Runtime>(
     app_handle: &tauri::AppHandle<R>,
     snapshot: TrayClickSnapshot,
@@ -455,7 +544,7 @@ fn register_spotlight_shortcut<R: Runtime>(
                             if panel.is_visible() {
                                 panel.hide();
                             } else {
-                                place_spotlight_window(&spotlight_window);
+                                place_spotlight_window(app, &spotlight_window);
                                 panel.show_and_make_key();
                             }
                         }
@@ -510,7 +599,7 @@ fn toggle_spotlight_window<R: Runtime>(app: &tauri::AppHandle<R>) {
             }
         }
         Ok(false) => {
-            place_spotlight_window(&spotlight_window);
+            place_spotlight_window(app, &spotlight_window);
             if let Err(error) = spotlight_window.show() {
                 log::warn!(
                     target: "vanguard::shortcut",
@@ -572,7 +661,7 @@ fn toggle_spotlight_panel<R: Runtime>(app: &tauri::AppHandle<R>) -> bool {
         return true;
     }
 
-    place_spotlight_window(&spotlight_window);
+    place_spotlight_window(app, &spotlight_window);
     spotlight_panel.show_and_make_key();
     true
 }
@@ -597,9 +686,6 @@ impl<R: Runtime> SpotlightWebviewWindowExt<R> for WebviewWindow<R> {
         spotlight_panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
 
         let handler = SpotlightPanelEventHandler::new();
-        handler.window_did_become_key(|_| {
-            log::debug!(target: "vanguard::spotlight", "spotlight panel became key");
-        });
 
         let app_handle = self.app_handle().clone();
         handler.window_did_resign_key(move |_| {
@@ -615,7 +701,47 @@ impl<R: Runtime> SpotlightWebviewWindowExt<R> for WebviewWindow<R> {
     }
 }
 
-fn place_spotlight_window<R: Runtime>(spotlight_window: &WebviewWindow<R>) {
+fn place_spotlight_window<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    spotlight_window: &WebviewWindow<R>,
+) {
+    let cursor_position = app_handle.cursor_position().ok();
+    let target_monitor = if let Some(cursor) = cursor_position {
+        if let Some(monitor) = find_monitor_from_cursor_flexible(app_handle, cursor) {
+            Some(monitor)
+        } else if let Some(monitor) = app_handle
+            .monitor_from_point(cursor.x, cursor.y)
+            .ok()
+            .flatten()
+        {
+            Some(monitor)
+        } else if let Some(monitor) = find_monitor_from_logical_point(app_handle, cursor) {
+            Some(monitor)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+    .or_else(|| spotlight_window.current_monitor().ok().flatten())
+    .or_else(|| app_handle.primary_monitor().ok().flatten());
+
+    if let Some(target_monitor) = target_monitor {
+        let (work_area_left, work_area_top, work_area_width, _) =
+            monitor_logical_work_area(&target_monitor);
+        let target_x = work_area_left + (work_area_width - SPOTLIGHT_WIDTH) / 2.0;
+
+        if let Err(error) =
+            spotlight_window.set_position(LogicalPosition::new(target_x, work_area_top))
+        {
+            log::warn!(
+                target: "vanguard::spotlight",
+                "failed to place spotlight window by active monitor: {error}"
+            );
+        }
+        return;
+    }
+
     if let Err(error) = spotlight_window
         .as_ref()
         .window()
@@ -623,7 +749,7 @@ fn place_spotlight_window<R: Runtime>(spotlight_window: &WebviewWindow<R>) {
     {
         log::warn!(
             target: "vanguard::spotlight",
-            "failed to set spotlight window position with positioner: {error}"
+            "failed to set spotlight window position with positioner fallback: {error}"
         );
     }
 }

@@ -282,11 +282,6 @@ function SpotlightApp() {
   return (
     <main className="spotlight-shell">
       <section ref={cardRef} className="spotlight-card">
-        <header className="spotlight-header">
-          <p className="spotlight-label">Spotlight</p>
-          <h1 className="spotlight-title">Search Vanguard</h1>
-        </header>
-
         <label className="spotlight-search" htmlFor="spotlight-search-input">
           <span className="spotlight-search-icon">⌘</span>
           <input
