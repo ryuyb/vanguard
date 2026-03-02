@@ -8,7 +8,9 @@ import {
   LogIn,
   LogOut,
   RefreshCw,
+  Search,
   ShieldAlert,
+  UserRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,13 +23,16 @@ import {
 } from "@/bindings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 export const Route = createFileRoute("/vault")({
@@ -110,6 +115,16 @@ function compactText(values: Array<string | null | undefined>) {
   return values.filter(isNonEmptyText);
 }
 
+function toAvatarText(email: string | null | undefined) {
+  const normalized = (email ?? "").trim();
+  if (!normalized) {
+    return "??";
+  }
+  const head = normalized.split("@")[0] ?? normalized;
+  const compacted = head.replace(/[^a-zA-Z0-9]/g, "");
+  return (compacted.slice(0, 2) || "??").toUpperCase();
+}
+
 function VaultPage() {
   const navigate = useNavigate({ from: "/vault" });
   const [pageState, setPageState] = useState<VaultPageState>("loading");
@@ -132,6 +147,7 @@ function VaultPage() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [isEnablingBiometric, setIsEnablingBiometric] = useState(false);
   const [isDisablingBiometric, setIsDisablingBiometric] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const detailRequestSeqRef = useRef(0);
 
   const loadVaultData = useCallback(async () => {
@@ -339,13 +355,27 @@ function VaultPage() {
     );
   }, [selectedFolderId, sortedFolders]);
 
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
   const filteredCiphers = useMemo(() => {
     const all = viewData?.ciphers ?? [];
-    if (selectedFolderId === ALL_FOLDERS_ID) {
-      return all;
+    const folderScoped =
+      selectedFolderId === ALL_FOLDERS_ID
+        ? all
+        : all.filter((cipher) => cipher.folderId === selectedFolderId);
+
+    if (!normalizedSearchQuery) {
+      return folderScoped;
     }
-    return all.filter((cipher) => cipher.folderId === selectedFolderId);
-  }, [selectedFolderId, viewData?.ciphers]);
+
+    return folderScoped.filter((cipher) => {
+      const searchText = [cipher.name, cipher.id, cipher.organizationId]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return searchText.includes(normalizedSearchQuery);
+    });
+  }, [normalizedSearchQuery, selectedFolderId, viewData?.ciphers]);
 
   useEffect(() => {
     if (!selectedCipherId) {
@@ -375,125 +405,167 @@ function VaultPage() {
     return map;
   }, [viewData?.ciphers]);
 
+  const userEmail = restoreState?.email ?? "未登录";
+  const userBaseUrl =
+    restoreState?.baseUrl ?? viewData?.syncStatus.baseUrl ?? "未知服务";
+  const avatarText = useMemo(() => toAvatarText(userEmail), [userEmail]);
+  const isHeaderActionBusy =
+    isLocking ||
+    isLoggingOut ||
+    isRefreshing ||
+    isEnablingBiometric ||
+    isDisablingBiometric;
+
   return (
     <main className="min-h-dvh bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))] p-4 md:p-8">
       <section className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <Card className="border-white/80 bg-white/90 shadow-sm">
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
-            <div className="space-y-1">
-              <CardTitle className="text-2xl">Vault Browser</CardTitle>
-              <CardDescription>
-                左侧为 folders（All + 所有 folder），右侧为当前 folder 的
-                ciphers
-              </CardDescription>
+        <header className="rounded-2xl border border-white/80 bg-white/90 p-3 shadow-sm backdrop-blur-sm md:p-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_minmax(0,560px)_320px] md:items-center">
+            <div className="hidden md:block" />
+
+            <div className="relative w-full">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                type="search"
+                placeholder="搜索名称、ID..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-9"
+              />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onLock}
-                disabled={
-                  isLocking ||
-                  isLoggingOut ||
-                  isRefreshing ||
-                  isEnablingBiometric ||
-                  isDisablingBiometric
-                }
-              >
-                {isLocking ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <Lock />
-                )}
-                锁定
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onLogout}
-                disabled={
-                  isLoggingOut ||
-                  isLocking ||
-                  isRefreshing ||
-                  isEnablingBiometric ||
-                  isDisablingBiometric
-                }
-              >
-                {isLoggingOut ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <LogOut />
-                )}
-                登出
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={loadVaultData}
-                disabled={
-                  isRefreshing ||
-                  isLocking ||
-                  isLoggingOut ||
-                  isEnablingBiometric ||
-                  isDisablingBiometric
-                }
-              >
-                {isRefreshing ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <RefreshCw />
-                )}
-                刷新
-              </Button>
-              {pageState === "ready" &&
-                biometricSupported &&
-                !biometricEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onEnableBiometric}
-                    disabled={
-                      isEnablingBiometric ||
-                      isDisablingBiometric ||
-                      isRefreshing ||
-                      isLocking ||
-                      isLoggingOut
-                    }
-                  >
-                    {isEnablingBiometric ? (
-                      <LoaderCircle className="animate-spin" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-auto w-full justify-start px-3 py-2"
+                >
+                  <div className="flex size-10 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
+                    {avatarText === "??" ? (
+                      <UserRound className="size-5" />
                     ) : (
-                      <Fingerprint />
+                      avatarText
                     )}
-                    {isEnablingBiometric ? "启用中..." : "启用 Touch ID"}
-                  </Button>
-                )}
-              {pageState === "ready" &&
-                biometricSupported &&
-                biometricEnabled && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onDisableBiometric}
-                    disabled={
-                      isEnablingBiometric ||
-                      isDisablingBiometric ||
-                      isRefreshing ||
-                      isLocking ||
-                      isLoggingOut
-                    }
-                  >
-                    {isDisablingBiometric ? (
-                      <LoaderCircle className="animate-spin" />
-                    ) : (
-                      <Fingerprint />
-                    )}
-                    {isDisablingBiometric ? "关闭中..." : "关闭 Touch ID"}
-                  </Button>
-                )}
-            </div>
-          </CardHeader>
-        </Card>
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <div className="truncate text-sm font-medium text-slate-900">
+                      {userEmail}
+                    </div>
+                    <div className="truncate text-xs text-slate-600">
+                      {userBaseUrl}
+                    </div>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel className="space-y-1">
+                  <div className="truncate text-sm text-slate-900">
+                    {userEmail}
+                  </div>
+                  <div className="truncate text-xs text-slate-600">
+                    {userBaseUrl}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={isHeaderActionBusy}
+                  onSelect={() => {
+                    void onLock();
+                  }}
+                >
+                  {isLocking ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <Lock />
+                  )}
+                  锁定
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={isHeaderActionBusy}
+                  onSelect={() => {
+                    void onLogout();
+                  }}
+                >
+                  {isLoggingOut ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <LogOut />
+                  )}
+                  登出
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                isRefreshing ||
+                isHeaderActionBusy ||
+                pageState === "needsLogin" ||
+                pageState === "locked"
+              }
+              onClick={loadVaultData}
+            >
+              {isRefreshing ? (
+                <LoaderCircle className="animate-spin" />
+              ) : (
+                <RefreshCw />
+              )}
+              刷新
+            </Button>
+            {pageState === "ready" &&
+              biometricSupported &&
+              !biometricEnabled && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onEnableBiometric}
+                  disabled={
+                    isEnablingBiometric ||
+                    isDisablingBiometric ||
+                    isRefreshing ||
+                    isLocking ||
+                    isLoggingOut
+                  }
+                >
+                  {isEnablingBiometric ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <Fingerprint />
+                  )}
+                  {isEnablingBiometric ? "启用中..." : "启用 Touch ID"}
+                </Button>
+              )}
+            {pageState === "ready" &&
+              biometricSupported &&
+              biometricEnabled && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onDisableBiometric}
+                  disabled={
+                    isEnablingBiometric ||
+                    isDisablingBiometric ||
+                    isRefreshing ||
+                    isLocking ||
+                    isLoggingOut
+                  }
+                >
+                  {isDisablingBiometric ? (
+                    <LoaderCircle className="animate-spin" />
+                  ) : (
+                    <Fingerprint />
+                  )}
+                  {isDisablingBiometric ? "关闭中..." : "关闭 Touch ID"}
+                </Button>
+              )}
+          </div>
+        </header>
 
         {pageState === "loading" && (
           <Card className="border-white/80 bg-white/90 shadow-sm">
@@ -552,26 +624,6 @@ function VaultPage() {
 
         {pageState === "ready" && viewData && (
           <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardHeader className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">
-                  account: {restoreState?.accountId ?? viewData.accountId}
-                </Badge>
-                <Badge variant="outline">folders: {sortedFolders.length}</Badge>
-                <Badge variant="outline">
-                  ciphers: {viewData.totalCiphers}
-                </Badge>
-                <Badge variant="outline">
-                  sync: {viewData.syncStatus.state}/
-                  {viewData.syncStatus.wsStatus}
-                </Badge>
-                {biometricSupported && (
-                  <Badge variant="outline">
-                    touch id: {biometricEnabled ? "enabled" : "disabled"}
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
               <aside className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -627,7 +679,9 @@ function VaultPage() {
                   <div className="space-y-2">
                     {filteredCiphers.length === 0 && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                        当前 folder 下没有 cipher。
+                        {normalizedSearchQuery
+                          ? "没有匹配搜索条件的 cipher。"
+                          : "当前 folder 下没有 cipher。"}
                       </div>
                     )}
 
