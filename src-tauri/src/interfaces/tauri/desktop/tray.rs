@@ -3,8 +3,9 @@ use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::Runtime;
 
 use crate::interfaces::tauri::desktop::constants::{
-    TRAY_ICON_ID, TRAY_MENU_LOCK_ID, TRAY_MENU_OPEN_QUICK_ACCESS_ID, TRAY_MENU_OPEN_VANGUARD_ID,
-    TRAY_MENU_QUIT_ID, TRAY_MENU_SETTINGS_ID,
+    TRAY_ICON_ID, TRAY_MENU_LOCK_ID, TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR,
+    TRAY_MENU_OPEN_QUICK_ACCESS_ID, TRAY_MENU_OPEN_VANGUARD_ID, TRAY_MENU_QUIT_ID,
+    TRAY_MENU_SETTINGS_ID,
 };
 use crate::interfaces::tauri::desktop::main_window::MainWindowFeature;
 use crate::interfaces::tauri::desktop::spotlight::SpotlightFeature;
@@ -76,7 +77,7 @@ impl TrayFeature {
             TRAY_MENU_OPEN_QUICK_ACCESS_ID,
             "打开快速访问",
             true,
-            None::<&str>,
+            Some(TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR),
         )?;
         let separator = PredefinedMenuItem::separator(app)?;
         let lock = MenuItem::with_id(app, TRAY_MENU_LOCK_ID, "锁定", true, None::<&str>)?;
