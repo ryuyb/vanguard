@@ -167,11 +167,7 @@ function UnlockPage() {
       }
 
       setMasterPassword("");
-      setFeedback({
-        kind: "success",
-        text: "解锁成功，可以继续访问密码库数据。",
-      });
-      await loadRestoreState();
+      await navigate({ to: "/vault" });
     } catch (error) {
       setFeedback({ kind: "error", text: errorToText(error) });
     } finally {
@@ -198,11 +194,7 @@ function UnlockPage() {
         return;
       }
       setMasterPassword("");
-      setFeedback({
-        kind: "success",
-        text: "Touch ID 解锁成功，可以继续访问密码库数据。",
-      });
-      await loadRestoreState();
+      await navigate({ to: "/vault" });
     } catch (error) {
       setFeedback({ kind: "error", text: errorToText(error) });
     } finally {
@@ -320,9 +312,6 @@ function UnlockPage() {
                       <LogOut />
                     )}
                     {isLoggingOut ? "正在登出..." : "登出"}
-                  </Button>
-                  <Button asChild variant="outline" className="w-full">
-                    <Link to="/">返回首页</Link>
                   </Button>
                 </div>
               )}
@@ -444,12 +433,6 @@ function UnlockPage() {
                         已启用，但当前设备还没有可用于解锁的本地同步数据，请先完成一次同步并用密码解锁。
                       </div>
                     )}
-
-                  {feedback.kind === "success" && (
-                    <Button asChild className="w-full" variant="outline">
-                      <Link to="/vault">进入 Vault 数据页</Link>
-                    </Button>
-                  )}
 
                   <Button
                     type="button"

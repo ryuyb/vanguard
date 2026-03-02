@@ -53,6 +53,27 @@ type TwoFactorState = {
   isSendingEmailCode: boolean;
 };
 
+const CUSTOM_SERVER_URL_OPTION = "__custom__";
+
+const SERVER_URL_OPTIONS = [
+  {
+    value: "https://bitwarden.com",
+    label: "Bitwarden.com",
+  },
+  {
+    value: "https://bitwarden.eu",
+    label: "Bitwarden.eu",
+  },
+] as const;
+
+function toServerUrlOption(value: string) {
+  const normalized = normalizeBaseUrl(value);
+  const matched = SERVER_URL_OPTIONS.find(
+    (option) => option.value === normalized,
+  );
+  return matched ? matched.value : CUSTOM_SERVER_URL_OPTION;
+}
+
 const TWO_FACTOR_PROVIDER_LABELS: Record<string, string> = {
   "0": "Authenticator",
   "1": "Email",
@@ -100,7 +121,10 @@ function errorToText(error: unknown) {
 
 function Index() {
   const navigate = useNavigate({ from: "/" });
-  const [baseUrl, setBaseUrl] = useState("");
+  const [customBaseUrl, setCustomBaseUrl] = useState("");
+  const [serverUrlOption, setServerUrlOption] = useState<string>(
+    CUSTOM_SERVER_URL_OPTION,
+  );
   const [email, setEmail] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -129,8 +153,15 @@ function Index() {
         const restored = result.data;
 
         if (restored.baseUrl) {
-          setBaseUrl((previous) =>
-            previous.trim().length > 0 ? previous : (restored.baseUrl ?? ""),
+          const normalizedRestoredBaseUrl = normalizeBaseUrl(restored.baseUrl);
+          const restoredOption = toServerUrlOption(normalizedRestoredBaseUrl);
+          if (restoredOption === CUSTOM_SERVER_URL_OPTION) {
+            setCustomBaseUrl((previous) =>
+              previous.trim().length > 0 ? previous : normalizedRestoredBaseUrl,
+            );
+          }
+          setServerUrlOption((previous) =>
+            previous === CUSTOM_SERVER_URL_OPTION ? restoredOption : previous,
           );
         }
         if (restored.email) {
@@ -153,17 +184,22 @@ function Index() {
     };
   }, []);
 
+  const effectiveBaseUrl =
+    serverUrlOption === CUSTOM_SERVER_URL_OPTION
+      ? customBaseUrl
+      : serverUrlOption;
+
   const canSubmit = useMemo(
     () =>
       !isSubmitting &&
       !isRestoringSession &&
-      normalizeBaseUrl(baseUrl).length > 0 &&
+      normalizeBaseUrl(effectiveBaseUrl).length > 0 &&
       email.trim().length > 0 &&
       masterPassword.length > 0 &&
       (twoFactorState ? twoFactorState.token.trim().length > 0 : true),
     [
-      baseUrl,
       email,
+      effectiveBaseUrl,
       isRestoringSession,
       isSubmitting,
       masterPassword,
@@ -184,7 +220,7 @@ function Index() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+    const normalizedBaseUrl = normalizeBaseUrl(effectiveBaseUrl);
     const trimmedEmail = email.trim();
 
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
@@ -352,7 +388,7 @@ function Index() {
       return;
     }
 
-    const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+    const normalizedBaseUrl = normalizeBaseUrl(effectiveBaseUrl);
     const trimmedEmail = email.trim();
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
       setFeedback({
@@ -445,23 +481,48 @@ function Index() {
 
               <div className="space-y-2">
                 <Label htmlFor="base-url">服务地址</Label>
-                <InputGroup>
-                  <InputGroupAddon>
-                    <Globe className="text-slate-500" />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    id="base-url"
-                    type="url"
-                    autoComplete="url"
-                    placeholder="https://vault.example.com"
-                    value={baseUrl}
-                    onChange={(event) => {
-                      clearTwoFactorChallenge();
-                      setBaseUrl(event.target.value);
-                    }}
-                    disabled={isSubmitting}
-                  />
-                </InputGroup>
+                <Select
+                  value={serverUrlOption}
+                  onValueChange={(value) => {
+                    clearTwoFactorChallenge();
+                    setServerUrlOption(value);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="base-url" className="w-full bg-white">
+                    <SelectValue placeholder="选择服务地址" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SERVER_URL_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={CUSTOM_SERVER_URL_OPTION}>
+                      自定义地址
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {serverUrlOption === CUSTOM_SERVER_URL_OPTION && (
+                  <InputGroup>
+                    <InputGroupAddon>
+                      <Globe className="text-slate-500" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      id="base-url-custom"
+                      type="url"
+                      autoComplete="url"
+                      placeholder="https://vault.example.com"
+                      value={customBaseUrl}
+                      onChange={(event) => {
+                        clearTwoFactorChallenge();
+                        setCustomBaseUrl(event.target.value);
+                      }}
+                      disabled={isSubmitting}
+                    />
+                  </InputGroup>
+                )}
               </div>
 
               <div className="space-y-2">
