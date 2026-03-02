@@ -1,7 +1,7 @@
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::window::Color;
-use tauri::{Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{ActivationPolicy, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt as PanelManagerExt, PanelHandle, PanelLevel,
@@ -11,6 +11,7 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_positioner::{Position, WindowExt};
 
 const SPOTLIGHT_WINDOW_LABEL: &str = "spotlight";
+const MAIN_WINDOW_LABEL: &str = "main";
 const SPOTLIGHT_PAGE_PATH: &str = "spotlight.html";
 const SPOTLIGHT_WIDTH: f64 = 980.0;
 const SPOTLIGHT_HEIGHT: f64 = 620.0;
@@ -40,6 +41,7 @@ pub fn install_desktop_features<R: Runtime>(
     app: &tauri::App<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     install_tray_icon(app)?;
+    bind_main_window_close_to_tray(app);
     let spotlight_window = ensure_spotlight_window(app)?;
     bind_spotlight_blur_hide(spotlight_window);
     register_spotlight_shortcut(app)?;
@@ -81,12 +83,8 @@ fn install_tray_icon<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
-        .on_menu_event(move |_app_handle, event: MenuEvent| {
-            log::info!(
-                target: "vanguard::tray",
-                "tray menu clicked (not implemented): {:?}",
-                event.id()
-            );
+        .on_menu_event(move |app_handle, event: MenuEvent| {
+            handle_tray_menu_event(app_handle, &event);
         });
 
     if let Some(default_icon) = app.default_window_icon().cloned() {
@@ -97,6 +95,62 @@ fn install_tray_icon<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     Ok(())
 }
 
+fn handle_tray_menu_event<R: Runtime>(app_handle: &tauri::AppHandle<R>, event: &MenuEvent) {
+    match event.id().as_ref() {
+        TRAY_MENU_OPEN_VANGUARD_ID => open_main_window_from_tray(app_handle),
+        TRAY_MENU_QUIT_ID => quit_app_from_tray(app_handle),
+        _ => {
+            log::info!(
+                target: "vanguard::tray",
+                "tray menu clicked (not implemented): {:?}",
+                event.id()
+            );
+        }
+    }
+}
+
+fn quit_app_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+    log::info!(target: "vanguard::tray", "exiting app from tray menu");
+    app_handle.exit(0);
+}
+
+fn open_main_window_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+    #[cfg(target_os = "macos")]
+    if let Err(error) = app_handle.set_activation_policy(ActivationPolicy::Regular) {
+        log::warn!(
+            target: "vanguard::tray",
+            "failed to set activation policy to regular on restore: {error}"
+        );
+    }
+
+    let Some(main_window) = app_handle.get_webview_window(MAIN_WINDOW_LABEL) else {
+        log::warn!(
+            target: "vanguard::tray",
+            "main window not found, cannot restore from tray"
+        );
+        return;
+    };
+
+    if let Err(error) = main_window.unminimize() {
+        log::warn!(
+            target: "vanguard::tray",
+            "failed to unminimize main window from tray: {error}"
+        );
+    }
+    if let Err(error) = main_window.show() {
+        log::warn!(
+            target: "vanguard::tray",
+            "failed to show main window from tray: {error}"
+        );
+    }
+    if let Err(error) = main_window.set_focus() {
+        log::warn!(
+            target: "vanguard::tray",
+            "failed to focus main window from tray: {error}"
+        );
+    }
+}
+
 fn ensure_spotlight_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<WebviewWindow<R>> {
     if let Some(window) = app.get_webview_window(SPOTLIGHT_WINDOW_LABEL) {
         return Ok(window);
@@ -105,6 +159,40 @@ fn ensure_spotlight_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<Web
     let spotlight_window = build_spotlight_window(app)?;
 
     Ok(spotlight_window)
+}
+
+fn bind_main_window_close_to_tray<R: Runtime>(app: &tauri::App<R>) {
+    let Some(main_window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        log::warn!(
+            target: "vanguard::tray",
+            "main window not found, skip close-to-tray binding"
+        );
+        return;
+    };
+
+    let main_window_for_events = main_window.clone();
+    #[cfg(target_os = "macos")]
+    let app_handle_for_events = app.handle().clone();
+    main_window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            #[cfg(target_os = "macos")]
+            if let Err(error) =
+                app_handle_for_events.set_activation_policy(ActivationPolicy::Accessory)
+            {
+                log::warn!(
+                    target: "vanguard::tray",
+                    "failed to set activation policy to accessory on hide: {error}"
+                );
+            }
+            if let Err(error) = main_window_for_events.hide() {
+                log::warn!(
+                    target: "vanguard::tray",
+                    "failed to hide main window on close request: {error}"
+                );
+            }
+        }
+    });
 }
 
 fn build_spotlight_window<R: Runtime, M: Manager<R>>(
