@@ -24,6 +24,21 @@ pub struct VaultUnlockWithPasswordRequestDto {
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct VaultEnableBiometricUnlockRequestDto {}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultDisableBiometricUnlockRequestDto {}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultBiometricStatusResponseDto {
+    pub supported: bool,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultLockRequestDto {}
 
 #[derive(Debug, Clone, Serialize, Type)]

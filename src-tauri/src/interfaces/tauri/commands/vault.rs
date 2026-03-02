@@ -8,11 +8,13 @@ use tauri::State;
 
 use crate::application::dto::auth::PreloginQuery;
 use crate::bootstrap::app_state::{AppState, PersistedAuthContext, VaultUserKey};
+use crate::infrastructure::security::biometric_store;
 use crate::infrastructure::vaultwarden::password_hash::derive_master_key;
 use crate::interfaces::tauri::dto::vault::{
-    VaultCipherDetailDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
-    VaultCipherItemDto, VaultFolderItemDto, VaultLockRequestDto, VaultUnlockWithPasswordRequestDto,
-    VaultViewDataRequestDto, VaultViewDataResponseDto,
+    VaultBiometricStatusResponseDto, VaultCipherDetailDto, VaultCipherDetailRequestDto,
+    VaultCipherDetailResponseDto, VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto,
+    VaultEnableBiometricUnlockRequestDto, VaultFolderItemDto, VaultLockRequestDto,
+    VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::{mapping, session};
 use crate::support::error::AppError;
@@ -63,76 +65,197 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String
 
 #[tauri::command]
 #[specta::specta]
+pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, String> {
+    let account_id = match state.active_account_id() {
+        Ok(value) => value,
+        Err(AppError::Validation(_)) => return Ok(false),
+        Err(error) => return Err(log_command_error("vault_is_unlocked", error)),
+    };
+
+    state
+        .get_vault_user_key(&account_id)
+        .map(|value| value.is_some())
+        .map_err(|error| log_command_error("vault_is_unlocked", error))
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn vault_unlock_with_password(
     state: State<'_, AppState>,
     request: VaultUnlockWithPasswordRequestDto,
 ) -> Result<(), String> {
-    let master_password = request.master_password.trim().to_string();
-    if master_password.is_empty() {
-        return Err(log_command_error(
-            "vault_unlock_with_password",
-            AppError::validation("master_password cannot be empty"),
-        ));
-    }
-    let unlock_context = resolve_unlock_context(&state, &master_password)
+    unlock_with_master_password(&state, &request.master_password)
         .await
         .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
-    let account_id = unlock_context.account_id.clone();
+    Ok(())
+}
 
-    let unlock_material = state
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_get_biometric_status(
+    state: State<'_, AppState>,
+) -> Result<VaultBiometricStatusResponseDto, String> {
+    if !biometric_store::is_supported() {
+        return Ok(VaultBiometricStatusResponseDto {
+            supported: false,
+            enabled: false,
+        });
+    }
+
+    let account_id = match state.active_account_id() {
+        Ok(value) => value,
+        Err(AppError::Validation(_)) => {
+            return Ok(VaultBiometricStatusResponseDto {
+                supported: true,
+                enabled: false,
+            });
+        }
+        Err(error) => return Err(log_command_error("vault_get_biometric_status", error)),
+    };
+    let enabled = biometric_store::has_unlock_bundle(&account_id)
+        .map_err(|error| log_command_error("vault_get_biometric_status", error))?;
+    Ok(VaultBiometricStatusResponseDto {
+        supported: true,
+        enabled,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Result<bool, String> {
+    if !biometric_store::is_supported() {
+        return Ok(false);
+    }
+
+    let account_id = match state.active_account_id() {
+        Ok(value) => value,
+        Err(AppError::Validation(_)) => return Ok(false),
+        Err(error) => return Err(log_command_error("vault_can_unlock_with_biometric", error)),
+    };
+
+    let user_decryption = state
         .sync_service()
         .load_live_user_decryption(account_id.clone())
         .await
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))
-        .and_then(|value| {
-            extract_unlock_material(value)
-                .map_err(|error| log_command_error("vault_unlock_with_password", error))
+        .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))?;
+    match extract_unlock_material(user_decryption) {
+        Ok(_) => {}
+        Err(error) if is_unlock_material_missing(&error) => return Ok(false),
+        Err(error) => return Err(log_command_error("vault_can_unlock_with_biometric", error)),
+    }
+
+    biometric_store::has_unlock_bundle(&account_id)
+        .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_enable_biometric_unlock(
+    state: State<'_, AppState>,
+    _request: VaultEnableBiometricUnlockRequestDto,
+) -> Result<(), String> {
+    if !biometric_store::is_supported() {
+        return Err(log_command_error(
+            "vault_enable_biometric_unlock",
+            AppError::validation("biometric unlock is only supported on macOS"),
+        ));
+    }
+
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))?;
+
+    let user_key = state
+        .get_vault_user_key(&account_id)
+        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "vault_enable_biometric_unlock",
+                AppError::validation(
+                    "vault is locked, please unlock with password before enabling touch id",
+                ),
+            )
         })?;
+    let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key)
+        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))?;
 
-    let master_keys = derive_master_key_candidates_for_unlock(
-        &state,
-        &unlock_context,
-        &master_password,
-        &unlock_material,
-    )
-    .await
-    .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
-
-    let user_key =
-        decrypt_user_key_with_master_keys(&unlock_material.encrypted_user_keys, &master_keys)
-            .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
-    state
-        .set_vault_user_key(account_id.clone(), user_key)
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
+    biometric_store::save_unlock_bundle(&account_id, &bundle)
+        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))?;
+    let verified_bundle = biometric_store::load_unlock_bundle(&account_id)
+        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))?;
+    if verified_bundle.account_id != account_id {
+        return Err(log_command_error(
+            "vault_enable_biometric_unlock",
+            AppError::internal("biometric verification returned mismatched account id"),
+        ));
+    }
 
     log::info!(
         target: "vanguard::tauri::vault",
-        "vault unlocked with password in memory account_id={}",
+        "biometric unlock enabled account_id={}",
         account_id
     );
+    Ok(())
+}
 
-    if state
-        .auth_session()
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))?
-        .is_none()
-    {
-        if let Err(error) =
-            session::restore_auth_session_with_master_password(&state, &master_password).await
-        {
-            log::warn!(
-                target: "vanguard::tauri::vault",
-                "vault unlock completed but auth session restore failed account_id={} status={} error_code={} message={}",
-                unlock_context.account_id,
-                error
-                    .status()
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| String::from("n/a")),
-                error.code(),
-                error.log_message()
-            );
-        }
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_disable_biometric_unlock(
+    state: State<'_, AppState>,
+    _request: VaultDisableBiometricUnlockRequestDto,
+) -> Result<(), String> {
+    if !biometric_store::is_supported() {
+        return Ok(());
     }
 
+    let account_id = match state.active_account_id() {
+        Ok(value) => value,
+        Err(AppError::Validation(_)) => return Ok(()),
+        Err(error) => return Err(log_command_error("vault_disable_biometric_unlock", error)),
+    };
+
+    biometric_store::delete_unlock_bundle(&account_id)
+        .map_err(|error| log_command_error("vault_disable_biometric_unlock", error))?;
+    log::info!(
+        target: "vanguard::tauri::vault",
+        "biometric unlock disabled account_id={}",
+        account_id
+    );
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_unlock_with_biometric(state: State<'_, AppState>) -> Result<(), String> {
+    if !biometric_store::is_supported() {
+        return Err(log_command_error(
+            "vault_unlock_with_biometric",
+            AppError::validation("biometric unlock is only supported on macOS"),
+        ));
+    }
+
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("vault_unlock_with_biometric", error))?;
+    let bundle = biometric_store::load_unlock_bundle(&account_id)
+        .map_err(|error| log_command_error("vault_unlock_with_biometric", error))?;
+    if bundle.account_id != account_id {
+        return Err(log_command_error(
+            "vault_unlock_with_biometric",
+            AppError::validation("biometric unlock account does not match current account"),
+        ));
+    }
+    let user_key = biometric_bundle_to_vault_user_key(&bundle)
+        .map_err(|error| log_command_error("vault_unlock_with_biometric", error))?;
+    state
+        .set_vault_user_key(account_id.clone(), user_key)
+        .map_err(|error| log_command_error("vault_unlock_with_biometric", error))?;
+
+    log::info!(
+        target: "vanguard::tauri::vault",
+        "vault unlocked with biometric account_id={}",
+        account_id
+    );
     Ok(())
 }
 
@@ -285,6 +408,60 @@ pub async fn vault_get_cipher_detail(
         .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
 
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
+}
+
+async fn unlock_with_master_password(state: &AppState, master_password: &str) -> AppResult<String> {
+    let master_password = master_password.trim().to_string();
+    if master_password.is_empty() {
+        return Err(AppError::validation("master_password cannot be empty"));
+    }
+
+    let unlock_context = resolve_unlock_context(state, &master_password).await?;
+    let account_id = unlock_context.account_id.clone();
+
+    let unlock_material = state
+        .sync_service()
+        .load_live_user_decryption(account_id.clone())
+        .await
+        .and_then(extract_unlock_material)?;
+
+    let master_keys = derive_master_key_candidates_for_unlock(
+        state,
+        &unlock_context,
+        &master_password,
+        &unlock_material,
+    )
+    .await?;
+
+    let user_key =
+        decrypt_user_key_with_master_keys(&unlock_material.encrypted_user_keys, &master_keys)?;
+    state.set_vault_user_key(account_id.clone(), user_key)?;
+
+    log::info!(
+        target: "vanguard::tauri::vault",
+        "vault unlocked with password in memory account_id={}",
+        account_id
+    );
+
+    if state.auth_session()?.is_none() {
+        if let Err(error) =
+            session::restore_auth_session_with_master_password(state, &master_password).await
+        {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "vault unlock completed but auth session restore failed account_id={} status={} error_code={} message={}",
+                unlock_context.account_id,
+                error
+                    .status()
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error.log_message()
+            );
+        }
+    }
+
+    Ok(account_id)
 }
 
 fn normalize_page(page: Option<u32>) -> u32 {
@@ -445,6 +622,39 @@ fn parse_user_key(raw: &str) -> Result<VaultUserKey, AppError> {
             "user_key length must be 32 or 64 bytes after base64 decode, got {len}"
         ))),
     }
+}
+
+fn vault_user_key_to_biometric_bundle(
+    account_id: &str,
+    user_key: &VaultUserKey,
+) -> Result<biometric_store::BiometricUnlockBundle, AppError> {
+    validate_key_lengths(&user_key.enc_key, user_key.mac_key.as_deref())?;
+    Ok(biometric_store::BiometricUnlockBundle::new(
+        String::from(account_id),
+        STANDARD_NO_PAD.encode(&user_key.enc_key),
+        user_key
+            .mac_key
+            .as_ref()
+            .map(|value| STANDARD_NO_PAD.encode(value)),
+    ))
+}
+
+fn biometric_bundle_to_vault_user_key(
+    bundle: &biometric_store::BiometricUnlockBundle,
+) -> Result<VaultUserKey, AppError> {
+    if bundle.account_id.trim().is_empty() {
+        return Err(AppError::validation(
+            "biometric unlock bundle account_id is empty",
+        ));
+    }
+    let enc_key = decode_base64_flexible(&bundle.enc_key_b64, "biometric.enc_key_b64")?;
+    let mac_key = bundle
+        .mac_key_b64
+        .as_ref()
+        .map(|value| decode_base64_flexible(value, "biometric.mac_key_b64"))
+        .transpose()?;
+    validate_key_lengths(&enc_key, mac_key.as_deref())?;
+    Ok(VaultUserKey { enc_key, mac_key })
 }
 
 #[derive(Debug, Clone)]

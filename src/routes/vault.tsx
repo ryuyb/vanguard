@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Fingerprint,
   FolderOpen,
   KeyRound,
   LoaderCircle,
@@ -126,6 +127,10 @@ function VaultPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [isEnablingBiometric, setIsEnablingBiometric] = useState(false);
+  const [isDisablingBiometric, setIsDisablingBiometric] = useState(false);
   const detailRequestSeqRef = useRef(0);
 
   const loadVaultData = useCallback(async () => {
@@ -147,11 +152,25 @@ function VaultPage() {
       }
 
       setRestoreState(restore.data);
+      if (restore.data.status !== "needsLogin") {
+        const biometricStatus = await commands.vaultGetBiometricStatus();
+        if (biometricStatus.status === "ok") {
+          setBiometricSupported(biometricStatus.data.supported);
+          setBiometricEnabled(biometricStatus.data.enabled);
+        } else {
+          setBiometricSupported(false);
+          setBiometricEnabled(false);
+        }
+      } else {
+        setBiometricSupported(false);
+        setBiometricEnabled(false);
+      }
       if (restore.data.status === "needsLogin") {
         setPageState("needsLogin");
         return;
       }
-      if (restore.data.status === "locked") {
+      const unlockedResult = await commands.vaultIsUnlocked();
+      if (unlockedResult.status === "error" || !unlockedResult.data) {
         setPageState("locked");
         return;
       }
@@ -217,6 +236,40 @@ function VaultPage() {
       setErrorText(errorToText(error));
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const onEnableBiometric = async () => {
+    setIsEnablingBiometric(true);
+    setErrorText("");
+    try {
+      const result = await commands.vaultEnableBiometricUnlock({});
+      if (result.status === "error") {
+        setErrorText(errorToText(result.error));
+        return;
+      }
+      await loadVaultData();
+    } catch (error) {
+      setErrorText(errorToText(error));
+    } finally {
+      setIsEnablingBiometric(false);
+    }
+  };
+
+  const onDisableBiometric = async () => {
+    setIsDisablingBiometric(true);
+    setErrorText("");
+    try {
+      const result = await commands.vaultDisableBiometricUnlock({});
+      if (result.status === "error") {
+        setErrorText(errorToText(result.error));
+        return;
+      }
+      await loadVaultData();
+    } catch (error) {
+      setErrorText(errorToText(error));
+    } finally {
+      setIsDisablingBiometric(false);
     }
   };
 
@@ -338,7 +391,13 @@ function VaultPage() {
                 type="button"
                 variant="outline"
                 onClick={onLock}
-                disabled={isLocking || isLoggingOut || isRefreshing}
+                disabled={
+                  isLocking ||
+                  isLoggingOut ||
+                  isRefreshing ||
+                  isEnablingBiometric ||
+                  isDisablingBiometric
+                }
               >
                 {isLocking ? (
                   <LoaderCircle className="animate-spin" />
@@ -351,7 +410,13 @@ function VaultPage() {
                 type="button"
                 variant="outline"
                 onClick={onLogout}
-                disabled={isLoggingOut || isLocking || isRefreshing}
+                disabled={
+                  isLoggingOut ||
+                  isLocking ||
+                  isRefreshing ||
+                  isEnablingBiometric ||
+                  isDisablingBiometric
+                }
               >
                 {isLoggingOut ? (
                   <LoaderCircle className="animate-spin" />
@@ -364,7 +429,13 @@ function VaultPage() {
                 type="button"
                 variant="outline"
                 onClick={loadVaultData}
-                disabled={isRefreshing || isLocking || isLoggingOut}
+                disabled={
+                  isRefreshing ||
+                  isLocking ||
+                  isLoggingOut ||
+                  isEnablingBiometric ||
+                  isDisablingBiometric
+                }
               >
                 {isRefreshing ? (
                   <LoaderCircle className="animate-spin" />
@@ -373,6 +444,52 @@ function VaultPage() {
                 )}
                 刷新
               </Button>
+              {pageState === "ready" &&
+                biometricSupported &&
+                !biometricEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onEnableBiometric}
+                    disabled={
+                      isEnablingBiometric ||
+                      isDisablingBiometric ||
+                      isRefreshing ||
+                      isLocking ||
+                      isLoggingOut
+                    }
+                  >
+                    {isEnablingBiometric ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Fingerprint />
+                    )}
+                    {isEnablingBiometric ? "启用中..." : "启用 Touch ID"}
+                  </Button>
+                )}
+              {pageState === "ready" &&
+                biometricSupported &&
+                biometricEnabled && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onDisableBiometric}
+                    disabled={
+                      isEnablingBiometric ||
+                      isDisablingBiometric ||
+                      isRefreshing ||
+                      isLocking ||
+                      isLoggingOut
+                    }
+                  >
+                    {isDisablingBiometric ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Fingerprint />
+                    )}
+                    {isDisablingBiometric ? "关闭中..." : "关闭 Touch ID"}
+                  </Button>
+                )}
             </div>
           </CardHeader>
         </Card>
@@ -447,6 +564,11 @@ function VaultPage() {
                   sync: {viewData.syncStatus.state}/
                   {viewData.syncStatus.wsStatus}
                 </Badge>
+                {biometricSupported && (
+                  <Badge variant="outline">
+                    touch id: {biometricEnabled ? "enabled" : "disabled"}
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">

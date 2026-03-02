@@ -23,7 +23,13 @@ pub fn run() {
             interfaces::tauri::commands::sync::vault_sync_status,
             interfaces::tauri::commands::sync::vault_sync_check_revision,
             interfaces::tauri::commands::vault::vault_can_unlock,
+            interfaces::tauri::commands::vault::vault_is_unlocked,
+            interfaces::tauri::commands::vault::vault_get_biometric_status,
+            interfaces::tauri::commands::vault::vault_can_unlock_with_biometric,
             interfaces::tauri::commands::vault::vault_unlock_with_password,
+            interfaces::tauri::commands::vault::vault_enable_biometric_unlock,
+            interfaces::tauri::commands::vault::vault_disable_biometric_unlock,
+            interfaces::tauri::commands::vault::vault_unlock_with_biometric,
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data,
             interfaces::tauri::commands::vault::vault_get_cipher_detail

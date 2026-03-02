@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
+  Fingerprint,
   KeyRound,
   LoaderCircle,
   Lock,
@@ -51,6 +52,11 @@ function UnlockPage() {
     useState<RestoreAuthStateResponseDto | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isBiometricUnlocking, setIsBiometricUnlocking] = useState(false);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [canBiometricUnlock, setCanBiometricUnlock] = useState(false);
+  const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
   const [masterPassword, setMasterPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [feedback, setFeedback] = useState<UnlockFeedback>({ kind: "idle" });
@@ -61,11 +67,43 @@ function UnlockPage() {
       const result = await commands.authRestoreState({});
       if (result.status === "error") {
         setFeedback({ kind: "error", text: errorToText(result.error) });
+        setBiometricSupported(false);
+        setBiometricEnabled(false);
+        setCanBiometricUnlock(false);
+        setIsVaultUnlocked(false);
         return;
       }
       setRestoreState(result.data);
+      let vaultUnlocked = false;
+      if (result.data.status !== "needsLogin") {
+        const unlockedResult = await commands.vaultIsUnlocked();
+        vaultUnlocked = unlockedResult.status === "ok" && unlockedResult.data;
+      }
+      setIsVaultUnlocked(vaultUnlocked);
+
+      const biometricStatus = await commands.vaultGetBiometricStatus();
+      const supported =
+        biometricStatus.status === "ok" && biometricStatus.data.supported;
+      const enabled =
+        biometricStatus.status === "ok" && biometricStatus.data.enabled;
+      setBiometricSupported(supported);
+      setBiometricEnabled(enabled);
+
+      if (!vaultUnlocked && supported && enabled) {
+        const canUnlockWithBiometric =
+          await commands.vaultCanUnlockWithBiometric();
+        setCanBiometricUnlock(
+          canUnlockWithBiometric.status === "ok" && canUnlockWithBiometric.data,
+        );
+      } else {
+        setCanBiometricUnlock(false);
+      }
     } catch (error) {
       setFeedback({ kind: "error", text: errorToText(error) });
+      setBiometricSupported(false);
+      setBiometricEnabled(false);
+      setCanBiometricUnlock(false);
+      setIsVaultUnlocked(false);
     } finally {
       setIsRestoring(false);
     }
@@ -79,15 +117,24 @@ function UnlockPage() {
     () =>
       !isRestoring &&
       !isUnlocking &&
-      restoreState?.status === "locked" &&
+      !isBiometricUnlocking &&
+      restoreState?.status !== "needsLogin" &&
+      !isVaultUnlocked &&
       masterPassword.trim().length > 0,
-    [isRestoring, isUnlocking, masterPassword, restoreState?.status],
+    [
+      isBiometricUnlocking,
+      isRestoring,
+      isUnlocking,
+      isVaultUnlocked,
+      masterPassword,
+      restoreState?.status,
+    ],
   );
 
   const onUnlock = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (restoreState?.status !== "locked") {
+    if (restoreState?.status === "needsLogin" || isVaultUnlocked) {
       setFeedback({
         kind: "error",
         text: "当前会话不是锁定状态，无法执行解锁。",
@@ -127,6 +174,37 @@ function UnlockPage() {
     }
   };
 
+  const onBiometricUnlock = async () => {
+    if (restoreState?.status === "needsLogin" || isVaultUnlocked) {
+      setFeedback({
+        kind: "error",
+        text: "当前会话不是锁定状态，无法执行 Touch ID 解锁。",
+      });
+      return;
+    }
+
+    setIsBiometricUnlocking(true);
+    setFeedback({ kind: "idle" });
+
+    try {
+      const result = await commands.vaultUnlockWithBiometric();
+      if (result.status === "error") {
+        setFeedback({ kind: "error", text: errorToText(result.error) });
+        return;
+      }
+      setMasterPassword("");
+      setFeedback({
+        kind: "success",
+        text: "Touch ID 解锁成功，可以继续访问密码库数据。",
+      });
+      await loadRestoreState();
+    } catch (error) {
+      setFeedback({ kind: "error", text: errorToText(error) });
+    } finally {
+      setIsBiometricUnlocking(false);
+    }
+  };
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_90%_15%,_hsl(210_85%_95%),_transparent_40%),radial-gradient(circle_at_12%_85%,_hsl(216_90%_97%),_transparent_45%),linear-gradient(160deg,_hsl(210_50%_98%),_hsl(0_0%_100%))] p-6 md:p-10">
       <div className="absolute -top-20 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-blue-300/15 blur-3xl" />
@@ -160,7 +238,7 @@ function UnlockPage() {
             </Badge>
             <CardTitle className="text-2xl font-semibold">解锁 Vault</CardTitle>
             <CardDescription>
-              调用 Tauri `vault_unlock_with_password` command 进行解锁
+              支持密码解锁与 Touch ID 解锁（需先显式启用）
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -182,102 +260,157 @@ function UnlockPage() {
               </div>
             )}
 
-            {!isRestoring && restoreState?.status === "authenticated" && (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                  当前会话已经是解锁状态，无需再次输入 master password。
-                </div>
-                <Button asChild className="w-full">
-                  <Link to="/vault">查看 Vault 数据</Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link to="/">返回首页</Link>
-                </Button>
-              </div>
-            )}
-
-            {!isRestoring && restoreState?.status === "locked" && (
-              <form className="space-y-5" onSubmit={onUnlock}>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <div>账户：{restoreState.email ?? "unknown"}</div>
-                  <div>服务：{restoreState.baseUrl ?? "unknown"}</div>
-                  <div>会话：{restoreState.accountId ?? "unknown"}</div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unlock-master-password">
-                    Master Password
-                  </Label>
-                  <InputGroup>
-                    <InputGroupAddon>
-                      <KeyRound className="text-slate-500" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="unlock-master-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      placeholder="输入主密码解锁"
-                      value={masterPassword}
-                      onChange={(event) =>
-                        setMasterPassword(event.target.value)
-                      }
-                      disabled={isUnlocking}
-                    />
-                    <InputGroupAddon align="inline-end" className="px-1.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-slate-500 hover:text-slate-900"
-                        onClick={() => setShowPassword((previous) => !previous)}
-                        disabled={isUnlocking}
-                        aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                      >
-                        {showPassword ? <EyeOff /> : <Eye />}
-                      </Button>
-                    </InputGroupAddon>
-                  </InputGroup>
-                </div>
-
-                {feedback.kind !== "idle" && (
-                  <div
-                    className={[
-                      "rounded-lg border px-3 py-2 text-sm",
-                      feedback.kind === "error" &&
-                        "border-red-200 bg-red-50 text-red-700",
-                      feedback.kind === "success" &&
-                        "border-emerald-200 bg-emerald-50 text-emerald-700",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {feedback.kind === "success" && (
-                      <ShieldCheck className="mr-1 inline size-4" />
-                    )}
-                    {feedback.kind === "error" && (
-                      <Lock className="mr-1 inline size-4" />
-                    )}
-                    {feedback.text}
+            {!isRestoring &&
+              restoreState?.status !== "needsLogin" &&
+              isVaultUnlocked && (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    当前 Vault 已是解锁状态，无需再次输入 master password。
                   </div>
-                )}
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full"
-                  disabled={!canUnlock}
-                >
-                  {isUnlocking && <LoaderCircle className="animate-spin" />}
-                  {isUnlocking ? "正在解锁..." : "解锁密码库"}
-                </Button>
-
-                {feedback.kind === "success" && (
-                  <Button asChild className="w-full" variant="outline">
-                    <Link to="/vault">进入 Vault 数据页</Link>
+                  {restoreState?.status === "locked" && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                      当前仅恢复了本地解锁状态，后端登录会话尚未恢复。
+                    </div>
+                  )}
+                  {biometricSupported && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      Touch ID：{biometricEnabled ? "已启用" : "未启用"}
+                    </div>
+                  )}
+                  {biometricSupported && !biometricEnabled && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      如需启用或关闭 Touch ID，请进入 Vault 页面进行设置。
+                    </div>
+                  )}
+                  <Button asChild className="w-full">
+                    <Link to="/vault">查看 Vault 数据</Link>
                   </Button>
-                )}
-              </form>
-            )}
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/">返回首页</Link>
+                  </Button>
+                </div>
+              )}
+
+            {!isRestoring &&
+              restoreState?.status !== "needsLogin" &&
+              !isVaultUnlocked && (
+                <form className="space-y-5" onSubmit={onUnlock}>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    <div>账户：{restoreState?.email ?? "unknown"}</div>
+                    <div>服务：{restoreState?.baseUrl ?? "unknown"}</div>
+                    <div>会话：{restoreState?.accountId ?? "unknown"}</div>
+                  </div>
+                  {biometricSupported && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      Touch ID：{biometricEnabled ? "已启用" : "未启用"}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unlock-master-password">
+                      Master Password
+                    </Label>
+                    <InputGroup>
+                      <InputGroupAddon>
+                        <KeyRound className="text-slate-500" />
+                      </InputGroupAddon>
+                      <InputGroupInput
+                        id="unlock-master-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        placeholder="输入主密码解锁"
+                        value={masterPassword}
+                        onChange={(event) =>
+                          setMasterPassword(event.target.value)
+                        }
+                        disabled={isUnlocking || isBiometricUnlocking}
+                      />
+                      <InputGroupAddon align="inline-end" className="px-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-slate-500 hover:text-slate-900"
+                          onClick={() =>
+                            setShowPassword((previous) => !previous)
+                          }
+                          disabled={isUnlocking || isBiometricUnlocking}
+                          aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                        >
+                          {showPassword ? <EyeOff /> : <Eye />}
+                        </Button>
+                      </InputGroupAddon>
+                    </InputGroup>
+                  </div>
+
+                  {feedback.kind !== "idle" && (
+                    <div
+                      className={[
+                        "rounded-lg border px-3 py-2 text-sm",
+                        feedback.kind === "error" &&
+                          "border-red-200 bg-red-50 text-red-700",
+                        feedback.kind === "success" &&
+                          "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {feedback.kind === "success" && (
+                        <ShieldCheck className="mr-1 inline size-4" />
+                      )}
+                      {feedback.kind === "error" && (
+                        <Lock className="mr-1 inline size-4" />
+                      )}
+                      {feedback.text}
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full"
+                    disabled={!canUnlock}
+                  >
+                    {isUnlocking && <LoaderCircle className="animate-spin" />}
+                    {isUnlocking ? "正在解锁..." : "解锁密码库"}
+                  </Button>
+
+                  {canBiometricUnlock && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                      onClick={onBiometricUnlock}
+                      disabled={isUnlocking || isBiometricUnlocking}
+                    >
+                      {isBiometricUnlocking ? (
+                        <LoaderCircle className="animate-spin" />
+                      ) : (
+                        <Fingerprint />
+                      )}
+                      {isBiometricUnlocking
+                        ? "正在等待 Touch ID..."
+                        : "使用 Touch ID 解锁"}
+                    </Button>
+                  )}
+
+                  {biometricSupported &&
+                    biometricEnabled &&
+                    !canBiometricUnlock && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        Touch ID
+                        已启用，但当前设备还没有可用于解锁的本地同步数据，请先完成一次同步并用密码解锁。
+                      </div>
+                    )}
+
+                  {feedback.kind === "success" && (
+                    <Button asChild className="w-full" variant="outline">
+                      <Link to="/vault">进入 Vault 数据页</Link>
+                    </Button>
+                  )}
+                </form>
+              )}
           </CardContent>
         </Card>
       </section>

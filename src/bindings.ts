@@ -77,9 +77,57 @@ async vaultCanUnlock() : Promise<Result<boolean, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async vaultIsUnlocked() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_is_unlocked") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_get_biometric_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultCanUnlockWithBiometric() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock_with_biometric") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultUnlockWithPassword(request: VaultUnlockWithPasswordRequestDto) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_password", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultEnableBiometricUnlock(request: VaultEnableBiometricUnlockRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_enable_biometric_unlock", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultDisableBiometricUnlock(request: VaultDisableBiometricUnlockRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_disable_biometric_unlock", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultUnlockWithBiometric() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_biometric") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -152,6 +200,7 @@ export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null;
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
 export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }
+export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
 export type VaultCipherCardDetailDto = { cardholderName: string | null; brand: string | null; number: string | null; expMonth: string | null; expYear: string | null; code: string | null }
 export type VaultCipherDataDetailDto = { name: string | null; notes: string | null; fields: VaultCipherFieldDetailDto[]; passwordHistory: VaultCipherPasswordHistoryDetailDto[]; uri: string | null; uris: VaultCipherLoginUriDetailDto[]; username: string | null; password: string | null; passwordRevisionDate: string | null; totp: string | null; autofillOnPageLoad: boolean | null; fido2Credentials: VaultCipherLoginFido2CredentialDetailDto[]; type: number | null; cardholderName: string | null; brand: string | null; number: string | null; expMonth: string | null; expYear: string | null; code: string | null; title: string | null; firstName: string | null; middleName: string | null; lastName: string | null; address1: string | null; address2: string | null; address3: string | null; city: string | null; state: string | null; postalCode: string | null; country: string | null; company: string | null; email: string | null; phone: string | null; ssn: string | null; passportNumber: string | null; licenseNumber: string | null; privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
 export type VaultCipherDetailDto = { id: string; organizationId: string | null; folderId: string | null; type: number | null; name: string | null; notes: string | null; key: string | null; favorite: boolean | null; edit: boolean | null; viewPassword: boolean | null; organizationUseTotp: boolean | null; creationDate: string | null; revisionDate: string | null; deletedDate: string | null; archivedDate: string | null; reprompt: number | null; permissions: VaultCipherPermissionsDetailDto | null; object: string | null; fields: VaultCipherFieldDetailDto[]; passwordHistory: VaultCipherPasswordHistoryDetailDto[]; collectionIds: string[]; data: VaultCipherDataDetailDto | null; login: VaultCipherLoginDetailDto | null; secureNote: VaultCipherSecureNoteDetailDto | null; card: VaultCipherCardDetailDto | null; identity: VaultCipherIdentityDetailDto | null; sshKey: VaultCipherSshKeyDetailDto | null; attachments: VaultAttachmentDetailDto[] }
@@ -167,6 +216,8 @@ export type VaultCipherPasswordHistoryDetailDto = { password: string | null; las
 export type VaultCipherPermissionsDetailDto = { delete: boolean | null; restore: boolean | null }
 export type VaultCipherSecureNoteDetailDto = { type: number | null }
 export type VaultCipherSshKeyDetailDto = { privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
+export type VaultDisableBiometricUnlockRequestDto = Record<string, never>
+export type VaultEnableBiometricUnlockRequestDto = Record<string, never>
 export type VaultFolderItemDto = { id: string; name: string | null }
 export type VaultLockRequestDto = Record<string, never>
 export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
