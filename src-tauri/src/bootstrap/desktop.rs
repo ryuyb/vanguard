@@ -1,14 +1,12 @@
 use tauri::window::Color;
-use tauri::{
-    Manager, PhysicalPosition, Position, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-};
+use tauri::{Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_positioner::{Position, WindowExt};
 
 const SPOTLIGHT_WINDOW_LABEL: &str = "spotlight";
 const SPOTLIGHT_PAGE_PATH: &str = "spotlight.html";
 const SPOTLIGHT_WIDTH: f64 = 980.0;
 const SPOTLIGHT_HEIGHT: f64 = 620.0;
-const SPOTLIGHT_TOP_OFFSET: i32 = 120;
 
 pub fn install_desktop_features<R: Runtime>(
     app: &tauri::App<R>,
@@ -122,40 +120,14 @@ fn toggle_spotlight_window<R: Runtime>(app: &tauri::AppHandle<R>) {
 }
 
 fn place_spotlight_window<R: Runtime>(spotlight_window: &WebviewWindow<R>) {
-    let monitor = match spotlight_window.current_monitor() {
-        Ok(Some(monitor)) => monitor,
-        Ok(None) => return,
-        Err(error) => {
-            log::warn!(
-                target: "vanguard::spotlight",
-                "failed to resolve current monitor: {error}"
-            );
-            return;
-        }
-    };
-
-    let monitor_area = monitor.work_area();
-    let window_size = match spotlight_window.inner_size() {
-        Ok(size) => size,
-        Err(error) => {
-            log::warn!(
-                target: "vanguard::spotlight",
-                "failed to resolve spotlight window size: {error}"
-            );
-            return;
-        }
-    };
-
-    let x =
-        monitor_area.position.x + (monitor_area.size.width as i32 - window_size.width as i32) / 2;
-    let y = monitor_area.position.y + SPOTLIGHT_TOP_OFFSET;
-
-    if let Err(error) =
-        spotlight_window.set_position(Position::Physical(PhysicalPosition::new(x, y)))
+    if let Err(error) = spotlight_window
+        .as_ref()
+        .window()
+        .move_window(Position::TopCenter)
     {
         log::warn!(
             target: "vanguard::spotlight",
-            "failed to set spotlight window position: {error}"
+            "failed to set spotlight window position with positioner: {error}"
         );
     }
 }
