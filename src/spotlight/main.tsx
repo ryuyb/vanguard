@@ -1,10 +1,10 @@
 import { emitTo } from "@tauri-apps/api/event";
-import { Window, getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, Window } from "@tauri-apps/api/window";
+import { error as logError } from "@tauri-apps/plugin-log";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
-import { StrictMode } from "react";
 import type { KeyboardEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { commands, type VaultCipherItemDto } from "@/bindings";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,20 @@ type SpotlightItem = {
   cipherId: string;
 };
 
+function errorToText(error: unknown) {
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown error";
+}
+
+function logClientError(context: string, error: unknown) {
+  void logError(`[spotlight] ${context}: ${errorToText(error)}`);
+}
+
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   return {
     id: `cipher-${cipher.id}`,
@@ -47,7 +61,7 @@ function SpotlightApp() {
     try {
       await getCurrentWindow().hide();
     } catch (error) {
-      console.error("Failed to hide spotlight", error);
+      logClientError("Failed to hide spotlight", error);
     }
   }, []);
 
@@ -64,9 +78,12 @@ function SpotlightApp() {
     setIsLoadingVault(true);
 
     try {
-      const viewData = await commands.vaultGetViewData({ page: 1, pageSize: 200 });
+      const viewData = await commands.vaultGetViewData({
+        page: 1,
+        pageSize: 200,
+      });
       if (viewData.status === "error") {
-        console.error("Failed to load vault data", viewData.error);
+        logClientError("Failed to load vault data", viewData.error);
         setVaultItems([]);
         return;
       }
@@ -74,7 +91,7 @@ function SpotlightApp() {
       const ciphers = viewData.data.ciphers.map(toCipherItem);
       setVaultItems(ciphers);
     } catch (error) {
-      console.error("Failed to load vault data", error);
+      logClientError("Failed to load vault data", error);
       setVaultItems([]);
     } finally {
       setIsLoadingVault(false);
@@ -104,7 +121,7 @@ function SpotlightApp() {
         await focusMainWindow();
         await hideSpotlight();
       } catch (error) {
-        console.error("Action failed", error);
+        logClientError("Action failed", error);
       }
     },
     [focusMainWindow, hideSpotlight],
@@ -162,7 +179,10 @@ function SpotlightApp() {
                 aria-label="Search"
                 onKeyDown={onCommandInputKeyDown}
               />
-              <InputGroupAddon align="inline-end" className="spotlight-search-addon">
+              <InputGroupAddon
+                align="inline-end"
+                className="spotlight-search-addon"
+              >
                 <SearchIcon className="size-4 shrink-0" />
               </InputGroupAddon>
             </InputGroup>
@@ -171,7 +191,10 @@ function SpotlightApp() {
             {isLoadingVault ? (
               <div className="spotlight-skeleton-list" aria-hidden>
                 {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={`skeleton-${index}`} className="spotlight-skeleton-item">
+                  <div
+                    key={`skeleton-${index}`}
+                    className="spotlight-skeleton-item"
+                  >
                     <Skeleton className="h-4 w-3/5" />
                     <Skeleton className="h-3 w-2/5" />
                   </div>
@@ -226,7 +249,9 @@ function SpotlightApp() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("spotlight-root") as HTMLElement).render(
+ReactDOM.createRoot(
+  document.getElementById("spotlight-root") as HTMLElement,
+).render(
   <StrictMode>
     <SpotlightApp />
   </StrictMode>,
