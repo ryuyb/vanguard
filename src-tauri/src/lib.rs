@@ -41,16 +41,21 @@ pub fn run() {
     #[cfg(debug_assertions)]
     export_specta_bindings(&specta_builder).expect("failed to export specta bindings");
 
-    tauri::Builder::default()
+    let app_builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
                 .build(),
         )
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+
+    app_builder
         .setup(move |app| {
             specta_builder.mount_events(app);
+
+            #[cfg(target_os = "macos")]
+            let _ = app.manage(tauri_nspanel::WebviewPanelManager::<tauri::Wry>::default());
 
             #[cfg(desktop)]
             {
