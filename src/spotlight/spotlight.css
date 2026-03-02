@@ -12,19 +12,22 @@ body,
 #spotlight-root {
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
   background: transparent;
+  overscroll-behavior: none;
 }
 
 .spotlight-shell {
-  min-height: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   padding: 48px 64px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.004);
+  overflow: hidden;
 }
 
 .spotlight-card {
@@ -104,6 +107,7 @@ body {
   padding: 0;
   max-height: 272px;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .spotlight-item {

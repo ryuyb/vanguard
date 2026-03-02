@@ -2,7 +2,7 @@ import { emitTo } from "@tauri-apps/api/event";
 import { Window, getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
 import type { KeyboardEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { commands, type VaultCipherItemDto } from "@/bindings";
 import "./spotlight.css";
@@ -95,6 +95,7 @@ function SpotlightApp() {
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const cardRef = useRef<HTMLElement | null>(null);
 
   const hideSpotlight = useCallback(async () => {
     try {
@@ -260,9 +261,27 @@ function SpotlightApp() {
     [executeItem, hideSpotlight, selectedIndex, visibleItems],
   );
 
+  useEffect(() => {
+    const onDocumentMouseDown = (event: globalThis.MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (cardRef.current?.contains(target)) {
+        return;
+      }
+      void hideSpotlight();
+    };
+
+    document.addEventListener("mousedown", onDocumentMouseDown, true);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentMouseDown, true);
+    };
+  }, [hideSpotlight]);
+
   return (
     <main className="spotlight-shell">
-      <section className="spotlight-card">
+      <section ref={cardRef} className="spotlight-card">
         <header className="spotlight-header">
           <p className="spotlight-label">Spotlight</p>
           <h1 className="spotlight-title">Search Vanguard</h1>

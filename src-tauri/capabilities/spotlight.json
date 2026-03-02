@@ -3,5 +3,11 @@
   "identifier": "spotlight",
   "description": "Capability for spotlight window",
   "windows": ["spotlight"],
-  "permissions": ["core:default", "log:default"]
+  "permissions": [
+    "core:default",
+    "log:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
 }
