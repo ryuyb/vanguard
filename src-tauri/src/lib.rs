@@ -51,6 +51,12 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             specta_builder.mount_events(app);
+
+            #[cfg(desktop)]
+            {
+                bootstrap::desktop::install_desktop_features(app)?;
+            }
+
             match app.path().app_data_dir() {
                 Ok(path) => {
                     log::info!(
