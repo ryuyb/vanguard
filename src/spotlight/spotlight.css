@@ -1,0 +1,63 @@
+:root {
+  color-scheme: light;
+  font-family: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.spotlight-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: start center;
+  padding: 48px 24px;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.16), transparent 45%),
+    linear-gradient(180deg, #f8fafc, #eef2ff);
+}
+
+.spotlight-card {
+  width: min(720px, 100%);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 18px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+}
+
+.spotlight-label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.spotlight-title {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.spotlight-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 16px;
+  outline: none;
+  color: #0f172a;
+  background: #fff;
+}
+
+.spotlight-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
