@@ -16,7 +16,9 @@
         "title": "",
         "width": 1000,
         "height": 800,
-        "decorations": true
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay"
       }
     ],
     "security": {
