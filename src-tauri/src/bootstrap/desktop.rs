@@ -1,7 +1,12 @@
+use std::sync::{Mutex, OnceLock};
+
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::window::Color;
-use tauri::{ActivationPolicy, Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    ActivationPolicy, LogicalPosition, Manager, Monitor, PhysicalPosition, Runtime, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder,
+};
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt as PanelManagerExt, PanelHandle, PanelLevel,
@@ -21,6 +26,13 @@ const TRAY_MENU_OPEN_QUICK_ACCESS_ID: &str = "tray-open-quick-access";
 const TRAY_MENU_LOCK_ID: &str = "tray-lock";
 const TRAY_MENU_SETTINGS_ID: &str = "tray-settings";
 const TRAY_MENU_QUIT_ID: &str = "tray-quit";
+static LAST_TRAY_ICON_CLICK_SNAPSHOT: OnceLock<Mutex<Option<TrayClickSnapshot>>> = OnceLock::new();
+
+#[derive(Clone, Copy, Debug)]
+struct TrayClickSnapshot {
+    position: PhysicalPosition<f64>,
+    rect_height: f64,
+}
 
 #[cfg(target_os = "macos")]
 tauri_panel! {
@@ -83,6 +95,15 @@ fn install_tray_icon<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
         .menu(&tray_menu)
         .show_menu_on_left_click(true)
+        .on_tray_icon_event(move |_tray, event: TrayIconEvent| {
+            if let TrayIconEvent::Click { position, rect, .. } = event {
+                let (_, rect_height) = rect_size_to_f64(rect.size);
+                record_last_tray_icon_click_snapshot(TrayClickSnapshot {
+                    position,
+                    rect_height,
+                });
+            }
+        })
         .on_menu_event(move |app_handle, event: MenuEvent| {
             handle_tray_menu_event(app_handle, &event);
         });
@@ -95,22 +116,34 @@ fn install_tray_icon<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
     Ok(())
 }
 
+fn rect_size_to_f64(size: tauri::Size) -> (f64, f64) {
+    match size {
+        tauri::Size::Logical(size) => (size.width, size.height),
+        tauri::Size::Physical(size) => (size.width as f64, size.height as f64),
+    }
+}
+
+fn record_last_tray_icon_click_snapshot(snapshot: TrayClickSnapshot) {
+    let locker = LAST_TRAY_ICON_CLICK_SNAPSHOT.get_or_init(|| Mutex::new(None));
+    if let Ok(mut last_position) = locker.lock() {
+        *last_position = Some(snapshot);
+    }
+}
+
+fn last_tray_icon_click_snapshot() -> Option<TrayClickSnapshot> {
+    let locker = LAST_TRAY_ICON_CLICK_SNAPSHOT.get_or_init(|| Mutex::new(None));
+    locker.lock().ok().and_then(|last_position| *last_position)
+}
+
 fn handle_tray_menu_event<R: Runtime>(app_handle: &tauri::AppHandle<R>, event: &MenuEvent) {
     match event.id().as_ref() {
         TRAY_MENU_OPEN_VANGUARD_ID => open_main_window_from_tray(app_handle),
         TRAY_MENU_QUIT_ID => quit_app_from_tray(app_handle),
-        _ => {
-            log::info!(
-                target: "vanguard::tray",
-                "tray menu clicked (not implemented): {:?}",
-                event.id()
-            );
-        }
+        _ => {}
     }
 }
 
 fn quit_app_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
-    log::info!(target: "vanguard::tray", "exiting app from tray menu");
     app_handle.exit(0);
 }
 
@@ -131,6 +164,8 @@ fn open_main_window_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
         return;
     };
 
+    move_main_window_to_active_monitor_center(app_handle, &main_window);
+
     if let Err(error) = main_window.unminimize() {
         log::warn!(
             target: "vanguard::tray",
@@ -149,6 +184,154 @@ fn open_main_window_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
             "failed to focus main window from tray: {error}"
         );
     }
+}
+
+fn move_main_window_to_active_monitor_center<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    main_window: &WebviewWindow<R>,
+) {
+    let tray_click_snapshot = last_tray_icon_click_snapshot();
+    let cursor_position = app_handle.cursor_position().ok();
+
+    let target_monitor = if let Some(snapshot) = tray_click_snapshot {
+        find_monitor_from_tray_click_snapshot(app_handle, snapshot).or_else(|| {
+            app_handle
+                .monitor_from_point(snapshot.position.x, snapshot.position.y)
+                .ok()
+                .flatten()
+        })
+    } else {
+        None
+    }
+    .or_else(|| {
+        cursor_position.and_then(|position| find_monitor_from_logical_point(app_handle, position))
+    })
+    .or_else(|| main_window.current_monitor().ok().flatten())
+    .or_else(|| app_handle.primary_monitor().ok().flatten());
+
+    let Some(target_monitor) = target_monitor else {
+        log::warn!(
+            target: "vanguard::tray",
+            "no monitor available, skip repositioning main window"
+        );
+        return;
+    };
+
+    let window_size = match main_window.outer_size() {
+        Ok(size) => size,
+        Err(error) => {
+            log::warn!(
+                target: "vanguard::tray",
+                "failed to read main window size for reposition: {error}"
+            );
+            return;
+        }
+    };
+    let window_scale = main_window
+        .scale_factor()
+        .ok()
+        .unwrap_or(target_monitor.scale_factor());
+    let window_width_logical = window_size.width as f64 / window_scale;
+    let window_height_logical = window_size.height as f64 / window_scale;
+
+    let (work_area_left, work_area_top, work_area_width, work_area_height) =
+        monitor_logical_work_area(&target_monitor);
+    let max_left = (work_area_left + work_area_width - window_width_logical).max(work_area_left);
+    let max_top = (work_area_top + work_area_height - window_height_logical).max(work_area_top);
+    let target_x = work_area_left + (work_area_width - window_width_logical) / 2.0;
+    let target_y = work_area_top + (work_area_height - window_height_logical) / 2.0;
+    let bounded_x = target_x.clamp(work_area_left, max_left);
+    let bounded_y = target_y.clamp(work_area_top, max_top);
+
+    if let Err(error) = main_window.set_position(LogicalPosition::new(bounded_x, bounded_y)) {
+        log::warn!(
+            target: "vanguard::tray",
+            "failed to reposition main window to active monitor: {error}"
+        );
+    }
+}
+
+fn find_monitor_from_logical_point<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    point: PhysicalPosition<f64>,
+) -> Option<Monitor> {
+    let monitors = app_handle.available_monitors().ok()?;
+    let mut matches: Vec<Monitor> = monitors
+        .into_iter()
+        .filter(|monitor| {
+            let (left, top, width, height) = monitor_logical_work_area(monitor);
+            let right = left + width;
+            let bottom = top + height;
+            point.x >= left && point.x < right && point.y >= top && point.y < bottom
+        })
+        .collect();
+
+    if matches.is_empty() {
+        return None;
+    }
+    if matches.len() == 1 {
+        return matches.pop();
+    }
+
+    // If multiple monitors still overlap after normalization, prefer the smaller logical area.
+    matches.sort_by(|left_monitor, right_monitor| {
+        let (_, _, left_width, left_height) = monitor_logical_work_area(left_monitor);
+        let (_, _, right_width, right_height) = monitor_logical_work_area(right_monitor);
+        let left_area = left_width * left_height;
+        let right_area = right_width * right_height;
+        left_area
+            .partial_cmp(&right_area)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    matches.into_iter().next()
+}
+
+fn find_monitor_from_tray_click_snapshot<R: Runtime>(
+    app_handle: &tauri::AppHandle<R>,
+    snapshot: TrayClickSnapshot,
+) -> Option<Monitor> {
+    let monitors = app_handle.available_monitors().ok()?;
+    let mut candidates: Vec<(Monitor, f64)> = Vec::new();
+
+    for monitor in monitors {
+        let scale = monitor.scale_factor();
+        let logical_x = snapshot.position.x / scale;
+        let logical_y = snapshot.position.y / scale;
+        let (left, top, width, height) = monitor_logical_work_area(&monitor);
+        let right = left + width;
+        let bottom = top + height;
+        let contains =
+            logical_x >= left && logical_x < right && logical_y >= top && logical_y < bottom;
+
+        if !contains {
+            continue;
+        }
+
+        let inferred_icon_height = snapshot.rect_height / scale;
+        let icon_height_score = (inferred_icon_height - 30.0).abs();
+        candidates.push((monitor, icon_height_score));
+    }
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    candidates.sort_by(|left, right| {
+        left.1
+            .partial_cmp(&right.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    candidates.into_iter().next().map(|entry| entry.0)
+}
+
+fn monitor_logical_work_area(monitor: &Monitor) -> (f64, f64, f64, f64) {
+    let work_area = monitor.work_area();
+    let scale = monitor.scale_factor();
+    let left = work_area.position.x as f64;
+    let top = work_area.position.y as f64;
+    let width = work_area.size.width as f64 / scale;
+    let height = work_area.size.height as f64 / scale;
+    (left, top, width, height)
 }
 
 fn ensure_spotlight_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<WebviewWindow<R>> {
