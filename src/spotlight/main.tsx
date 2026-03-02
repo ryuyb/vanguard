@@ -1,82 +1,31 @@
 import { emitTo } from "@tauri-apps/api/event";
 import { Window, getCurrentWindow } from "@tauri-apps/api/window";
+import { Command as CommandPrimitive } from "cmdk";
+import { SearchIcon } from "lucide-react";
 import { StrictMode } from "react";
 import type { KeyboardEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { commands, type VaultCipherItemDto } from "@/bindings";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardFooter } from "@/components/ui/card";
+import { Command, CommandItem, CommandList } from "@/components/ui/command";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import "@/main.css";
 import "./spotlight.css";
 
-type SpotlightRoute = "/" | "/unlock" | "/vault";
-
-type SpotlightItem =
-  | {
-      id: string;
-      kind: "route";
-      title: string;
-      subtitle: string;
-      badge: string;
-      route: SpotlightRoute;
-    }
-  | {
-      id: string;
-      kind: "sync";
-      title: string;
-      subtitle: string;
-      badge: string;
-    }
-  | {
-      id: string;
-      kind: "cipher";
-      title: string;
-      subtitle: string;
-      badge: string;
-      cipherId: string;
-    };
-
-const QUICK_ITEMS: SpotlightItem[] = [
-  {
-    id: "route-vault",
-    kind: "route",
-    title: "Open Vault",
-    subtitle: "Navigate to vault page",
-    badge: "Route",
-    route: "/vault",
-  },
-  {
-    id: "route-unlock",
-    kind: "route",
-    title: "Unlock Vault",
-    subtitle: "Navigate to unlock page",
-    badge: "Route",
-    route: "/unlock",
-  },
-  {
-    id: "route-login",
-    kind: "route",
-    title: "Open Login",
-    subtitle: "Navigate to login page",
-    badge: "Route",
-    route: "/",
-  },
-  {
-    id: "action-sync",
-    kind: "sync",
-    title: "Sync Now",
-    subtitle: "Run vault_sync_now command",
-    badge: "Action",
-  },
-];
-
-function errorToText(error: unknown) {
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unknown error";
-}
+type SpotlightItem = {
+  id: string;
+  kind: "cipher";
+  title: string;
+  subtitle: string;
+  badge: string;
+  cipherId: string;
+};
 
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   return {
@@ -93,15 +42,12 @@ function SpotlightApp() {
   const [query, setQuery] = useState("");
   const [vaultItems, setVaultItems] = useState<SpotlightItem[]>([]);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
-  const [statusText, setStatusText] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const cardRef = useRef<HTMLElement | null>(null);
 
   const hideSpotlight = useCallback(async () => {
     try {
       await getCurrentWindow().hide();
     } catch (error) {
-      setStatusText(`Failed to hide spotlight: ${errorToText(error)}`);
+      console.error("Failed to hide spotlight", error);
     }
   }, []);
 
@@ -116,42 +62,19 @@ function SpotlightApp() {
 
   const loadVaultItems = useCallback(async () => {
     setIsLoadingVault(true);
-    setStatusText("");
 
     try {
-      const restore = await commands.authRestoreState({});
-      if (restore.status === "error") {
-        setStatusText(`Failed to restore state: ${errorToText(restore.error)}`);
-        setVaultItems([]);
-        return;
-      }
-
-      if (restore.data.status === "needsLogin") {
-        setStatusText("Not logged in. Login to search vault items.");
-        setVaultItems([]);
-        return;
-      }
-
-      if (restore.data.status === "locked") {
-        setStatusText("Vault is locked. Unlock to search vault items.");
-        setVaultItems([]);
-        return;
-      }
-
       const viewData = await commands.vaultGetViewData({ page: 1, pageSize: 200 });
       if (viewData.status === "error") {
-        setStatusText(`Failed to load vault data: ${errorToText(viewData.error)}`);
+        console.error("Failed to load vault data", viewData.error);
         setVaultItems([]);
         return;
       }
 
       const ciphers = viewData.data.ciphers.map(toCipherItem);
       setVaultItems(ciphers);
-      if (ciphers.length === 0) {
-        setStatusText("No vault items found.");
-      }
     } catch (error) {
-      setStatusText(`Failed to load vault data: ${errorToText(error)}`);
+      console.error("Failed to load vault data", error);
       setVaultItems([]);
     } finally {
       setIsLoadingVault(false);
@@ -162,103 +85,39 @@ function SpotlightApp() {
     void loadVaultItems();
   }, [loadVaultItems]);
 
-  const searchableItems = useMemo(
-    () => [...vaultItems, ...QUICK_ITEMS],
-    [vaultItems],
-  );
-
   const visibleItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
       return vaultItems;
     }
 
-    return searchableItems.filter((item) => {
+    return vaultItems.filter((item) => {
       const haystack = `${item.title} ${item.subtitle}`.toLowerCase();
       return haystack.includes(normalized);
     });
-  }, [query, searchableItems, vaultItems]);
-
-  useEffect(() => {
-    if (visibleItems.length === 0) {
-      setSelectedIndex(-1);
-      return;
-    }
-    setSelectedIndex(0);
-  }, [visibleItems]);
+  }, [query, vaultItems]);
 
   const executeItem = useCallback(
-    async (item: SpotlightItem) => {
-      setStatusText("");
-
+    async (_item: SpotlightItem) => {
       try {
-        if (item.kind === "route") {
-          await emitTo("main", "spotlight:navigate", { to: item.route });
-          await focusMainWindow();
-          await hideSpotlight();
-          return;
-        }
-
-        if (item.kind === "sync") {
-          setStatusText("Syncing...");
-          const syncResult = await commands.vaultSyncNow({ excludeDomains: false });
-          if (syncResult.status === "error") {
-            setStatusText(`Sync failed: ${errorToText(syncResult.error)}`);
-            return;
-          }
-
-          setStatusText("Sync succeeded.");
-          await hideSpotlight();
-          return;
-        }
-
         await emitTo("main", "spotlight:navigate", { to: "/vault" });
         await focusMainWindow();
         await hideSpotlight();
       } catch (error) {
-        setStatusText(`Action failed: ${errorToText(error)}`);
+        console.error("Action failed", error);
       }
     },
     [focusMainWindow, hideSpotlight],
   );
 
-  const onInputKeyDown = useCallback(
+  const onCommandInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (visibleItems.length === 0) {
-          return;
-        }
-        setSelectedIndex((previous) => (previous + 1) % visibleItems.length);
-        return;
-      }
-
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        if (visibleItems.length === 0) {
-          return;
-        }
-        setSelectedIndex((previous) =>
-          previous <= 0 ? visibleItems.length - 1 : previous - 1,
-        );
-        return;
-      }
-
-      if (event.key === "Enter") {
-        event.preventDefault();
-        if (selectedIndex < 0 || selectedIndex >= visibleItems.length) {
-          return;
-        }
-        void executeItem(visibleItems[selectedIndex]);
-        return;
-      }
-
       if (event.key === "Escape") {
         event.preventDefault();
         void hideSpotlight();
       }
     },
-    [executeItem, hideSpotlight, selectedIndex, visibleItems],
+    [hideSpotlight],
   );
 
   useEffect(() => {
@@ -267,7 +126,8 @@ function SpotlightApp() {
       if (!(target instanceof Node)) {
         return;
       }
-      if (cardRef.current?.contains(target)) {
+      const cardElement = document.getElementById("spotlight-card");
+      if (cardElement?.contains(target)) {
         return;
       }
       void hideSpotlight();
@@ -281,66 +141,87 @@ function SpotlightApp() {
 
   return (
     <main className="spotlight-shell">
-      <section ref={cardRef} className="spotlight-card">
-        <label className="spotlight-search" htmlFor="spotlight-search-input">
-          <span className="spotlight-search-icon">⌘</span>
-          <input
-            id="spotlight-search-input"
-            className="spotlight-input"
-            type="text"
-            // biome-ignore lint/a11y/noAutofocus: need autoFocus
-            autoFocus
-            placeholder="Search passwords, commands, or pages"
-            aria-label="Search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onInputKeyDown}
-          />
-        </label>
-
-        <ul className="spotlight-results">
-          {visibleItems.length === 0 ? (
-            <li className="spotlight-empty">No result</li>
-          ) : (
-            visibleItems.map((item, index) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className={`spotlight-item${index === selectedIndex ? " is-active" : ""}`}
-                  onClick={() => {
-                    void executeItem(item);
-                  }}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                >
-                  <div>
-                    <p className="spotlight-item-title">{item.title}</p>
-                    <p className="spotlight-item-subtitle">{item.subtitle}</p>
+      <Card id="spotlight-card" className="spotlight-card">
+        <Command
+          className="spotlight-command"
+          value={query}
+          onValueChange={setQuery}
+          shouldFilter={false}
+          loop
+        >
+          <div className="spotlight-search">
+            <InputGroup className="spotlight-search-group">
+              <CommandPrimitive.Input
+                id="spotlight-search-input"
+                className="spotlight-input"
+                autoFocus
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                placeholder="Search passwords, commands, or pages"
+                aria-label="Search"
+                onKeyDown={onCommandInputKeyDown}
+              />
+              <InputGroupAddon align="inline-end" className="spotlight-search-addon">
+                <SearchIcon className="size-4 shrink-0" />
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+          <ScrollArea className="spotlight-results">
+            {isLoadingVault ? (
+              <div className="spotlight-skeleton-list" aria-hidden>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div key={`skeleton-${index}`} className="spotlight-skeleton-item">
+                    <Skeleton className="h-4 w-3/5" />
+                    <Skeleton className="h-3 w-2/5" />
                   </div>
-                  <span className="spotlight-item-badge">{item.badge}</span>
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
+                ))}
+              </div>
+            ) : (
+              <CommandList className="spotlight-command-list">
+                {visibleItems.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={item.id}
+                    className="spotlight-item"
+                    onSelect={() => {
+                      void executeItem(item);
+                    }}
+                  >
+                    <div>
+                      <p className="spotlight-item-title">{item.title}</p>
+                      <p className="spotlight-item-subtitle">{item.subtitle}</p>
+                    </div>
+                    <Badge variant="secondary" className="spotlight-item-badge">
+                      {item.badge}
+                    </Badge>
+                  </CommandItem>
+                ))}
+              </CommandList>
+            )}
+          </ScrollArea>
+        </Command>
 
-        <footer className="spotlight-meta">
+        <Separator className="spotlight-meta-separator" />
+
+        <CardFooter className="spotlight-meta">
           <span className="spotlight-meta-item">
-            <kbd className="spotlight-kbd">↑</kbd>
-            <kbd className="spotlight-kbd">↓</kbd>
+            <KbdGroup>
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
+            </KbdGroup>
             Navigate
           </span>
           <span className="spotlight-meta-item">
-            <kbd className="spotlight-kbd">Enter</kbd>
+            <Kbd>Enter</Kbd>
             Run
           </span>
           <span className="spotlight-meta-item">
-            <kbd className="spotlight-kbd">Esc</kbd>
+            <Kbd>Esc</Kbd>
             Close
           </span>
-          {isLoadingVault && <span className="spotlight-status">Loading vault...</span>}
-          {!isLoadingVault && statusText && <span className="spotlight-status">{statusText}</span>}
-        </footer>
-      </section>
+        </CardFooter>
+      </Card>
     </main>
   );
 }
