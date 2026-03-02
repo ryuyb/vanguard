@@ -1,17 +1,25 @@
+use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::window::Color;
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
-use tauri_plugin_positioner::{Position, WindowExt};
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, ManagerExt as PanelManagerExt, PanelHandle, PanelLevel,
     StyleMask, WebviewWindowExt as WebviewPanelExt,
 };
+use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_positioner::{Position, WindowExt};
 
 const SPOTLIGHT_WINDOW_LABEL: &str = "spotlight";
 const SPOTLIGHT_PAGE_PATH: &str = "spotlight.html";
 const SPOTLIGHT_WIDTH: f64 = 980.0;
 const SPOTLIGHT_HEIGHT: f64 = 620.0;
+const TRAY_ICON_ID: &str = "vanguard-tray";
+const TRAY_MENU_OPEN_VANGUARD_ID: &str = "tray-open-vanguard";
+const TRAY_MENU_OPEN_QUICK_ACCESS_ID: &str = "tray-open-quick-access";
+const TRAY_MENU_LOCK_ID: &str = "tray-lock";
+const TRAY_MENU_SETTINGS_ID: &str = "tray-settings";
+const TRAY_MENU_QUIT_ID: &str = "tray-quit";
 
 #[cfg(target_os = "macos")]
 tauri_panel! {
@@ -31,9 +39,61 @@ tauri_panel! {
 pub fn install_desktop_features<R: Runtime>(
     app: &tauri::App<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    install_tray_icon(app)?;
     let spotlight_window = ensure_spotlight_window(app)?;
     bind_spotlight_blur_hide(spotlight_window);
     register_spotlight_shortcut(app)?;
+    Ok(())
+}
+
+fn install_tray_icon<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
+    let open_vanguard = MenuItem::with_id(
+        app,
+        TRAY_MENU_OPEN_VANGUARD_ID,
+        "打开 Vanguard",
+        true,
+        None::<&str>,
+    )?;
+    let open_quick_access = MenuItem::with_id(
+        app,
+        TRAY_MENU_OPEN_QUICK_ACCESS_ID,
+        "打开快速访问",
+        true,
+        None::<&str>,
+    )?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let lock = MenuItem::with_id(app, TRAY_MENU_LOCK_ID, "锁定", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, TRAY_MENU_SETTINGS_ID, "设置", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, TRAY_MENU_QUIT_ID, "退出", true, None::<&str>)?;
+
+    let tray_menu = Menu::with_items(
+        app,
+        &[
+            &open_vanguard,
+            &open_quick_access,
+            &separator,
+            &lock,
+            &settings,
+            &quit,
+        ],
+    )?;
+
+    let mut tray_builder = TrayIconBuilder::with_id(TRAY_ICON_ID)
+        .menu(&tray_menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(move |_app_handle, event: MenuEvent| {
+            log::info!(
+                target: "vanguard::tray",
+                "tray menu clicked (not implemented): {:?}",
+                event.id()
+            );
+        });
+
+    if let Some(default_icon) = app.default_window_icon().cloned() {
+        tray_builder = tray_builder.icon(default_icon);
+    }
+
+    let _ = tray_builder.build(app)?;
     Ok(())
 }
 
@@ -47,7 +107,9 @@ fn ensure_spotlight_window<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<Web
     Ok(spotlight_window)
 }
 
-fn build_spotlight_window<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<WebviewWindow<R>> {
+fn build_spotlight_window<R: Runtime, M: Manager<R>>(
+    manager: &M,
+) -> tauri::Result<WebviewWindow<R>> {
     WebviewWindowBuilder::new(
         manager,
         SPOTLIGHT_WINDOW_LABEL,
