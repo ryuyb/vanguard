@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
@@ -6,6 +6,7 @@ import {
   KeyRound,
   LoaderCircle,
   Lock,
+  LogOut,
   ShieldCheck,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -48,11 +49,13 @@ function errorToText(error: unknown) {
 }
 
 function UnlockPage() {
+  const navigate = useNavigate({ from: "/unlock" });
   const [restoreState, setRestoreState] =
     useState<RestoreAuthStateResponseDto | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isBiometricUnlocking, setIsBiometricUnlocking] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [canBiometricUnlock, setCanBiometricUnlock] = useState(false);
@@ -118,11 +121,13 @@ function UnlockPage() {
       !isRestoring &&
       !isUnlocking &&
       !isBiometricUnlocking &&
+      !isLoggingOut &&
       restoreState?.status !== "needsLogin" &&
       !isVaultUnlocked &&
       masterPassword.trim().length > 0,
     [
       isBiometricUnlocking,
+      isLoggingOut,
       isRestoring,
       isUnlocking,
       isVaultUnlocked,
@@ -205,6 +210,24 @@ function UnlockPage() {
     }
   };
 
+  const onLogout = async () => {
+    setIsLoggingOut(true);
+    setFeedback({ kind: "idle" });
+    try {
+      const result = await commands.authLogout({});
+      if (result.status === "error") {
+        setFeedback({ kind: "error", text: errorToText(result.error) });
+        return;
+      }
+      setMasterPassword("");
+      await navigate({ to: "/" });
+    } catch (error) {
+      setFeedback({ kind: "error", text: errorToText(error) });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_90%_15%,_hsl(210_85%_95%),_transparent_40%),radial-gradient(circle_at_12%_85%,_hsl(216_90%_97%),_transparent_45%),linear-gradient(160deg,_hsl(210_50%_98%),_hsl(0_0%_100%))] p-6 md:p-10">
       <div className="absolute -top-20 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-blue-300/15 blur-3xl" />
@@ -221,8 +244,7 @@ function UnlockPage() {
             会话已锁定，请输入主密码解锁
           </h1>
           <p className="text-sm leading-relaxed text-slate-600">
-            前端只提交 master password，解锁推导和密钥恢复都在 Tauri Rust
-            后端完成。
+            输入主密码后即可解锁，继续安全访问你的密码库。
           </p>
           <img
             src={lockedIllustration}
@@ -285,6 +307,20 @@ function UnlockPage() {
                   <Button asChild className="w-full">
                     <Link to="/vault">查看 Vault 数据</Link>
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isLoggingOut}
+                    onClick={onLogout}
+                  >
+                    {isLoggingOut ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <LogOut />
+                    )}
+                    {isLoggingOut ? "正在登出..." : "登出"}
+                  </Button>
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/">返回首页</Link>
                   </Button>
@@ -296,9 +332,8 @@ function UnlockPage() {
               !isVaultUnlocked && (
                 <form className="space-y-5" onSubmit={onUnlock}>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                    <div>账户：{restoreState?.email ?? "unknown"}</div>
-                    <div>服务：{restoreState?.baseUrl ?? "unknown"}</div>
-                    <div>会话：{restoreState?.accountId ?? "unknown"}</div>
+                    <div>登录邮箱：{restoreState?.email ?? "unknown"}</div>
+                    <div>服务地址：{restoreState?.baseUrl ?? "unknown"}</div>
                   </div>
                   {biometricSupported && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -323,7 +358,9 @@ function UnlockPage() {
                         onChange={(event) =>
                           setMasterPassword(event.target.value)
                         }
-                        disabled={isUnlocking || isBiometricUnlocking}
+                        disabled={
+                          isUnlocking || isBiometricUnlocking || isLoggingOut
+                        }
                       />
                       <InputGroupAddon align="inline-end" className="px-1.5">
                         <Button
@@ -334,7 +371,9 @@ function UnlockPage() {
                           onClick={() =>
                             setShowPassword((previous) => !previous)
                           }
-                          disabled={isUnlocking || isBiometricUnlocking}
+                          disabled={
+                            isUnlocking || isBiometricUnlocking || isLoggingOut
+                          }
                           aria-label={showPassword ? "隐藏密码" : "显示密码"}
                         >
                           {showPassword ? <EyeOff /> : <Eye />}
@@ -382,7 +421,9 @@ function UnlockPage() {
                       size="lg"
                       className="w-full"
                       onClick={onBiometricUnlock}
-                      disabled={isUnlocking || isBiometricUnlocking}
+                      disabled={
+                        isUnlocking || isBiometricUnlocking || isLoggingOut
+                      }
                     >
                       {isBiometricUnlocking ? (
                         <LoaderCircle className="animate-spin" />
@@ -409,6 +450,23 @@ function UnlockPage() {
                       <Link to="/vault">进入 Vault 数据页</Link>
                     </Button>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={
+                      isUnlocking || isBiometricUnlocking || isLoggingOut
+                    }
+                    onClick={onLogout}
+                  >
+                    {isLoggingOut ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <LogOut />
+                    )}
+                    {isLoggingOut ? "正在登出..." : "登出"}
+                  </Button>
                 </form>
               )}
           </CardContent>

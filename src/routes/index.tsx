@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
@@ -10,7 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import loginIllustration from "@/assets/login.svg";
 import { commands } from "@/bindings";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +67,15 @@ function normalizeBaseUrl(value: string) {
   return value.trim().replace(/\/+$/, "");
 }
 
+function isValidServerUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function toProviderLabel(provider: string) {
   return TWO_FACTOR_PROVIDER_LABELS[provider] ?? `Provider ${provider}`;
 }
@@ -90,25 +99,87 @@ function errorToText(error: unknown) {
 }
 
 function Index() {
-  const [baseUrl, setBaseUrl] = useState("https://vault.example.com");
+  const navigate = useNavigate({ from: "/" });
+  const [baseUrl, setBaseUrl] = useState("");
   const [email, setEmail] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<LoginFeedback>({ kind: "idle" });
+  const [submitProgressText, setSubmitProgressText] = useState("");
+  const [isRestoringSession, setIsRestoringSession] = useState(true);
   const [twoFactorState, setTwoFactorState] = useState<TwoFactorState | null>(
     null,
   );
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      setIsRestoringSession(true);
+      try {
+        const result = await commands.authRestoreState({});
+        if (cancelled) {
+          return;
+        }
+        if (result.status === "error") {
+          return;
+        }
+
+        const restored = result.data;
+
+        if (restored.baseUrl) {
+          setBaseUrl((previous) =>
+            previous.trim().length > 0 ? previous : (restored.baseUrl ?? ""),
+          );
+        }
+        if (restored.email) {
+          setEmail((previous) =>
+            previous.trim().length > 0 ? previous : (restored.email ?? ""),
+          );
+        }
+      } catch {
+        // ignored: first-screen hint should not block manual login
+      } finally {
+        if (!cancelled) {
+          setIsRestoringSession(false);
+        }
+      }
+    };
+
+    restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const canSubmit = useMemo(
     () =>
       !isSubmitting &&
+      !isRestoringSession &&
       normalizeBaseUrl(baseUrl).length > 0 &&
       email.trim().length > 0 &&
       masterPassword.length > 0 &&
       (twoFactorState ? twoFactorState.token.trim().length > 0 : true),
-    [baseUrl, email, isSubmitting, masterPassword, twoFactorState],
+    [
+      baseUrl,
+      email,
+      isRestoringSession,
+      isSubmitting,
+      masterPassword,
+      twoFactorState,
+    ],
   );
+
+  const clearTwoFactorChallenge = () => {
+    if (!twoFactorState) {
+      return;
+    }
+    setTwoFactorState(null);
+    if (feedback.kind === "twoFactor") {
+      setFeedback({ kind: "idle" });
+    }
+  };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -119,13 +190,28 @@ function Index() {
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
       setFeedback({
         kind: "error",
-        text: "请填写 server url、email 和 master password。",
+        text: "请先填写服务地址、登录邮箱和主密码。",
+      });
+      return;
+    }
+    if (!isValidServerUrl(normalizedBaseUrl)) {
+      setFeedback({
+        kind: "error",
+        text: "服务地址格式不正确，请以 http:// 或 https:// 开头。",
+      });
+      return;
+    }
+    if (!trimmedEmail.includes("@")) {
+      setFeedback({
+        kind: "error",
+        text: "邮箱格式看起来不正确，请检查后重试。",
       });
       return;
     }
 
     setIsSubmitting(true);
     setFeedback({ kind: "idle" });
+    setSubmitProgressText("正在验证账号信息...");
 
     try {
       const twoFactorProvider = twoFactorState
@@ -134,7 +220,10 @@ function Index() {
       const twoFactorToken = twoFactorState?.token.trim() || null;
 
       if (twoFactorState && (twoFactorProvider === null || !twoFactorToken)) {
-        setFeedback({ kind: "error", text: "请输入有效的二步验证码。" });
+        setFeedback({
+          kind: "error",
+          text: "请输入完整的二步验证码后再继续。",
+        });
         return;
       }
 
@@ -154,74 +243,73 @@ function Index() {
       }
 
       if (result.data.status === "authenticated") {
+        setSubmitProgressText("正在准备你的密码库...");
         setTwoFactorState(null);
 
         const canUnlockResult = await commands.vaultCanUnlock();
         if (canUnlockResult.status === "error") {
           setFeedback({
             kind: "error",
-            text: `登录成功，但无法判断本地解锁能力：${errorToText(canUnlockResult.error)}`,
+            text: `你已登录成功，但暂时无法判断解锁状态：${errorToText(canUnlockResult.error)}`,
           });
           return;
         }
         const canUnlock = canUnlockResult.data;
 
         if (canUnlock) {
+          setSubmitProgressText("正在解锁本地密码库...");
           const unlockResult = await commands.vaultUnlockWithPassword({
             masterPassword,
           });
           if (unlockResult.status === "error") {
             setFeedback({
               kind: "error",
-              text: `登录成功，但解锁失败：${errorToText(unlockResult.error)}`,
+              text: `你已登录成功，但解锁失败：${errorToText(unlockResult.error)}`,
             });
             return;
           }
 
+          setSubmitProgressText("正在同步最新数据...");
           const syncResult = await commands.vaultSyncNow({
             excludeDomains: false,
           });
           if (syncResult.status === "error") {
-            setFeedback({
-              kind: "error",
-              text: `登录与解锁成功，但同步失败：${errorToText(syncResult.error)}`,
-            });
+            setMasterPassword("");
+            await navigate({ to: "/vault" });
             return;
           }
 
-          setFeedback({
-            kind: "success",
-            text: "登录成功，检测到本地同步历史，已先解锁再同步。",
-          });
+          setMasterPassword("");
+          await navigate({ to: "/vault" });
           return;
         }
 
+        setSubmitProgressText("正在首次同步密码库...");
         const syncResult = await commands.vaultSyncNow({
           excludeDomains: false,
         });
         if (syncResult.status === "error") {
           setFeedback({
             kind: "error",
-            text: `登录成功，但首次同步失败：${errorToText(syncResult.error)}`,
+            text: `你已登录成功，但首次同步失败：${errorToText(syncResult.error)}`,
           });
           return;
         }
 
+        setSubmitProgressText("正在完成解锁...");
         const unlockResult = await commands.vaultUnlockWithPassword({
           masterPassword,
         });
         if (unlockResult.status === "error") {
           setFeedback({
             kind: "error",
-            text: `首次同步成功，但解锁失败：${errorToText(unlockResult.error)}`,
+            text: `首次同步已完成，但解锁失败：${errorToText(unlockResult.error)}`,
           });
           return;
         }
 
-        setFeedback({
-          kind: "success",
-          text: "登录成功，无本地同步历史，已先同步再解锁。",
-        });
+        setMasterPassword("");
+        await navigate({ to: "/vault" });
         return;
       }
 
@@ -242,12 +330,13 @@ function Index() {
 
       setFeedback({
         kind: "twoFactor",
-        text: `账号需要二步验证，请继续完成验证（可用方式：${providers.map(toProviderLabel).join("、") || "未知方式"}）。`,
+        text: `需要二步验证，请输入验证码继续（可用方式：${providers.map(toProviderLabel).join("、") || "未知方式"}）。`,
       });
     } catch (error) {
       setFeedback({ kind: "error", text: errorToText(error) });
     } finally {
       setIsSubmitting(false);
+      setSubmitProgressText("");
     }
   };
 
@@ -258,7 +347,7 @@ function Index() {
     if (twoFactorState.selectedProvider !== "1") {
       setFeedback({
         kind: "error",
-        text: "当前验证方式不是 Email 2FA，无法发送邮件验证码。",
+        text: "当前不是邮箱验证方式，无法发送邮件验证码。",
       });
       return;
     }
@@ -268,7 +357,7 @@ function Index() {
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
       setFeedback({
         kind: "error",
-        text: "发送验证码前，请确保 server url、email 和 master password 已填写。",
+        text: "发送验证码前，请先填写服务地址、登录邮箱和主密码。",
       });
       return;
     }
@@ -294,7 +383,7 @@ function Index() {
 
       setFeedback({
         kind: "success",
-        text: "已发送邮箱验证码，请查收后输入二步验证码继续登录。",
+        text: "验证码已发送到邮箱，请查收后输入并继续登录。",
       });
     } catch (error) {
       setFeedback({ kind: "error", text: errorToText(error) });
@@ -320,11 +409,10 @@ function Index() {
           </Badge>
           <div className="space-y-4">
             <h1 className="text-4xl leading-tight font-semibold tracking-tight text-slate-900">
-              本地优先的 Vaultwarden 密码管理器
+              欢迎回来，继续管理你的密码库
             </h1>
             <p className="text-base leading-relaxed text-slate-600">
-              仅输入服务地址、邮箱和主密码。密钥推导、会话管理和同步都在 Tauri
-              Rust 后端完成。
+              输入服务地址、邮箱和主密码后，即可完成登录并自动准备好你的密码库。
             </p>
           </div>
           <img
@@ -337,19 +425,26 @@ function Index() {
         <Card className="border-white/70 bg-white/90 shadow-xl backdrop-blur-sm">
           <CardHeader className="space-y-2">
             <Badge variant="secondary" className="w-fit">
-              Secure Login
+              登录
             </Badge>
             <CardTitle className="text-2xl font-semibold">
-              登录 Vaultwarden
+              登录你的 Vaultwarden 账号
             </CardTitle>
             <CardDescription>
-              调用 Tauri `auth_login_with_password` command 完成登录
+              支持二步验证，登录后会自动准备密码库
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-5" onSubmit={onSubmit}>
+              {isRestoringSession && (
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <LoaderCircle className="animate-spin" />
+                  正在检查上次会话...
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="base-url">Server URL</Label>
+                <Label htmlFor="base-url">服务地址</Label>
                 <InputGroup>
                   <InputGroupAddon>
                     <Globe className="text-slate-500" />
@@ -360,14 +455,17 @@ function Index() {
                     autoComplete="url"
                     placeholder="https://vault.example.com"
                     value={baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
+                    onChange={(event) => {
+                      clearTwoFactorChallenge();
+                      setBaseUrl(event.target.value);
+                    }}
                     disabled={isSubmitting}
                   />
                 </InputGroup>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">登录邮箱</Label>
                 <InputGroup>
                   <InputGroupAddon>
                     <Mail className="text-slate-500" />
@@ -378,14 +476,17 @@ function Index() {
                     autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    onChange={(event) => {
+                      clearTwoFactorChallenge();
+                      setEmail(event.target.value);
+                    }}
                     disabled={isSubmitting}
                   />
                 </InputGroup>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="master-password">Master Password</Label>
+                <Label htmlFor="master-password">主密码</Label>
                 <InputGroup>
                   <InputGroupAddon>
                     <KeyRound className="text-slate-500" />
@@ -396,7 +497,10 @@ function Index() {
                     autoComplete="current-password"
                     placeholder="输入主密码"
                     value={masterPassword}
-                    onChange={(event) => setMasterPassword(event.target.value)}
+                    onChange={(event) => {
+                      clearTwoFactorChallenge();
+                      setMasterPassword(event.target.value);
+                    }}
                     disabled={isSubmitting}
                   />
                   <InputGroupAddon align="inline-end" className="px-1.5">
@@ -503,7 +607,7 @@ function Index() {
                       {!twoFactorState.isSendingEmailCode && <Send />}
                       {twoFactorState.isSendingEmailCode
                         ? "正在发送邮箱验证码..."
-                        : "发送 Email 验证码"}
+                        : "发送邮箱验证码"}
                     </Button>
                   )}
                 </div>
@@ -538,18 +642,10 @@ function Index() {
               >
                 {isSubmitting && <LoaderCircle className="animate-spin" />}
                 {isSubmitting
-                  ? "正在登录..."
+                  ? submitProgressText || "正在登录..."
                   : twoFactorState
-                    ? "验证并登录"
-                    : "登录并同步"}
-              </Button>
-
-              <Button asChild variant="ghost" className="w-full">
-                <Link to="/unlock">已登录但锁定？前往解锁页</Link>
-              </Button>
-
-              <Button asChild variant="ghost" className="w-full">
-                <Link to="/vault">查看 Vault 数据</Link>
+                    ? "验证后继续"
+                    : "登录并进入密码库"}
               </Button>
             </form>
           </CardContent>

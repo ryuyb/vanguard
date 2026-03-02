@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Fingerprint,
   FolderOpen,
@@ -111,6 +111,7 @@ function compactText(values: Array<string | null | undefined>) {
 }
 
 function VaultPage() {
+  const navigate = useNavigate({ from: "/vault" });
   const [pageState, setPageState] = useState<VaultPageState>("loading");
   const [restoreState, setRestoreState] =
     useState<RestoreAuthStateResponseDto | null>(null);
@@ -214,7 +215,7 @@ function VaultPage() {
         setErrorText(errorToText(result.error));
         return;
       }
-      await loadVaultData();
+      await navigate({ to: "/unlock" });
     } catch (error) {
       setErrorText(errorToText(error));
     } finally {
@@ -231,7 +232,7 @@ function VaultPage() {
         setErrorText(errorToText(result.error));
         return;
       }
-      await loadVaultData();
+      await navigate({ to: "/" });
     } catch (error) {
       setErrorText(errorToText(error));
     } finally {
