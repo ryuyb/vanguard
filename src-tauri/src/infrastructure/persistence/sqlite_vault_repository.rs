@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
@@ -20,7 +20,7 @@ use crate::support::result::AppResult;
 
 pub struct SqliteVaultRepository {
     db_dir: PathBuf,
-    connections: Mutex<HashMap<String, Connection>>,
+    connections: Mutex<HashMap<String, Arc<Mutex<Connection>>>>,
 }
 
 const SQLITE_BUSY_TIMEOUT_MS: u64 = 5_000;
@@ -41,28 +41,51 @@ impl SqliteVaultRepository {
         })
     }
 
-    fn with_account_connection<T>(
-        &self,
-        account_id: &str,
-        f: impl FnOnce(&mut Connection) -> AppResult<T>,
-    ) -> AppResult<T> {
+    fn account_connection(&self, account_id: &str) -> AppResult<Arc<Mutex<Connection>>> {
+        {
+            let connections = self
+                .connections
+                .lock()
+                .map_err(|_| AppError::internal("failed to lock sqlite connections cache"))?;
+            if let Some(connection) = connections.get(account_id) {
+                return Ok(Arc::clone(connection));
+            }
+        }
+
+        let db_path = self.db_path_for_account(account_id);
+        let new_connection = Arc::new(Mutex::new(Self::open_connection(&db_path)?));
+
         let mut connections = self
             .connections
             .lock()
-            .map_err(|_| AppError::internal("failed to lock sqlite connections"))?;
-
-        if !connections.contains_key(account_id) {
-            let db_path = self.db_path_for_account(account_id);
-            let connection = Self::open_connection(&db_path)?;
-            connections.insert(account_id.to_string(), connection);
+            .map_err(|_| AppError::internal("failed to lock sqlite connections cache"))?;
+        if let Some(connection) = connections.get(account_id) {
+            return Ok(Arc::clone(connection));
         }
 
-        let connection = connections.get_mut(account_id).ok_or_else(|| {
-            AppError::internal(format!(
-                "failed to get sqlite connection for account_id={account_id}"
-            ))
-        })?;
-        f(connection)
+        connections.insert(account_id.to_string(), Arc::clone(&new_connection));
+        Ok(new_connection)
+    }
+
+    async fn with_account_connection<T>(
+        &self,
+        account_id: &str,
+        f: impl FnOnce(&mut Connection, &str) -> AppResult<T> + Send + 'static,
+    ) -> AppResult<T>
+    where
+        T: Send + 'static,
+    {
+        let account_id = account_id.to_string();
+        let connection = self.account_connection(&account_id)?;
+
+        tokio::task::spawn_blocking(move || {
+            let mut connection = connection
+                .lock()
+                .map_err(|_| AppError::internal("failed to lock sqlite account connection"))?;
+            f(&mut connection, &account_id)
+        })
+        .await
+        .map_err(|error| AppError::internal(format!("sqlite task join error: {error}")))?
     }
 
     fn db_path_for_account(&self, account_id: &str) -> PathBuf {
@@ -638,7 +661,8 @@ impl SqliteVaultRepository {
 #[async_trait]
 impl VaultRepositoryPort for SqliteVaultRepository {
     async fn set_sync_running(&self, account_id: &str, base_url: &str) -> AppResult<SyncContext> {
-        self.with_account_connection(account_id, |connection| {
+        let base_url = base_url.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::ensure_context_row(connection, account_id)?;
             connection
                 .execute(
@@ -662,6 +686,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })
         })
+        .await
     }
 
     async fn set_sync_succeeded(
@@ -672,7 +697,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         synced_at_ms: i64,
         counts: SyncItemCounts,
     ) -> AppResult<SyncContext> {
-        self.with_account_connection(account_id, |connection| {
+        let base_url = base_url.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::ensure_context_row(connection, account_id)?;
             connection
                 .execute(
@@ -713,6 +739,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })
         })
+        .await
     }
 
     async fn set_sync_failed(
@@ -721,7 +748,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         base_url: &str,
         error_message: String,
     ) -> AppResult<SyncContext> {
-        self.with_account_connection(account_id, |connection| {
+        let base_url = base_url.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::ensure_context_row(connection, account_id)?;
             connection
                 .execute(
@@ -745,6 +773,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })
         })
+        .await
     }
 
     async fn set_sync_degraded(
@@ -753,7 +782,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         base_url: &str,
         error_message: String,
     ) -> AppResult<SyncContext> {
-        self.with_account_connection(account_id, |connection| {
+        let base_url = base_url.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::ensure_context_row(connection, account_id)?;
             connection
                 .execute(
@@ -777,16 +807,18 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })
         })
+        .await
     }
 
     async fn get_sync_context(&self, account_id: &str) -> AppResult<Option<SyncContext>> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::read_sync_context(connection, account_id)
         })
+        .await
     }
 
     async fn set_ws_status(&self, account_id: &str, ws_status: WsStatus) -> AppResult<SyncContext> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             Self::ensure_context_row(connection, account_id)?;
             connection
                 .execute(
@@ -807,10 +839,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 ))
             })
         })
+        .await
     }
 
     async fn begin_sync_transaction(&self, account_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
 
             let exists = tx
@@ -848,10 +881,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn commit_sync_transaction(&self, account_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
 
@@ -871,10 +905,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn rollback_sync_transaction(&self, account_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             Self::clear_staging_snapshot(&tx, account_id)?;
@@ -890,10 +925,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_profile(&self, account_id: &str, profile: SyncProfile) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             let payload_json = Self::to_json(&profile, "sync profile")?;
@@ -915,10 +951,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_folders(&self, account_id: &str, folders: Vec<SyncFolder>) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             {
@@ -947,10 +984,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_folder_live(&self, account_id: &str, folder: SyncFolder) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let payload_json = Self::to_json(&folder, "live sync folder")?;
             connection
                 .execute(
@@ -966,10 +1004,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn delete_folder_live(&self, account_id: &str, folder_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        let folder_id = folder_id.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             connection
                 .execute(
                     "DELETE FROM live_folders WHERE account_id = ?1 AND id = ?2",
@@ -980,10 +1020,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn count_live_folders(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let count = connection
                 .query_row(
                     "SELECT COUNT(1) FROM live_folders WHERE account_id = ?1",
@@ -995,10 +1036,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             to_u32(count, "live_folders_count")
         })
+        .await
     }
 
     async fn list_live_folders(&self, account_id: &str) -> AppResult<Vec<SyncFolder>> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let mut statement = connection
                 .prepare(
                     r#"
@@ -1030,6 +1072,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
 
             Ok(folders)
         })
+        .await
     }
 
     async fn upsert_collections(
@@ -1037,7 +1080,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         account_id: &str,
         collections: Vec<SyncCollection>,
     ) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             {
@@ -1072,10 +1115,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_policies(&self, account_id: &str, policies: Vec<SyncPolicy>) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             {
@@ -1104,10 +1148,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_ciphers(&self, account_id: &str, ciphers: Vec<SyncCipher>) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             {
@@ -1137,10 +1182,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_cipher_live(&self, account_id: &str, cipher: SyncCipher) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let sanitized = sanitize_cipher_for_persistence(cipher);
             let payload_json = Self::to_json(&sanitized, "live sync cipher")?;
             connection
@@ -1157,10 +1203,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        let cipher_id = cipher_id.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             connection
                 .execute(
                     "DELETE FROM live_ciphers WHERE account_id = ?1 AND id = ?2",
@@ -1171,10 +1219,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let count = connection
                 .query_row(
                     "SELECT COUNT(1) FROM live_ciphers WHERE account_id = ?1",
@@ -1186,6 +1235,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             to_u32(count, "live_ciphers_count")
         })
+        .await
     }
 
     async fn get_live_cipher(
@@ -1193,7 +1243,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         account_id: &str,
         cipher_id: &str,
     ) -> AppResult<Option<SyncCipher>> {
-        self.with_account_connection(account_id, |connection| {
+        let cipher_id = cipher_id.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             let payload_json: Option<String> = connection
                 .query_row(
                     r#"
@@ -1215,6 +1266,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 .map(|value| Self::from_json(&value, "live sync cipher payload"))
                 .transpose()
         })
+        .await
     }
 
     async fn list_live_ciphers(
@@ -1223,7 +1275,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         offset: u32,
         limit: u32,
     ) -> AppResult<Vec<SyncCipher>> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let mut statement = connection
                 .prepare(
                     r#"
@@ -1258,10 +1310,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
 
             Ok(ciphers)
         })
+        .await
     }
 
     async fn upsert_sends(&self, account_id: &str, sends: Vec<SyncSend>) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             {
@@ -1290,10 +1343,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_send_live(&self, account_id: &str, send: SyncSend) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let payload_json = Self::to_json(&send, "live sync send")?;
             connection
                 .execute(
@@ -1309,10 +1363,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn delete_send_live(&self, account_id: &str, send_id: &str) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        let send_id = send_id.to_string();
+        self.with_account_connection(account_id, move |connection, account_id| {
             connection
                 .execute(
                     "DELETE FROM live_sends WHERE account_id = ?1 AND id = ?2",
@@ -1323,10 +1379,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn count_live_sends(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let count = connection
                 .query_row(
                     "SELECT COUNT(1) FROM live_sends WHERE account_id = ?1",
@@ -1338,6 +1395,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             to_u32(count, "live_sends_count")
         })
+        .await
     }
 
     async fn upsert_domains(
@@ -1345,7 +1403,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         account_id: &str,
         domains: Option<SyncDomains>,
     ) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             tx.execute(
@@ -1381,6 +1439,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn upsert_user_decryption(
@@ -1388,7 +1447,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         account_id: &str,
         user_decryption: Option<SyncUserDecryption>,
     ) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let tx = Self::begin_sql_transaction(connection)?;
             Self::ensure_active_transaction(&tx, account_id)?;
             tx.execute(
@@ -1424,13 +1483,14 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
             Ok(())
         })
+        .await
     }
 
     async fn load_live_user_decryption(
         &self,
         account_id: &str,
     ) -> AppResult<Option<SyncUserDecryption>> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             let payload = connection
                 .query_row(
                     r#"
@@ -1455,6 +1515,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 )?)),
             }
         })
+        .await
     }
 
     async fn save_snapshot_meta(
@@ -1462,7 +1523,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         account_id: &str,
         snapshot_meta: VaultSnapshotMeta,
     ) -> AppResult<()> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             connection
                 .execute(
                     r#"
@@ -1490,10 +1551,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
             Ok(())
         })
+        .await
     }
 
     async fn load_snapshot_meta(&self, account_id: &str) -> AppResult<Option<VaultSnapshotMeta>> {
-        self.with_account_connection(account_id, |connection| {
+        self.with_account_connection(account_id, move |connection, account_id| {
             connection
                 .query_row(
                     r#"
@@ -1526,6 +1588,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })
                 .transpose()
         })
+        .await
     }
 }
 
