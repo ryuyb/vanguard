@@ -241,6 +241,10 @@ function UnlockPage() {
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_90%_15%,_hsl(210_85%_95%),_transparent_40%),radial-gradient(circle_at_12%_85%,_hsl(216_90%_97%),_transparent_45%),linear-gradient(160deg,_hsl(210_50%_98%),_hsl(0_0%_100%))] p-6 md:p-10">
+      <div
+        data-tauri-drag-region
+        className="absolute inset-x-0 top-0 z-20 h-6"
+      />
       <div className="absolute -top-20 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-blue-300/15 blur-3xl" />
 
       <section className="relative mx-auto grid w-full max-w-5xl gap-8 md:min-h-[calc(100dvh-5rem)] md:grid-cols-[0.9fr_1.1fr] md:items-center">

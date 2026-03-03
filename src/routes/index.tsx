@@ -445,6 +445,10 @@ function Index() {
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_15%_15%,_hsl(219_100%_97%),_transparent_45%),radial-gradient(circle_at_85%_8%,_hsl(210_100%_96%),_transparent_40%),linear-gradient(130deg,_hsl(220_46%_98%),_hsl(0_0%_100%))] p-6 md:p-10">
+      <div
+        data-tauri-drag-region
+        className="absolute inset-x-0 top-0 z-20 h-6"
+      />
       <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-sky-300/15 blur-3xl" />
       <div className="absolute -bottom-28 -left-10 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
 

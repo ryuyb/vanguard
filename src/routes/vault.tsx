@@ -1014,9 +1014,6 @@ function VaultPage() {
                 </div>
               </div>
 
-              <div className="px-4 pt-3 pb-2 text-sm font-medium text-slate-700">
-                {selectedMenuName} ({filteredCiphers.length})
-              </div>
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-1 px-2 pb-2">
                   {filteredCiphers.map((cipher) => (
