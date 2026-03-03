@@ -301,8 +301,11 @@ function Index() {
 
         if (canUnlock) {
           setSubmitProgressText("正在解锁本地密码库...");
-          const unlockResult = await commands.vaultUnlockWithPassword({
-            masterPassword,
+          const unlockResult = await commands.vaultUnlock({
+            method: {
+              type: "masterPassword",
+              password: masterPassword,
+            },
           });
           if (unlockResult.status === "error") {
             setFeedback({
@@ -340,8 +343,11 @@ function Index() {
         }
 
         setSubmitProgressText("正在完成解锁...");
-        const unlockResult = await commands.vaultUnlockWithPassword({
-          masterPassword,
+        const unlockResult = await commands.vaultUnlock({
+          method: {
+            type: "masterPassword",
+            password: masterPassword,
+          },
         });
         if (unlockResult.status === "error") {
           setFeedback({

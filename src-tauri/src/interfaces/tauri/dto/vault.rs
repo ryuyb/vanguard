@@ -18,8 +18,16 @@ pub struct VaultCipherDetailRequestDto {
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct VaultUnlockWithPasswordRequestDto {
-    pub master_password: String,
+pub struct VaultUnlockRequestDto {
+    pub method: VaultUnlockMethodDto,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum VaultUnlockMethodDto {
+    MasterPassword { password: String },
+    Pin { pin: String },
+    Biometric,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -48,12 +56,6 @@ pub struct VaultEnablePinUnlockRequestDto {
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultDisablePinUnlockRequestDto {}
-
-#[derive(Debug, Clone, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct VaultUnlockWithPinRequestDto {
-    pub pin: String,
-}
 
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

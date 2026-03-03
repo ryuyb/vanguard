@@ -34,31 +34,6 @@ pub trait BiometricUnlockExecutor: Send + Sync {
     ) -> AppResult<UnlockVaultResult>;
 }
 
-struct UnsupportedPinUnlockExecutor;
-
-#[async_trait]
-impl PinUnlockExecutor for UnsupportedPinUnlockExecutor {
-    async fn execute_pin_unlock(
-        &self,
-        _runtime: &dyn VaultRuntimePort,
-        _pin: String,
-    ) -> AppResult<UnlockVaultResult> {
-        Err(AppError::validation("pin unlock is not configured"))
-    }
-}
-
-struct UnsupportedBiometricUnlockExecutor;
-
-#[async_trait]
-impl BiometricUnlockExecutor for UnsupportedBiometricUnlockExecutor {
-    async fn execute_biometric_unlock(
-        &self,
-        _runtime: &dyn VaultRuntimePort,
-    ) -> AppResult<UnlockVaultResult> {
-        Err(AppError::validation("biometric unlock is not configured"))
-    }
-}
-
 #[derive(Clone)]
 pub struct UnlockVaultUseCase {
     master_password_executor: Arc<dyn MasterPasswordUnlockExecutor>,
@@ -77,27 +52,6 @@ impl UnlockVaultUseCase {
             pin_executor,
             biometric_executor,
         }
-    }
-
-    pub fn with_master_password_executor(
-        master_password_executor: Arc<dyn MasterPasswordUnlockExecutor>,
-    ) -> Self {
-        Self::new(
-            master_password_executor,
-            Arc::new(UnsupportedPinUnlockExecutor),
-            Arc::new(UnsupportedBiometricUnlockExecutor),
-        )
-    }
-
-    pub fn with_master_and_biometric_executor(
-        master_password_executor: Arc<dyn MasterPasswordUnlockExecutor>,
-        biometric_executor: Arc<dyn BiometricUnlockExecutor>,
-    ) -> Self {
-        Self::new(
-            master_password_executor,
-            Arc::new(UnsupportedPinUnlockExecutor),
-            biometric_executor,
-        )
     }
 
     pub async fn execute(

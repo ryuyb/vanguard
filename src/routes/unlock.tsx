@@ -169,8 +169,11 @@ function UnlockPage() {
     setFeedback({ kind: "idle" });
 
     try {
-      const result = await commands.vaultUnlockWithPassword({
-        masterPassword: trimmedPassword,
+      const result = await commands.vaultUnlock({
+        method: {
+          type: "masterPassword",
+          password: trimmedPassword,
+        },
       });
 
       if (result.status === "error") {
@@ -200,7 +203,11 @@ function UnlockPage() {
     setFeedback({ kind: "idle" });
 
     try {
-      const result = await commands.vaultUnlockWithBiometric();
+      const result = await commands.vaultUnlock({
+        method: {
+          type: "biometric",
+        },
+      });
       if (result.status === "error") {
         setFeedback({ kind: "error", text: errorToText(result.error) });
         return;

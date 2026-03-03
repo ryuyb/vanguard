@@ -20,8 +20,7 @@ use crate::interfaces::tauri::dto::vault::{
     VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
     VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto,
-    VaultUnlockWithPasswordRequestDto, VaultUnlockWithPinRequestDto, VaultViewDataRequestDto,
-    VaultViewDataResponseDto,
+    VaultUnlockMethodDto, VaultUnlockRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
@@ -87,22 +86,19 @@ pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, Strin
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_unlock_with_password(
+pub async fn vault_unlock(
     state: State<'_, AppState>,
-    request: VaultUnlockWithPasswordRequestDto,
+    request: VaultUnlockRequestDto,
 ) -> Result<(), String> {
-    let master_password = request.master_password.trim().to_string();
     build_unlock_use_case(&state)
         .execute(
             &*state,
             UnlockVaultCommand {
-                method: UnlockMethod::MasterPassword {
-                    password: master_password,
-                },
+                method: to_unlock_method(request.method),
             },
         )
         .await
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
+        .map_err(|error| log_command_error("vault_unlock", error))?;
 
     Ok(())
 }
@@ -198,40 +194,6 @@ pub async fn vault_disable_pin_unlock(
         .disable_pin_unlock(&*state)
         .await
         .map_err(|error| log_command_error("vault_disable_pin_unlock", error))
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn vault_unlock_with_pin(
-    state: State<'_, AppState>,
-    request: VaultUnlockWithPinRequestDto,
-) -> Result<(), String> {
-    let pin = request.pin.trim().to_string();
-    build_unlock_use_case(&state)
-        .execute(
-            &*state,
-            UnlockVaultCommand {
-                method: UnlockMethod::Pin { pin },
-            },
-        )
-        .await
-        .map_err(|error| log_command_error("vault_unlock_with_pin", error))
-        .map(|_| ())
-}
-
-#[tauri::command]
-#[specta::specta]
-pub async fn vault_unlock_with_biometric(state: State<'_, AppState>) -> Result<(), String> {
-    build_unlock_use_case(&state)
-        .execute(
-            &*state,
-            UnlockVaultCommand {
-                method: UnlockMethod::Biometric,
-            },
-        )
-        .await
-        .map_err(|error| log_command_error("vault_unlock_with_biometric", error))
-        .map(|_| ())
 }
 
 #[tauri::command]
@@ -344,6 +306,16 @@ fn to_vault_user_key_material(user_key: &VaultUserKey) -> VaultUserKeyMaterial {
     VaultUserKeyMaterial {
         enc_key: user_key.enc_key.clone(),
         mac_key: user_key.mac_key.clone(),
+    }
+}
+
+fn to_unlock_method(method: VaultUnlockMethodDto) -> UnlockMethod {
+    match method {
+        VaultUnlockMethodDto::MasterPassword { password } => {
+            UnlockMethod::MasterPassword { password }
+        }
+        VaultUnlockMethodDto::Pin { pin } => UnlockMethod::Pin { pin },
+        VaultUnlockMethodDto::Biometric => UnlockMethod::Biometric,
     }
 }
 
