@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use std::path::{Path, PathBuf};
 
 pub mod application;
@@ -7,6 +8,7 @@ pub mod infrastructure;
 pub mod interfaces;
 pub mod support;
 
+#[cfg(debug_assertions)]
 use specta_typescript::BigIntExportBehavior;
 use tauri::Manager;
 
