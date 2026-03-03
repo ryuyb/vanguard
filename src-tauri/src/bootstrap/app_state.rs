@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
+use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
@@ -365,6 +367,50 @@ impl AppState {
             .map_err(|_| AppError::internal("failed to lock persisted auth state store"))?;
         *store = value;
         Ok(())
+    }
+}
+
+impl VaultRuntimePort for AppState {
+    fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        self.auth_session().map(|value| {
+            value.map(|session| VaultUnlockContext {
+                account_id: session.account_id,
+                base_url: session.base_url,
+                email: session.email,
+                kdf: session.kdf,
+                kdf_iterations: session.kdf_iterations,
+                kdf_memory: session.kdf_memory,
+                kdf_parallelism: session.kdf_parallelism,
+            })
+        })
+    }
+
+    fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        AppState::persisted_auth_context(self).map(|value| {
+            value.map(|persisted| VaultUnlockContext {
+                account_id: persisted.account_id,
+                base_url: persisted.base_url,
+                email: persisted.email,
+                kdf: persisted.kdf,
+                kdf_iterations: persisted.kdf_iterations,
+                kdf_memory: persisted.kdf_memory,
+                kdf_parallelism: persisted.kdf_parallelism,
+            })
+        })
+    }
+
+    fn set_vault_user_key_material(
+        &self,
+        account_id: String,
+        key: VaultUserKeyMaterial,
+    ) -> AppResult<()> {
+        self.set_vault_user_key(
+            account_id,
+            VaultUserKey {
+                enc_key: key.enc_key,
+                mac_key: key.mac_key,
+            },
+        )
     }
 }
 

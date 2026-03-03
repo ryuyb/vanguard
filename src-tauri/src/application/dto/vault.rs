@@ -8,6 +8,27 @@ pub struct GetCipherDetailQuery {
 }
 
 #[derive(Debug, Clone)]
+pub struct UnlockVaultWithPasswordCommand {
+    pub master_password: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnlockVaultWithPasswordResult {
+    pub account_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultUnlockContext {
+    pub account_id: String,
+    pub base_url: String,
+    pub email: String,
+    pub kdf: Option<i32>,
+    pub kdf_iterations: Option<i32>,
+    pub kdf_memory: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
 pub struct VaultUserKeyMaterial {
     pub enc_key: Vec<u8>,
     pub mac_key: Option<Vec<u8>>,
