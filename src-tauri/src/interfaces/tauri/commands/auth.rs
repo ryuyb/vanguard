@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::application::dto::auth::PasswordLoginOutcome;
+use crate::application::dto::auth::{PasswordLoginOutcome, SessionInfo};
 use crate::bootstrap::app_state::AppState;
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
@@ -25,6 +25,35 @@ fn log_command_error(command: &str, error: AppError) -> String {
     payload.message
 }
 
+async fn initialize_authenticated_session(
+    state: &AppState,
+    base_url: &str,
+    email: &str,
+    master_password: &str,
+    session_info: &SessionInfo,
+) -> Result<(), AppError> {
+    let account_id =
+        account_id::derive_account_id_from_access_token(base_url, &session_info.access_token)?;
+    let auth_session = session::build_auth_session(
+        base_url.to_string(),
+        email.to_string(),
+        account_id,
+        session_info.clone(),
+    )?;
+    state.set_auth_session(auth_session.clone())?;
+    if let Err(error) = state.persist_auth_state(&auth_session, master_password) {
+        log::warn!(
+            target: "vanguard::tauri::auth",
+            "failed to persist encrypted auth state account_id={}: [{}] {}",
+            auth_session.account_id,
+            error.code(),
+            error.log_message()
+        );
+    }
+    session::start_background_sync(state, &auth_session).await;
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_login_with_password(
@@ -46,59 +75,19 @@ pub async fn auth_login_with_password(
     }
 
     if let PasswordLoginOutcome::Authenticated(session) = &result {
-        match account_id::derive_account_id_from_access_token(&base_url, &session.access_token) {
-            Ok(account_id) => {
-                let auth_session = session::build_auth_session(
-                    base_url.clone(),
-                    email.clone(),
-                    account_id.clone(),
-                    session.clone(),
-                )
-                .and_then(|value| {
-                    state
-                        .set_auth_session(value.clone())
-                        .map(|_| value)
-                        .map_err(|error| {
-                            AppError::internal(format!(
-                                "failed to store authenticated session: {}",
-                                error.log_message()
-                            ))
-                        })
-                });
-
-                match auth_session {
-                    Ok(auth_session) => {
-                        if let Err(error) =
-                            state.persist_auth_state(&auth_session, &master_password)
-                        {
-                            log::warn!(
-                                target: "vanguard::tauri::auth",
-                                "failed to persist encrypted auth state account_id={}: [{}] {}",
-                                auth_session.account_id,
-                                error.code(),
-                                error.log_message()
-                            );
-                        }
-                        session::start_background_sync(&state, &auth_session).await;
-                    }
-                    Err(error) => {
-                        log::warn!(
-                            target: "vanguard::tauri::auth",
-                            "failed to initialize authenticated session state: [{}] {}",
-                            error.code(),
-                            error.log_message()
-                        );
-                    }
-                }
-            }
-            Err(error) => {
+        if let Err(error) =
+            initialize_authenticated_session(&state, &base_url, &email, &master_password, session)
+                .await
+        {
+            if let Err(clear_error) = state.clear_auth_session() {
                 log::warn!(
                     target: "vanguard::tauri::auth",
-                    "skip session init after login due to account id derive failure: [{}] {}",
-                    error.code(),
-                    error.log_message()
+                    "failed to cleanup auth session after init error: [{}] {}",
+                    clear_error.code(),
+                    clear_error.log_message()
                 );
             }
+            return Err(log_command_error("auth_login_with_password", error));
         }
     }
 
