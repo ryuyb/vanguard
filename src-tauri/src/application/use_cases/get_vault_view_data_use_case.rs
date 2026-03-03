@@ -72,6 +72,17 @@ impl GetVaultViewDataUseCase {
         let ciphers = ciphers
             .into_iter()
             .map(|cipher| {
+                let login_username = vault_crypto::decrypt_optional_field(
+                    cipher.login.as_ref().and_then(|login| login.username.clone()),
+                    &user_key,
+                    "cipher.login.username",
+                )?;
+                let data_username = vault_crypto::decrypt_optional_field(
+                    cipher.data.as_ref().and_then(|data| data.username.clone()),
+                    &user_key,
+                    "cipher.data.username",
+                )?;
+
                 Ok(VaultCipherItem {
                     id: cipher.id,
                     folder_id: cipher.folder_id,
@@ -82,6 +93,8 @@ impl GetVaultViewDataUseCase {
                         &user_key,
                         "cipher.name",
                     )?,
+                    username: first_non_empty(login_username, data_username),
+                    creation_date: cipher.creation_date,
                     revision_date: cipher.revision_date,
                     deleted_date: cipher.deleted_date,
                     attachment_count: cipher.attachments.len().min(u32::MAX as usize) as u32,
@@ -110,4 +123,18 @@ fn normalize_page_size(page_size: Option<u32>) -> u32 {
     page_size
         .unwrap_or(DEFAULT_PAGE_SIZE)
         .clamp(1, MAX_PAGE_SIZE)
+}
+
+fn first_non_empty(left: Option<String>, right: Option<String>) -> Option<String> {
+    if let Some(value) = left {
+        if !value.trim().is_empty() {
+            return Some(value);
+        }
+    }
+    if let Some(value) = right {
+        if !value.trim().is_empty() {
+            return Some(value);
+        }
+    }
+    None
 }

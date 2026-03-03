@@ -1,46 +1,83 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  Archive,
+  ArrowUpDown,
   ChevronDown,
-  FolderOpen,
-  KeyRound,
+  ChevronRight,
   LoaderCircle,
   Lock,
-  LogIn,
   LogOut,
   Search,
-  ShieldAlert,
+  Star,
+  Trash2,
   UserRound,
+  X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   commands,
-  type RestoreAuthStateResponseDto,
   type VaultCipherDetailDto,
   type VaultCipherItemDto,
   type VaultFolderItemDto,
   type VaultViewDataResponseDto,
 } from "@/bindings";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/vault")({
   component: VaultPage,
 });
 
-type VaultPageState = "loading" | "needsLogin" | "locked" | "ready" | "error";
+const ALL_ITEMS_ID = "__all_items__";
+const FAVORITES_ID = "__favorites__";
+const TRASH_ID = "__trash__";
 
-const ALL_FOLDERS_ID = "__all__";
+type VaultPageState = "loading" | "needsLogin" | "locked" | "ready" | "error";
+type CipherTypeFilter =
+  | "all"
+  | "login"
+  | "card"
+  | "identify"
+  | "note"
+  | "ssh_key";
+type CipherSortBy = "title" | "created" | "modified";
+type CipherSortDirection = "asc" | "desc";
+
+function toTypeFilterLabel(filter: CipherTypeFilter) {
+  if (filter === "login") {
+    return "Login";
+  }
+  if (filter === "card") {
+    return "Card";
+  }
+  if (filter === "identify") {
+    return "Identify";
+  }
+  if (filter === "note") {
+    return "Note";
+  }
+  if (filter === "ssh_key") {
+    return "SSH key";
+  }
+  return "All types";
+}
 
 function errorToText(error: unknown) {
   if (typeof error === "string") {
@@ -49,7 +86,17 @@ function errorToText(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
-  return "加载密码库失败，请稍后重试。";
+  return "加载 vault 数据失败，请稍后重试。";
+}
+
+function toAvatarText(email: string | null | undefined) {
+  const normalized = (email ?? "").trim();
+  if (!normalized) {
+    return "??";
+  }
+  const head = normalized.split("@")[0] ?? normalized;
+  const compacted = head.replace(/[^a-zA-Z0-9]/g, "");
+  return (compacted.slice(0, 2) || "??").toUpperCase();
 }
 
 function toCipherTypeLabel(type: number | null) {
@@ -82,140 +129,237 @@ function formatRevisionDate(value: string | null) {
   return parsed.toLocaleString();
 }
 
-function formatRevisionDateOrNull(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-  return formatRevisionDate(value);
-}
-
 function sortFolders(folders: VaultFolderItemDto[]) {
   return [...folders].sort((left, right) =>
     (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
   );
 }
 
-function isNonEmptyText(value: string | null | undefined): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+function toSortableDate(value: string | null | undefined) {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return timestamp;
 }
 
 function firstNonEmptyText(
   ...values: Array<string | null | undefined>
 ): string | null {
   for (const value of values) {
-    if (isNonEmptyText(value)) {
+    if (typeof value === "string" && value.trim().length > 0) {
       return value;
     }
   }
   return null;
 }
 
-function compactText(values: Array<string | null | undefined>) {
-  return values.filter(isNonEmptyText);
+type FolderTreeNode = {
+  key: string;
+  label: string;
+  folderId: string | null;
+  children: FolderTreeNode[];
+};
+
+type FolderTreeNodeDraft = {
+  key: string;
+  label: string;
+  folderId: string | null;
+  childrenMap: Map<string, FolderTreeNodeDraft>;
+};
+
+function normalizeFolderSegments(folderName: string | null) {
+  const normalized = (folderName ?? "").trim();
+  const rawSegments = normalized.split(/[\\/]+/).map((item) => item.trim());
+  const segments = rawSegments.filter((item) => item.length > 0);
+  if (segments.length > 0) {
+    return segments;
+  }
+  return ["Untitled folder"];
 }
 
-function toAvatarText(email: string | null | undefined) {
-  const normalized = (email ?? "").trim();
-  if (!normalized) {
-    return "??";
+function buildFolderTree(folders: VaultFolderItemDto[]) {
+  const root = new Map<string, FolderTreeNodeDraft>();
+
+  for (const folder of folders) {
+    const segments = normalizeFolderSegments(folder.name);
+    let current = root;
+    const pathParts: string[] = [];
+
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      pathParts.push(segment);
+      const key = pathParts.join("/");
+
+      let node = current.get(segment);
+      if (!node) {
+        node = {
+          key,
+          label: segment,
+          folderId: null,
+          childrenMap: new Map<string, FolderTreeNodeDraft>(),
+        };
+        current.set(segment, node);
+      }
+
+      if (index === segments.length - 1) {
+        node.folderId = folder.id;
+      }
+
+      current = node.childrenMap;
+    }
   }
-  const head = normalized.split("@")[0] ?? normalized;
-  const compacted = head.replace(/[^a-zA-Z0-9]/g, "");
-  return (compacted.slice(0, 2) || "??").toUpperCase();
+
+  const toSortedNodes = (
+    map: Map<string, FolderTreeNodeDraft>,
+  ): FolderTreeNode[] => {
+    return [...map.values()]
+      .sort((left, right) =>
+        left.label.localeCompare(right.label, "zh-Hans-CN"),
+      )
+      .map((node) => ({
+        key: node.key,
+        label: node.label,
+        folderId: node.folderId,
+        children: toSortedNodes(node.childrenMap),
+      }));
+  };
+
+  return toSortedNodes(root);
+}
+
+function collectFolderTreeKeys(nodes: FolderTreeNode[]) {
+  const keys: string[] = [];
+
+  const walk = (items: FolderTreeNode[]) => {
+    for (const item of items) {
+      keys.push(item.key);
+      walk(item.children);
+    }
+  };
+
+  walk(nodes);
+  return keys;
+}
+
+function countNodeCiphers(
+  node: FolderTreeNode,
+  folderCipherCount: Map<string, number>,
+): number {
+  const selfCount = node.folderId
+    ? (folderCipherCount.get(node.folderId) ?? 0)
+    : 0;
+  let childCount = 0;
+  for (const child of node.children) {
+    childCount += countNodeCiphers(child, folderCipherCount);
+  }
+  return selfCount + childCount;
 }
 
 function VaultPage() {
   const navigate = useNavigate({ from: "/vault" });
-  const [pageState, setPageState] = useState<VaultPageState>("loading");
-  const [restoreState, setRestoreState] =
-    useState<RestoreAuthStateResponseDto | null>(null);
-  const [viewData, setViewData] = useState<VaultViewDataResponseDto | null>(
-    null,
-  );
-  const [selectedFolderId, setSelectedFolderId] = useState(ALL_FOLDERS_ID);
-  const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
-  const [selectedCipherDetail, setSelectedCipherDetail] =
-    useState<VaultCipherDetailDto | null>(null);
-  const [cipherDetailError, setCipherDetailError] = useState("");
-  const [isCipherDetailLoading, setIsCipherDetailLoading] = useState(false);
-  const [errorText, setErrorText] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const inlineSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const [headerSearchQuery, setHeaderSearchQuery] = useState("");
+  const [cipherSearchQuery, setCipherSearchQuery] = useState("");
+  const [isInlineSearchOpen, setIsInlineSearchOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<CipherTypeFilter>("all");
+  const [sortBy, setSortBy] = useState<CipherSortBy>("modified");
+  const [sortDirection, setSortDirection] =
+    useState<CipherSortDirection>("desc");
+  const [userEmail, setUserEmail] = useState("未登录");
+  const [userBaseUrl, setUserBaseUrl] = useState("未知服务");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [pageState, setPageState] = useState<VaultPageState>("loading");
+  const [errorText, setErrorText] = useState("");
+  const [viewData, setViewData] = useState<VaultViewDataResponseDto | null>(
+    null,
+  );
+  const [selectedMenuId, setSelectedMenuId] = useState(ALL_ITEMS_ID);
+  const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
+  const [selectedCipherDetail, setSelectedCipherDetail] =
+    useState<VaultCipherDetailDto | null>(null);
+  const [isCipherDetailLoading, setIsCipherDetailLoading] = useState(false);
+  const [cipherDetailError, setCipherDetailError] = useState("");
+  const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
+    new Set<string>(),
+  );
   const detailRequestSeqRef = useRef(0);
 
   const loadVaultData = useCallback(async () => {
-    detailRequestSeqRef.current += 1;
     setIsRefreshing(true);
     setErrorText("");
     setPageState("loading");
-    setSelectedCipherId(null);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(false);
 
     try {
       const restore = await commands.authRestoreState({});
       if (restore.status === "error") {
         setPageState("error");
         setErrorText(errorToText(restore.error));
+        setUserEmail("未登录");
+        setUserBaseUrl("未知服务");
         return;
       }
 
-      setRestoreState(restore.data);
+      setUserEmail(restore.data.email ?? "未登录");
+      setUserBaseUrl(restore.data.baseUrl ?? "未知服务");
       if (restore.data.status === "needsLogin") {
         setPageState("needsLogin");
-        return;
-      }
-      const unlockedResult = await commands.vaultIsUnlocked();
-      if (unlockedResult.status === "error" || !unlockedResult.data) {
-        setPageState("locked");
+        setViewData(null);
         return;
       }
 
-      const vaultViewData = await commands.vaultGetViewData({
+      const unlockResult = await commands.vaultIsUnlocked();
+      if (unlockResult.status === "error" || !unlockResult.data) {
+        setPageState("locked");
+        setViewData(null);
+        return;
+      }
+
+      const result = await commands.vaultGetViewData({
         page: 1,
-        pageSize: 200,
+        pageSize: 500,
       });
 
-      if (vaultViewData.status === "error") {
-        const text = errorToText(vaultViewData.error);
+      if (result.status === "error") {
+        const text = errorToText(result.error);
         if (text.toLowerCase().includes("vault is locked")) {
           setPageState("locked");
-          return;
+        } else {
+          setPageState("error");
+          setErrorText(text);
         }
-        setPageState("error");
-        setErrorText(text);
+        setViewData(null);
         return;
       }
 
-      setViewData(vaultViewData.data);
+      setViewData(result.data);
       setPageState("ready");
     } catch (error) {
       setPageState("error");
       setErrorText(errorToText(error));
+      setViewData(null);
     } finally {
       setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    loadVaultData();
+    void loadVaultData();
   }, [loadVaultData]);
 
   const onLock = async () => {
     setIsLocking(true);
-    setErrorText("");
     try {
       const result = await commands.vaultLock({});
-      if (result.status === "error") {
-        setErrorText(errorToText(result.error));
-        return;
+      if (result.status === "ok") {
+        await navigate({ to: "/unlock" });
       }
-      await navigate({ to: "/unlock" });
-    } catch (error) {
-      setErrorText(errorToText(error));
     } finally {
       setIsLocking(false);
     }
@@ -223,20 +367,163 @@ function VaultPage() {
 
   const onLogout = async () => {
     setIsLoggingOut(true);
-    setErrorText("");
     try {
       const result = await commands.authLogout({});
-      if (result.status === "error") {
-        setErrorText(errorToText(result.error));
-        return;
+      if (result.status === "ok") {
+        await navigate({ to: "/" });
       }
-      await navigate({ to: "/" });
-    } catch (error) {
-      setErrorText(errorToText(error));
     } finally {
       setIsLoggingOut(false);
     }
   };
+
+  const sortedFolders = useMemo(
+    () => sortFolders(viewData?.folders ?? []),
+    [viewData?.folders],
+  );
+  const folderTree = useMemo(
+    () => buildFolderTree(sortedFolders),
+    [sortedFolders],
+  );
+  const folderTreeKeys = useMemo(
+    () => collectFolderTreeKeys(folderTree),
+    [folderTree],
+  );
+  const folderIdSet = useMemo(
+    () => new Set(sortedFolders.map((folder) => folder.id)),
+    [sortedFolders],
+  );
+
+  useEffect(() => {
+    setExpandedNodeKeys((previous) => {
+      const validKeys = new Set(folderTreeKeys);
+      const next = new Set<string>();
+      for (const key of previous) {
+        if (validKeys.has(key)) {
+          next.add(key);
+        }
+      }
+      if (next.size === 0) {
+        for (const node of folderTree) {
+          next.add(node.key);
+        }
+      }
+      return next;
+    });
+  }, [folderTree, folderTreeKeys]);
+
+  useEffect(() => {
+    if (
+      selectedMenuId === ALL_ITEMS_ID ||
+      selectedMenuId === FAVORITES_ID ||
+      selectedMenuId === TRASH_ID
+    ) {
+      return;
+    }
+    const exists = folderIdSet.has(selectedMenuId);
+    if (!exists) {
+      setSelectedMenuId(ALL_ITEMS_ID);
+    }
+  }, [folderIdSet, selectedMenuId]);
+
+  useEffect(() => {
+    if (!isInlineSearchOpen) {
+      return;
+    }
+    const frameId = requestAnimationFrame(() => {
+      inlineSearchInputRef.current?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [isInlineSearchOpen]);
+
+  const normalizedCipherSearchQuery = cipherSearchQuery.trim().toLowerCase();
+
+  const filteredCiphers = useMemo(() => {
+    const allCiphers = viewData?.ciphers ?? [];
+    const folderFiltered =
+      selectedMenuId === ALL_ITEMS_ID ||
+      selectedMenuId === FAVORITES_ID ||
+      selectedMenuId === TRASH_ID
+        ? allCiphers
+        : allCiphers.filter((cipher) => cipher.folderId === selectedMenuId);
+
+    const typeFiltered = folderFiltered.filter((cipher) => {
+      if (typeFilter === "all") {
+        return true;
+      }
+      if (typeFilter === "login") {
+        return cipher.type === 1;
+      }
+      if (typeFilter === "note") {
+        return cipher.type === 2;
+      }
+      if (typeFilter === "card") {
+        return cipher.type === 3;
+      }
+      if (typeFilter === "identify") {
+        return cipher.type === 4;
+      }
+      if (typeFilter === "ssh_key") {
+        return cipher.type === 5;
+      }
+      return true;
+    });
+
+    const searchFiltered = !normalizedCipherSearchQuery
+      ? typeFiltered
+      : typeFiltered.filter((cipher) => {
+          const searchText = [cipher.name, cipher.id, cipher.organizationId]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return searchText.includes(normalizedCipherSearchQuery);
+        });
+
+    return [...searchFiltered].sort((left, right) => {
+      if (sortBy === "title") {
+        const titleCompare = (left.name ?? "").localeCompare(
+          right.name ?? "",
+          "zh-Hans-CN",
+        );
+        return sortDirection === "asc" ? titleCompare : -titleCompare;
+      }
+      if (sortBy === "created") {
+        const createdCompare =
+          toSortableDate(left.creationDate) -
+          toSortableDate(right.creationDate);
+        return sortDirection === "asc" ? createdCompare : -createdCompare;
+      }
+      const modifiedCompare =
+        toSortableDate(left.revisionDate) - toSortableDate(right.revisionDate);
+      return sortDirection === "asc" ? modifiedCompare : -modifiedCompare;
+    });
+  }, [
+    normalizedCipherSearchQuery,
+    selectedMenuId,
+    sortBy,
+    sortDirection,
+    typeFilter,
+    viewData?.ciphers,
+  ]);
+
+  useEffect(() => {
+    if (!selectedCipherId) {
+      return;
+    }
+    const existsInList = filteredCiphers.some(
+      (cipher) => cipher.id === selectedCipherId,
+    );
+    if (existsInList) {
+      return;
+    }
+    detailRequestSeqRef.current += 1;
+    setSelectedCipherId(null);
+    setSelectedCipherDetail(null);
+    setCipherDetailError("");
+    setIsCipherDetailLoading(false);
+  }, [filteredCiphers, selectedCipherId]);
 
   const loadCipherDetail = useCallback(async (cipherId: string) => {
     const normalizedCipherId = cipherId.trim();
@@ -279,69 +566,6 @@ function VaultPage() {
     }
   }, []);
 
-  const sortedFolders = useMemo(
-    () => sortFolders(viewData?.folders ?? []),
-    [viewData?.folders],
-  );
-
-  useEffect(() => {
-    if (selectedFolderId === ALL_FOLDERS_ID) {
-      return;
-    }
-    if (!sortedFolders.find((folder) => folder.id === selectedFolderId)) {
-      setSelectedFolderId(ALL_FOLDERS_ID);
-    }
-  }, [selectedFolderId, sortedFolders]);
-
-  const currentFolderName = useMemo(() => {
-    if (selectedFolderId === ALL_FOLDERS_ID) {
-      return "All";
-    }
-    return (
-      sortedFolders.find((folder) => folder.id === selectedFolderId)?.name ??
-      "Unknown Folder"
-    );
-  }, [selectedFolderId, sortedFolders]);
-
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-
-  const filteredCiphers = useMemo(() => {
-    const all = viewData?.ciphers ?? [];
-    const folderScoped =
-      selectedFolderId === ALL_FOLDERS_ID
-        ? all
-        : all.filter((cipher) => cipher.folderId === selectedFolderId);
-
-    if (!normalizedSearchQuery) {
-      return folderScoped;
-    }
-
-    return folderScoped.filter((cipher) => {
-      const searchText = [cipher.name, cipher.id, cipher.organizationId]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return searchText.includes(normalizedSearchQuery);
-    });
-  }, [normalizedSearchQuery, selectedFolderId, viewData?.ciphers]);
-
-  useEffect(() => {
-    if (!selectedCipherId) {
-      return;
-    }
-    const existsInFilteredList = filteredCiphers.some(
-      (cipher) => cipher.id === selectedCipherId,
-    );
-    if (existsInFilteredList) {
-      return;
-    }
-    detailRequestSeqRef.current += 1;
-    setSelectedCipherId(null);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(false);
-  }, [filteredCiphers, selectedCipherId]);
-
   const folderCipherCount = useMemo(() => {
     const map = new Map<string, number>();
     for (const cipher of viewData?.ciphers ?? []) {
@@ -353,14 +577,44 @@ function VaultPage() {
     return map;
   }, [viewData?.ciphers]);
 
-  const userEmail = restoreState?.email ?? "未登录";
-  const userBaseUrl =
-    restoreState?.baseUrl ?? viewData?.syncStatus.baseUrl ?? "未知服务";
+  const selectedMenuName = useMemo(() => {
+    if (selectedMenuId === ALL_ITEMS_ID) {
+      return "All items";
+    }
+    if (selectedMenuId === FAVORITES_ID) {
+      return "Favorites";
+    }
+    if (selectedMenuId === TRASH_ID) {
+      return "Trash";
+    }
+    return (
+      sortedFolders.find((folder) => folder.id === selectedMenuId)?.name ??
+      "Unknown folder"
+    );
+  }, [selectedMenuId, sortedFolders]);
+
+  const onFolderTreeOpenChange = useCallback(
+    (nodeKey: string, open: boolean) => {
+      setExpandedNodeKeys((previous) => {
+        const next = new Set(previous);
+        if (open) {
+          next.add(nodeKey);
+        } else {
+          next.delete(nodeKey);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   const avatarText = useMemo(() => toAvatarText(userEmail), [userEmail]);
   const isHeaderActionBusy = isLocking || isLoggingOut || isRefreshing;
+  const lockLabel = isLocking ? "锁定中..." : "锁定";
+  const logoutLabel = isLoggingOut ? "登出中..." : "登出";
 
   return (
-    <main className="min-h-dvh bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))]">
+    <main className="flex h-dvh flex-col bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))]">
       <header
         data-tauri-drag-region
         className="w-full border-b border-slate-200/80 bg-slate-100/95 px-4 py-1 shadow-sm backdrop-blur-sm md:px-8 md:py-1.5"
@@ -376,10 +630,11 @@ function VaultPage() {
             >
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
               <Input
+                ref={searchInputRef}
                 type="search"
                 placeholder="搜索名称、ID..."
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                value={headerSearchQuery}
+                onChange={(event) => setHeaderSearchQuery(event.target.value)}
                 className="h-8 pl-9 text-sm"
               />
             </div>
@@ -431,7 +686,7 @@ function VaultPage() {
                     ) : (
                       <Lock />
                     )}
-                    锁定
+                    {lockLabel}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
@@ -445,7 +700,7 @@ function VaultPage() {
                     ) : (
                       <LogOut />
                     )}
-                    登出
+                    {logoutLabel}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -454,176 +709,458 @@ function VaultPage() {
         </div>
       </header>
 
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 md:px-8 md:py-8">
+      <section className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4">
         {pageState === "loading" && (
-          <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardContent className="flex items-center gap-2 py-6 text-sm text-slate-700">
-              <LoaderCircle className="animate-spin" />
-              正在加载密码库数据...
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
+            正在加载 vault 数据...
+          </div>
         )}
 
         {pageState === "needsLogin" && (
-          <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardContent className="space-y-4 py-6">
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                未检测到登录会话，请先登录。
-              </div>
-              <Button asChild>
-                <Link to="/">
-                  <LogIn />
-                  前往登录页
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
+            当前未登录，请先登录后访问 vault。
+          </div>
         )}
 
         {pageState === "locked" && (
-          <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardContent className="space-y-4 py-6">
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                当前会话已锁定，请先输入 master password 解锁后再查看数据。
-              </div>
-              <Button asChild>
-                <Link to="/unlock">
-                  <KeyRound />
-                  前往解锁页
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
+            当前 vault 已锁定，请先解锁。
+          </div>
         )}
 
         {pageState === "error" && (
-          <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardContent className="space-y-4 py-6">
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                <ShieldAlert className="mr-1 inline size-4" />
-                {errorText || "读取密码库时发生错误。"}
-              </div>
-              <Button type="button" variant="outline" onClick={loadVaultData}>
-                重试
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-red-700 shadow-sm">
+            {errorText || "读取 vault 数据失败。"}
+          </div>
         )}
 
         {pageState === "ready" && viewData && (
-          <Card className="border-white/80 bg-white/90 shadow-sm">
-            <CardContent className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
-              <aside className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <FolderOpen className="size-4" />
-                  Folders
-                </div>
-                <Separator />
-
-                <Button
-                  type="button"
-                  variant={
-                    selectedFolderId === ALL_FOLDERS_ID ? "secondary" : "ghost"
-                  }
-                  className="w-full justify-between"
-                  onClick={() => setSelectedFolderId(ALL_FOLDERS_ID)}
-                >
-                  <span>All</span>
-                  <Badge variant="outline">{viewData.ciphers.length}</Badge>
-                </Button>
-
-                {sortedFolders.map((folder) => (
-                  <Button
-                    key={folder.id}
+          <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)] grid-rows-1 gap-0">
+            <aside className="h-full min-h-0 border border-slate-300/35 bg-slate-300/30 shadow-sm backdrop-blur-md">
+              <ScrollArea className="h-full">
+                <div className="space-y-2 p-2">
+                  <button
                     type="button"
-                    variant={
-                      selectedFolderId === folder.id ? "secondary" : "ghost"
-                    }
-                    className="w-full justify-between"
-                    onClick={() => setSelectedFolderId(folder.id)}
+                    onClick={() => setSelectedMenuId(ALL_ITEMS_ID)}
+                    className={[
+                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                      selectedMenuId === ALL_ITEMS_ID
+                        ? "bg-sky-100/90 font-medium text-sky-800"
+                        : "text-slate-700 hover:bg-slate-100",
+                    ].join(" ")}
                   >
-                    <span className="max-w-[180px] truncate text-left">
-                      {folder.name ?? "Untitled Folder"}
-                    </span>
-                    <Badge variant="outline">
-                      {folderCipherCount.get(folder.id) ?? 0}
-                    </Badge>
-                  </Button>
-                ))}
-              </aside>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-2">
+                        <Archive className="size-4 text-slate-500" />
+                        All items
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {viewData.ciphers.length}
+                      </span>
+                    </div>
+                  </button>
 
-              <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-slate-700">
-                    Ciphers in: {currentFolderName}
-                  </div>
-                  <Badge variant="secondary">
-                    {filteredCiphers.length} items
-                  </Badge>
-                </div>
-                <Separator />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMenuId(FAVORITES_ID)}
+                    className={[
+                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                      selectedMenuId === FAVORITES_ID
+                        ? "bg-sky-100/90 font-medium text-sky-800"
+                        : "text-slate-700 hover:bg-slate-100",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-2">
+                        <Star className="size-4 text-slate-500" />
+                        Favorites
+                      </span>
+                      <span className="text-xs text-slate-500">-</span>
+                    </div>
+                  </button>
 
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                  <div className="space-y-2">
-                    {filteredCiphers.length === 0 && (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                        {normalizedSearchQuery
-                          ? "没有匹配搜索条件的 cipher。"
-                          : "当前 folder 下没有 cipher。"}
-                      </div>
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMenuId(TRASH_ID)}
+                    className={[
+                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                      selectedMenuId === TRASH_ID
+                        ? "bg-sky-100/90 font-medium text-sky-800"
+                        : "text-slate-700 hover:bg-slate-100",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-2">
+                        <Trash2 className="size-4 text-slate-500" />
+                        Trash
+                      </span>
+                      <span className="text-xs text-slate-500">-</span>
+                    </div>
+                  </button>
 
-                    {filteredCiphers.map((cipher) => (
-                      <CipherRow
-                        key={cipher.id}
-                        cipher={cipher}
-                        selected={cipher.id === selectedCipherId}
-                        loading={
-                          isCipherDetailLoading &&
-                          cipher.id === selectedCipherId
-                        }
-                        onClick={() => loadCipherDetail(cipher.id)}
+                  <div className="space-y-1">
+                    {folderTree.map((node) => (
+                      <FolderTreeMenuItem
+                        key={node.key}
+                        node={node}
+                        depth={0}
+                        selectedMenuId={selectedMenuId}
+                        expandedNodeKeys={expandedNodeKeys}
+                        folderCipherCount={folderCipherCount}
+                        onFolderSelect={setSelectedMenuId}
+                        onOpenChange={onFolderTreeOpenChange}
                       />
                     ))}
                   </div>
-
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-3">
-                    {!selectedCipherId && (
-                      <div className="text-sm text-slate-600">
-                        点击左侧 cipher 查看详情。
-                      </div>
-                    )}
-
-                    {selectedCipherId && isCipherDetailLoading && (
-                      <div className="flex items-center gap-2 text-sm text-slate-700">
-                        <LoaderCircle className="size-4 animate-spin" />
-                        正在加载 cipher 详情...
-                      </div>
-                    )}
-
-                    {selectedCipherId &&
-                      !isCipherDetailLoading &&
-                      cipherDetailError && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                          <ShieldAlert className="mr-1 inline size-4" />
-                          {cipherDetailError}
-                        </div>
-                      )}
-
-                    {selectedCipherId &&
-                      !isCipherDetailLoading &&
-                      !cipherDetailError &&
-                      selectedCipherDetail && (
-                        <CipherDetailPanel cipher={selectedCipherDetail} />
-                      )}
-                  </div>
                 </div>
-              </section>
-            </CardContent>
-          </Card>
+              </ScrollArea>
+            </aside>
+
+            <section className="flex h-full min-h-0 flex-col bg-white/80 shadow-sm">
+              <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
+                <div className="relative h-8 min-w-0 flex-1">
+                  <div className="absolute inset-y-0 left-0 flex items-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-8 justify-start gap-1 rounded-md px-2 text-xs font-medium text-slate-700 hover:bg-slate-200/70 data-[state=open]:bg-slate-200/70"
+                          aria-label="筛选类型"
+                          title="筛选类型"
+                        >
+                          <span>{toTypeFilterLabel(typeFilter)}</span>
+                          <ChevronDown className="size-3.5 text-slate-500" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-44">
+                        <DropdownMenuRadioGroup
+                          value={typeFilter}
+                          onValueChange={(value) =>
+                            setTypeFilter(value as CipherTypeFilter)
+                          }
+                        >
+                          <DropdownMenuRadioItem value="all">
+                            All types
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="login">
+                            Login
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="card">
+                            Card
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="identify">
+                            Identify
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="note">
+                            Note
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="ssh_key">
+                            SSH key
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <AnimatePresence>
+                    {isInlineSearchOpen && (
+                      <motion.div
+                        className="absolute inset-y-0 right-0 left-2 z-20"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={{ duration: 0.18, ease: "easeOut" }}
+                      >
+                        <Input
+                          ref={inlineSearchInputRef}
+                          type="search"
+                          value={cipherSearchQuery}
+                          onChange={(event) =>
+                            setCipherSearchQuery(event.target.value)
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              setCipherSearchQuery("");
+                              setIsInlineSearchOpen(false);
+                            }
+                          }}
+                          placeholder={`在 ${selectedMenuName} 中查找`}
+                          className="h-8 bg-white text-xs"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="size-8 px-0"
+                    aria-label={
+                      isInlineSearchOpen
+                        ? "关闭搜索"
+                        : `在 ${selectedMenuName} 中查找`
+                    }
+                    title={
+                      isInlineSearchOpen
+                        ? "关闭搜索"
+                        : `在 ${selectedMenuName} 中查找`
+                    }
+                    onClick={() => {
+                      if (isInlineSearchOpen) {
+                        setCipherSearchQuery("");
+                        setIsInlineSearchOpen(false);
+                        return;
+                      }
+                      setIsInlineSearchOpen(true);
+                    }}
+                  >
+                    <AnimatePresence mode="wait" initial={false}>
+                      {isInlineSearchOpen ? (
+                        <motion.span
+                          key="close"
+                          initial={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                          exit={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
+                          className="inline-flex"
+                        >
+                          <X className="size-4" />
+                        </motion.span>
+                      ) : (
+                        <motion.span
+                          key="search"
+                          initial={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                          exit={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
+                          className="inline-flex"
+                        >
+                          <Search className="size-4" />
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="size-8 px-0"
+                        aria-label="排序"
+                        title="排序"
+                      >
+                        <ArrowUpDown className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup
+                        value={sortBy}
+                        onValueChange={(value) =>
+                          setSortBy(value as CipherSortBy)
+                        }
+                      >
+                        <DropdownMenuRadioItem value="title">
+                          标题
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="created">
+                          创建日期
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="modified">
+                          修改日期
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>排序方向</DropdownMenuLabel>
+                      <DropdownMenuRadioGroup
+                        value={sortDirection}
+                        onValueChange={(value) =>
+                          setSortDirection(value as CipherSortDirection)
+                        }
+                      >
+                        {sortBy === "title" ? (
+                          <>
+                            <DropdownMenuRadioItem value="asc">
+                              按字母顺序
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="desc">
+                              字母倒序
+                            </DropdownMenuRadioItem>
+                          </>
+                        ) : (
+                          <>
+                            <DropdownMenuRadioItem value="desc">
+                              最新的在前
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="asc">
+                              最早的在前
+                            </DropdownMenuRadioItem>
+                          </>
+                        )}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <div className="px-4 pt-3 pb-2 text-sm font-medium text-slate-700">
+                {selectedMenuName} ({filteredCiphers.length})
+              </div>
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-1 px-2 pb-2">
+                  {filteredCiphers.map((cipher) => (
+                    <CipherRow
+                      key={cipher.id}
+                      cipher={cipher}
+                      selected={cipher.id === selectedCipherId}
+                      loading={
+                        isCipherDetailLoading && cipher.id === selectedCipherId
+                      }
+                      onClick={() => {
+                        void loadCipherDetail(cipher.id);
+                      }}
+                    />
+                  ))}
+                  {filteredCiphers.length === 0 && (
+                    <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                      当前筛选下没有 cipher。
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </section>
+
+            <section className="h-full min-h-0 bg-white/80 shadow-sm">
+              <ScrollArea className="h-full">
+                <div className="p-3">
+                  {!selectedCipherId && <div className="min-h-[320px]" />}
+
+                  {selectedCipherId && isCipherDetailLoading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-700">
+                      <LoaderCircle className="size-4 animate-spin" />
+                      正在加载 cipher 详情...
+                    </div>
+                  )}
+
+                  {selectedCipherId &&
+                    !isCipherDetailLoading &&
+                    cipherDetailError && (
+                      <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                        {cipherDetailError}
+                      </div>
+                    )}
+
+                  {selectedCipherId &&
+                    !isCipherDetailLoading &&
+                    !cipherDetailError &&
+                    selectedCipherDetail && (
+                      <CipherDetailPanel cipher={selectedCipherDetail} />
+                    )}
+                </div>
+              </ScrollArea>
+            </section>
+          </div>
         )}
       </section>
     </main>
+  );
+}
+
+function FolderTreeMenuItem({
+  node,
+  depth,
+  selectedMenuId,
+  expandedNodeKeys,
+  folderCipherCount,
+  onFolderSelect,
+  onOpenChange,
+}: {
+  node: FolderTreeNode;
+  depth: number;
+  selectedMenuId: string;
+  expandedNodeKeys: Set<string>;
+  folderCipherCount: Map<string, number>;
+  onFolderSelect: (folderId: string) => void;
+  onOpenChange: (nodeKey: string, open: boolean) => void;
+}) {
+  const hasChildren = node.children.length > 0;
+  const isExpanded = expandedNodeKeys.has(node.key);
+  const isSelected = node.folderId != null && selectedMenuId === node.folderId;
+  const count = countNodeCiphers(node, folderCipherCount);
+
+  return (
+    <Collapsible
+      open={hasChildren ? isExpanded : false}
+      onOpenChange={(open) => onOpenChange(node.key, open)}
+    >
+      <div className="space-y-1" style={{ paddingLeft: `${depth * 10}px` }}>
+        <div className="flex items-center gap-1">
+          {hasChildren ? (
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex size-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+                aria-label={isExpanded ? "collapse folder" : "expand folder"}
+              >
+                <ChevronRight
+                  className={[
+                    "size-4 transition-transform",
+                    isExpanded ? "rotate-90" : "",
+                  ].join(" ")}
+                />
+              </button>
+            </CollapsibleTrigger>
+          ) : (
+            <span className="inline-block size-6" aria-hidden="true" />
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              if (node.folderId) {
+                onFolderSelect(node.folderId);
+                return;
+              }
+              if (hasChildren) {
+                onOpenChange(node.key, !isExpanded);
+              }
+            }}
+            className={[
+              "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
+              isSelected
+                ? "bg-sky-100/90 font-medium text-sky-800"
+                : "text-slate-700 hover:bg-slate-100",
+            ].join(" ")}
+          >
+            <span className="truncate">{node.label}</span>
+            <span className="text-xs text-slate-500">{count}</span>
+          </button>
+        </div>
+
+        {hasChildren && (
+          <CollapsibleContent>
+            <div className="space-y-1">
+              {node.children.map((child) => (
+                <FolderTreeMenuItem
+                  key={child.key}
+                  node={child}
+                  depth={depth + 1}
+                  selectedMenuId={selectedMenuId}
+                  expandedNodeKeys={expandedNodeKeys}
+                  folderCipherCount={folderCipherCount}
+                  onFolderSelect={onFolderSelect}
+                  onOpenChange={onOpenChange}
+                />
+              ))}
+            </div>
+          </CollapsibleContent>
+        )}
+      </div>
+    </Collapsible>
   );
 }
 
@@ -641,40 +1178,45 @@ function CipherRow({
   return (
     <button
       type="button"
-      className={[
-        "w-full rounded-lg border p-3 text-left transition-colors",
-        selected
-          ? "border-sky-300 bg-sky-50/70"
-          : "border-slate-200 bg-slate-50/60 hover:border-slate-300",
-      ].join(" ")}
       onClick={onClick}
+      className={[
+        "w-full rounded-lg px-3 py-2 text-left transition-colors",
+        selected
+          ? "bg-sky-100/85 text-sky-900"
+          : "bg-slate-50/80 text-slate-800 hover:bg-slate-100",
+      ].join(" ")}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-slate-900">
-            {cipher.name ?? "Untitled Cipher"}
-          </div>
-          <div className="mt-1 text-xs text-slate-600">id: {cipher.id}</div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Badge variant="outline">{toCipherTypeLabel(cipher.type)}</Badge>
-          {cipher.attachmentCount > 0 && (
-            <Badge variant="outline">
-              attachments: {cipher.attachmentCount}
-            </Badge>
-          )}
-        </div>
+      <div className="truncate text-sm font-medium">
+        {cipher.name ?? "Untitled cipher"}
       </div>
-      <div className="mt-2 text-xs text-slate-600">
-        revision: {formatRevisionDate(cipher.revisionDate)}
+      <div className="mt-1 truncate text-xs text-slate-600">
+        {cipher.username ?? ""}
       </div>
       {loading && (
-        <div className="mt-2 inline-flex items-center gap-1.5 rounded border border-sky-200 bg-white/70 px-2 py-1 text-xs text-sky-700">
+        <div className="mt-1 flex items-center gap-1 text-xs text-sky-700">
           <LoaderCircle className="size-3 animate-spin" />
-          正在获取详情
+          加载中...
         </div>
       )}
     </button>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) {
+  if (!value) {
+    return null;
+  }
+  return (
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-sm">
+      <div className="text-slate-500">{label}</div>
+      <div className="break-all text-slate-800">{value}</div>
+    </div>
   );
 }
 
@@ -683,306 +1225,49 @@ function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
     cipher.login?.username,
     cipher.data?.username,
   );
-  const password = firstNonEmptyText(
-    cipher.login?.password,
-    cipher.data?.password,
+  const uri = firstNonEmptyText(
+    cipher.login?.uri,
+    cipher.data?.uri,
+    cipher.login?.uris[0]?.uri,
+    cipher.data?.uris[0]?.uri,
   );
-  const totp = firstNonEmptyText(cipher.login?.totp, cipher.data?.totp);
-  const singleUri = firstNonEmptyText(cipher.login?.uri, cipher.data?.uri);
-  const uriList = compactText([
-    ...((cipher.login?.uris ?? []).map((item) => item.uri) ?? []),
-    ...((cipher.data?.uris ?? []).map((item) => item.uri) ?? []),
-  ]);
   const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
-  const customFields = [
-    ...(cipher.fields ?? []),
-    ...(cipher.data?.fields ?? []),
-  ].filter(
-    (field) => isNonEmptyText(field.name) || isNonEmptyText(field.value),
-  );
-  const attachments = cipher.attachments ?? [];
-  const passwordHistory = [
-    ...(cipher.passwordHistory ?? []),
-    ...(cipher.data?.passwordHistory ?? []),
-  ].filter((item) => isNonEmptyText(item.password));
-
-  const cardRows = [
-    {
-      label: "持卡人",
-      value: firstNonEmptyText(
-        cipher.card?.cardholderName,
-        cipher.data?.cardholderName,
-      ),
-    },
-    {
-      label: "品牌",
-      value: firstNonEmptyText(cipher.card?.brand, cipher.data?.brand),
-    },
-    {
-      label: "卡号",
-      value: firstNonEmptyText(cipher.card?.number, cipher.data?.number),
-    },
-    {
-      label: "到期月",
-      value: firstNonEmptyText(cipher.card?.expMonth, cipher.data?.expMonth),
-    },
-    {
-      label: "到期年",
-      value: firstNonEmptyText(cipher.card?.expYear, cipher.data?.expYear),
-    },
-    {
-      label: "安全码",
-      value: firstNonEmptyText(cipher.card?.code, cipher.data?.code),
-    },
-  ];
-
-  const identityRows = [
-    {
-      label: "姓名",
-      value: compactText([
-        cipher.identity?.firstName ?? cipher.data?.firstName,
-        cipher.identity?.middleName ?? cipher.data?.middleName,
-        cipher.identity?.lastName ?? cipher.data?.lastName,
-      ]).join(" "),
-    },
-    {
-      label: "邮箱",
-      value: firstNonEmptyText(cipher.identity?.email, cipher.data?.email),
-    },
-    {
-      label: "电话",
-      value: firstNonEmptyText(cipher.identity?.phone, cipher.data?.phone),
-    },
-    {
-      label: "公司",
-      value: firstNonEmptyText(cipher.identity?.company, cipher.data?.company),
-    },
-    {
-      label: "地址",
-      value: compactText([
-        cipher.identity?.address1 ?? cipher.data?.address1,
-        cipher.identity?.address2 ?? cipher.data?.address2,
-        cipher.identity?.address3 ?? cipher.data?.address3,
-        cipher.identity?.city ?? cipher.data?.city,
-        cipher.identity?.state ?? cipher.data?.state,
-        cipher.identity?.postalCode ?? cipher.data?.postalCode,
-        cipher.identity?.country ?? cipher.data?.country,
-      ]).join(", "),
-    },
-  ];
-
-  const sshPrivateKey = firstNonEmptyText(
-    cipher.sshKey?.privateKey,
-    cipher.data?.privateKey,
-  );
-  const sshPublicKey = firstNonEmptyText(
-    cipher.sshKey?.publicKey,
-    cipher.data?.publicKey,
-  );
-  const sshFingerprint = firstNonEmptyText(
-    cipher.sshKey?.keyFingerprint,
-    cipher.data?.keyFingerprint,
-  );
+  const folderId = cipher.folderId;
+  const organizationId = cipher.organizationId;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-sm font-semibold text-slate-900">
-          {cipher.name ?? "Untitled Cipher"}
+        <div className="text-base font-semibold text-slate-900">
+          {cipher.name ?? "Untitled cipher"}
         </div>
-        <div className="text-xs text-slate-600">id: {cipher.id}</div>
+        <div className="text-xs text-slate-500">{cipher.id}</div>
       </div>
 
-      <DetailGrid
-        items={[
-          { label: "类型", value: toCipherTypeLabel(cipher.type) },
-          { label: "Folder", value: cipher.folderId },
-          { label: "Organization", value: cipher.organizationId },
-          {
-            label: "创建时间",
-            value: formatRevisionDateOrNull(cipher.creationDate),
-          },
-          {
-            label: "更新时间",
-            value: formatRevisionDateOrNull(cipher.revisionDate),
-          },
-          {
-            label: "收藏",
-            value:
-              cipher.favorite == null ? null : cipher.favorite ? "是" : "否",
-          },
-          {
-            label: "附件数",
-            value: String(cipher.attachments.length),
-          },
-          {
-            label: "Collection 数",
-            value: String(cipher.collectionIds.length),
-          },
-        ]}
-      />
-
-      {(username || password || totp || singleUri || uriList.length > 0) && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">登录信息</div>
-          <DetailGrid
-            items={[
-              { label: "用户名", value: username },
-              { label: "密码", value: password },
-              { label: "TOTP", value: totp },
-              { label: "主 URI", value: singleUri },
-            ]}
-          />
-          {uriList.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs text-slate-600">URI 列表</div>
-              <div className="space-y-1">
-                {uriList.map((uri) => (
-                  <div
-                    key={uri}
-                    className="rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-xs break-all text-slate-700"
-                  >
-                    {uri}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="space-y-2">
+        <DetailRow label="Type" value={toCipherTypeLabel(cipher.type)} />
+        <DetailRow label="Folder" value={folderId} />
+        <DetailRow label="Org" value={organizationId} />
+        <DetailRow
+          label="Revision"
+          value={formatRevisionDate(cipher.revisionDate)}
+        />
+        <DetailRow label="Username" value={username} />
+        <DetailRow label="URI" value={uri} />
+        <DetailRow
+          label="Attachments"
+          value={String(cipher.attachments.length)}
+        />
+      </div>
 
       {notes && (
-        <div className="space-y-1">
-          <div className="text-sm font-medium text-slate-800">备注</div>
-          <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+        <div className="rounded-lg bg-slate-50/90 p-2">
+          <div className="mb-1 text-xs text-slate-500">Notes</div>
+          <pre className="whitespace-pre-wrap text-sm text-slate-800">
             {notes}
           </pre>
         </div>
       )}
-
-      {customFields.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">自定义字段</div>
-          <div className="space-y-1.5">
-            {customFields.map((field, index) => (
-              <div
-                key={`${field.name ?? "field"}-${index}`}
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
-              >
-                <span className="font-medium text-slate-900">
-                  {field.name ?? "Unnamed"}
-                </span>
-                <span>: </span>
-                <span className="break-all">{field.value ?? "—"}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {cardRows.some((item) => isNonEmptyText(item.value)) && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">银行卡信息</div>
-          <DetailGrid items={cardRows} />
-        </div>
-      )}
-
-      {identityRows.some((item) => isNonEmptyText(item.value)) && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">身份信息</div>
-          <DetailGrid items={identityRows} />
-        </div>
-      )}
-
-      {(sshPrivateKey || sshPublicKey || sshFingerprint) && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">SSH Key</div>
-          <DetailGrid
-            items={[{ label: "Fingerprint", value: sshFingerprint }]}
-          />
-          {sshPublicKey && (
-            <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
-              {sshPublicKey}
-            </pre>
-          )}
-          {sshPrivateKey && (
-            <pre className="whitespace-pre-wrap rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
-              {sshPrivateKey}
-            </pre>
-          )}
-        </div>
-      )}
-
-      {attachments.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">附件</div>
-          <div className="space-y-1.5">
-            {attachments.map((attachment) => (
-              <div
-                key={attachment.id}
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
-              >
-                <div className="font-medium text-slate-900">
-                  {attachment.fileName ?? attachment.id}
-                </div>
-                <div className="mt-1 text-slate-600">
-                  {firstNonEmptyText(attachment.sizeName, attachment.size) ??
-                    "未知大小"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {passwordHistory.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-slate-800">密码历史</div>
-          <div className="space-y-1.5">
-            {passwordHistory.map((item, index) => (
-              <div
-                key={`${item.password ?? "password"}-${index}`}
-                className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
-              >
-                <div className="font-mono break-all">{item.password}</div>
-                <div className="mt-1 text-slate-600">
-                  {formatRevisionDateOrNull(item.lastUsedDate) ?? "Unknown"}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DetailGrid({
-  items,
-}: {
-  items: Array<{ label: string; value: string | null | undefined }>;
-}) {
-  const visibleItems = items.filter((item) => isNonEmptyText(item.value));
-
-  if (visibleItems.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="grid gap-1.5 sm:grid-cols-2">
-      {visibleItems.map((item) => (
-        <div
-          key={item.label}
-          className="rounded border border-slate-200 bg-white px-2 py-1.5"
-        >
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">
-            {item.label}
-          </div>
-          <div className="mt-1 text-xs break-all text-slate-800">
-            {item.value}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
