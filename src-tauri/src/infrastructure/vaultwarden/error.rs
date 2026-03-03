@@ -16,7 +16,7 @@ pub enum VaultwardenError {
     },
     TokenRejected {
         status: u16,
-        error: TokenErrorResponse,
+        error: Box<TokenErrorResponse>,
     },
 }
 

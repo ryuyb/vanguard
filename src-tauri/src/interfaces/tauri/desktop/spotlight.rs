@@ -1,3 +1,5 @@
+#![allow(clippy::unused_unit)]
+
 use tauri::window::Color;
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};

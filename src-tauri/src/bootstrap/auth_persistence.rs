@@ -46,26 +46,31 @@ pub struct PersistedAuthState {
     pub updated_at_ms: i64,
 }
 
+#[derive(Debug, Clone)]
+pub struct PersistedAuthStateContext {
+    pub account_id: String,
+    pub base_url: String,
+    pub email: String,
+    pub kdf: Option<i32>,
+    pub kdf_iterations: Option<i32>,
+    pub kdf_memory: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
+}
+
 impl PersistedAuthState {
     pub fn new(
-        account_id: String,
-        base_url: String,
-        email: String,
-        kdf: Option<i32>,
-        kdf_iterations: Option<i32>,
-        kdf_memory: Option<i32>,
-        kdf_parallelism: Option<i32>,
+        context: PersistedAuthStateContext,
         encrypted_session: PersistedEncryptedSession,
     ) -> AppResult<Self> {
         Ok(Self {
             version: AUTH_STATE_VERSION,
-            account_id,
-            base_url,
-            email,
-            kdf,
-            kdf_iterations,
-            kdf_memory,
-            kdf_parallelism,
+            account_id: context.account_id,
+            base_url: context.base_url,
+            email: context.email,
+            kdf: context.kdf,
+            kdf_iterations: context.kdf_iterations,
+            kdf_memory: context.kdf_memory,
+            kdf_parallelism: context.kdf_parallelism,
             encrypted_session,
             updated_at_ms: now_unix_ms()?,
         })

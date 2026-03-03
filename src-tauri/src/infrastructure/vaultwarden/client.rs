@@ -177,7 +177,7 @@ impl VaultwardenClient {
         if let Ok(token_error) = serde_json::from_str::<TokenErrorResponse>(&body) {
             return Err(VaultwardenError::TokenRejected {
                 status,
-                error: token_error,
+                error: Box::new(token_error),
             });
         }
 
@@ -477,7 +477,7 @@ impl VaultwardenClient {
         }
     }
 
-    fn validated_base_url<'a>(base_url: &'a str) -> VaultwardenResult<&'a str> {
+    fn validated_base_url(base_url: &str) -> VaultwardenResult<&str> {
         VaultwardenConfig::validate_base_url(base_url)?;
         Ok(base_url.trim_end_matches('/'))
     }

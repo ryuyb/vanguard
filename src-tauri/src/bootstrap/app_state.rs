@@ -15,7 +15,7 @@ use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
-    PersistedAuthState, SessionWrapRuntime,
+    PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
 };
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -251,13 +251,7 @@ impl AppState {
         )?;
         self.set_auth_wrap_runtime(Some(runtime))?;
         let persisted = PersistedAuthState::new(
-            session.account_id.clone(),
-            session.base_url.clone(),
-            session.email.clone(),
-            session.kdf,
-            session.kdf_iterations,
-            session.kdf_memory,
-            session.kdf_parallelism,
+            persisted_auth_state_context_from_session(session),
             encrypted_session,
         )?;
         self.store_persisted_auth_state(Some(persisted))
@@ -280,13 +274,7 @@ impl AppState {
             &refresh_token,
         )?;
         let persisted = PersistedAuthState::new(
-            session.account_id.clone(),
-            session.base_url.clone(),
-            session.email.clone(),
-            session.kdf,
-            session.kdf_iterations,
-            session.kdf_memory,
-            session.kdf_parallelism,
+            persisted_auth_state_context_from_session(session),
             encrypted_session,
         )?;
         self.store_persisted_auth_state(Some(persisted))
@@ -544,5 +532,17 @@ fn build_temp_auth_state_path(path: &Path) -> PathBuf {
     match path.parent() {
         Some(parent) => parent.join(temp_file_name),
         None => PathBuf::from(temp_file_name),
+    }
+}
+
+fn persisted_auth_state_context_from_session(session: &AuthSession) -> PersistedAuthStateContext {
+    PersistedAuthStateContext {
+        account_id: session.account_id.clone(),
+        base_url: session.base_url.clone(),
+        email: session.email.clone(),
+        kdf: session.kdf,
+        kdf_iterations: session.kdf_iterations,
+        kdf_memory: session.kdf_memory,
+        kdf_parallelism: session.kdf_parallelism,
     }
 }

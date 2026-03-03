@@ -102,6 +102,7 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             Err(VaultwardenError::TokenRejected { error, .. })
                 if is_two_factor_required(&error) =>
             {
+                let error = *error;
                 Ok(PasswordLoginOutcome::TwoFactorRequired(
                     TwoFactorChallenge {
                         error: error.error,
@@ -352,6 +353,7 @@ fn map_vaultwarden_error(error: VaultwardenError) -> AppError {
             status, message, ..
         } => AppError::remote_status(status, message),
         VaultwardenError::TokenRejected { status, error } => {
+            let error = *error;
             let message =
                 first_non_empty(vec![error.error_description, error.error, error.message])
                     .unwrap_or_else(|| String::from("token rejected"));

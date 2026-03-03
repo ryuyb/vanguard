@@ -805,7 +805,7 @@ fn is_sync_event_type(event_type: i32) -> bool {
 }
 
 fn is_incremental_cipher_event_type(event_type: i32) -> bool {
-    matches!(event_type, 0 | 1 | 2)
+    matches!(event_type, 0..=2)
 }
 
 fn is_incremental_folder_event_type(event_type: i32) -> bool {
@@ -813,7 +813,7 @@ fn is_incremental_folder_event_type(event_type: i32) -> bool {
 }
 
 fn is_incremental_send_event_type(event_type: i32) -> bool {
-    matches!(event_type, 12 | 13 | 14)
+    matches!(event_type, 12..=14)
 }
 
 fn extract_payload_id(payload: Option<&JsonValue>) -> Option<String> {

@@ -111,7 +111,7 @@ impl WindowPlacementPolicy {
             }
         }
 
-        if let Some(cursor_position) = app_handle.cursor_position().ok() {
+        if let Ok(cursor_position) = app_handle.cursor_position() {
             if let Some(monitor) = find_monitor_from_logical_point(app_handle, cursor_position) {
                 return Some(monitor);
             }
@@ -128,7 +128,7 @@ impl WindowPlacementPolicy {
         app_handle: &tauri::AppHandle<R>,
         spotlight_window: &WebviewWindow<R>,
     ) -> Option<Monitor> {
-        if let Some(cursor_position) = app_handle.cursor_position().ok() {
+        if let Ok(cursor_position) = app_handle.cursor_position() {
             if let Some(monitor) = find_monitor_from_cursor_flexible(app_handle, cursor_position) {
                 return Some(monitor);
             }
