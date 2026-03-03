@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::auth::{RefreshTokenCommand, SessionInfo};
@@ -7,6 +9,14 @@ use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 const REFRESH_GRACE_PERIOD_MS: i64 = 60_000;
+type RefreshSingleflightLock = Arc<tokio::sync::Mutex<()>>;
+static REFRESH_SINGLEFLIGHT_LOCKS: OnceLock<Mutex<HashMap<String, RefreshSingleflightLock>>> =
+    OnceLock::new();
+
+enum RefreshDecision {
+    Retry,
+    Return(AuthSession),
+}
 
 pub fn build_auth_session(
     base_url: String,
@@ -106,11 +116,36 @@ pub async fn restore_auth_session_with_master_password(
 }
 
 async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSession> {
-    let current = state.require_auth_session()?;
-    if !force && !current.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
-        return Ok(current);
-    }
+    loop {
+        let current = state.require_auth_session()?;
+        if !force && !current.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
+            return Ok(current);
+        }
 
+        let account_id = current.account_id.clone();
+        let singleflight_lock = acquire_refresh_singleflight_lock(&account_id)?;
+        let decision = {
+            let _guard = singleflight_lock.lock().await;
+            let latest = state.require_auth_session()?;
+            if latest.account_id != account_id {
+                RefreshDecision::Retry
+            } else if !force && !latest.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
+                RefreshDecision::Return(latest)
+            } else {
+                let refreshed = refresh_auth_session_locked(state, latest).await?;
+                RefreshDecision::Return(refreshed)
+            }
+        };
+        cleanup_refresh_singleflight_lock(&account_id, &singleflight_lock);
+
+        match decision {
+            RefreshDecision::Retry => continue,
+            RefreshDecision::Return(session) => return Ok(session),
+        }
+    }
+}
+
+async fn refresh_auth_session_locked(state: &AppState, current: AuthSession) -> AppResult<AuthSession> {
     let refresh_token = current.refresh_token.clone().ok_or_else(|| {
         AppError::validation("current session missing refresh token, please login again")
     })?;
@@ -168,6 +203,37 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
     }
     start_background_sync(state, &next).await;
     Ok(next)
+}
+
+fn acquire_refresh_singleflight_lock(account_id: &str) -> AppResult<RefreshSingleflightLock> {
+    let lock_store = REFRESH_SINGLEFLIGHT_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut locks = lock_store
+        .lock()
+        .map_err(|_| AppError::internal("failed to lock refresh singleflight store"))?;
+    Ok(locks
+        .entry(account_id.to_string())
+        .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+        .clone())
+}
+
+fn cleanup_refresh_singleflight_lock(account_id: &str, lock: &RefreshSingleflightLock) {
+    if Arc::strong_count(lock) > 2 {
+        return;
+    }
+
+    let Some(lock_store) = REFRESH_SINGLEFLIGHT_LOCKS.get() else {
+        return;
+    };
+
+    if let Ok(mut locks) = lock_store.lock() {
+        let should_remove = locks
+            .get(account_id)
+            .map(|existing| Arc::ptr_eq(existing, lock) && Arc::strong_count(existing) <= 2)
+            .unwrap_or(false);
+        if should_remove {
+            locks.remove(account_id);
+        }
+    }
 }
 
 pub async fn start_background_sync(state: &AppState, session: &AuthSession) {
