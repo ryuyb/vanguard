@@ -3,7 +3,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::application::dto::vault::{
-    GetCipherDetailQuery, GetVaultViewDataQuery, UnlockVaultCommand, VaultUserKeyMaterial,
+    EnablePinUnlockCommand, GetCipherDetailQuery, GetVaultViewDataQuery, UnlockVaultCommand,
+    VaultUserKeyMaterial,
 };
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
 use crate::application::use_cases::unlock_vault_with_password_use_case::{
@@ -11,13 +12,16 @@ use crate::application::use_cases::unlock_vault_with_password_use_case::{
 };
 use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
 use crate::application::use_cases::vault_biometric_use_case::VaultBiometricUseCase;
+use crate::application::use_cases::vault_pin_use_case::VaultPinUseCase;
 use crate::bootstrap::app_state::{AppState, VaultUserKey};
-use crate::domain::unlock::UnlockMethod;
+use crate::domain::unlock::{PinLockType, UnlockMethod};
 use crate::interfaces::tauri::dto::vault::{
     VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
-    VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto,
-    VaultEnableBiometricUnlockRequestDto, VaultFolderItemDto, VaultLockRequestDto,
-    VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
+    VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
+    VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
+    VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto,
+    VaultUnlockWithPasswordRequestDto, VaultUnlockWithPinRequestDto, VaultViewDataRequestDto,
+    VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
@@ -33,6 +37,19 @@ fn log_command_error(command: &str, error: AppError) -> String {
         sanitized
     );
     payload.message
+}
+
+fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
+    UnlockVaultUseCase::new(
+        Arc::new(UnlockVaultWithPasswordUseCase::new(
+            state.master_password_unlock_data_port(),
+        )),
+        Arc::new(VaultPinUseCase::new(state.pin_unlock_port())),
+        Arc::new(VaultBiometricUseCase::new(
+            state.sync_service(),
+            state.biometric_unlock_port(),
+        )),
+    )
 }
 
 #[tauri::command]
@@ -75,9 +92,7 @@ pub async fn vault_unlock_with_password(
     request: VaultUnlockWithPasswordRequestDto,
 ) -> Result<(), String> {
     let master_password = request.master_password.trim().to_string();
-    UnlockVaultUseCase::with_master_password_executor(Arc::new(
-        UnlockVaultWithPasswordUseCase::new(state.master_password_unlock_data_port()),
-    ))
+    build_unlock_use_case(&state)
         .execute(
             &*state,
             UnlockVaultCommand {
@@ -140,16 +155,74 @@ pub async fn vault_disable_biometric_unlock(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn vault_get_pin_status(
+    state: State<'_, AppState>,
+) -> Result<VaultPinStatusResponseDto, String> {
+    let status = VaultPinUseCase::new(state.pin_unlock_port())
+        .pin_status(&*state)
+        .await
+        .map_err(|error| log_command_error("vault_get_pin_status", error))?;
+
+    Ok(VaultPinStatusResponseDto {
+        supported: status.supported,
+        enabled: status.enabled,
+        lock_type: to_pin_lock_type_dto(status.lock_type),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_enable_pin_unlock(
+    state: State<'_, AppState>,
+    request: VaultEnablePinUnlockRequestDto,
+) -> Result<(), String> {
+    VaultPinUseCase::new(state.pin_unlock_port())
+        .enable_pin_unlock(
+            &*state,
+            EnablePinUnlockCommand {
+                pin: request.pin,
+                lock_type: to_pin_lock_type(request.lock_type),
+            },
+        )
+        .await
+        .map_err(|error| log_command_error("vault_enable_pin_unlock", error))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_disable_pin_unlock(
+    state: State<'_, AppState>,
+    _request: VaultDisablePinUnlockRequestDto,
+) -> Result<(), String> {
+    VaultPinUseCase::new(state.pin_unlock_port())
+        .disable_pin_unlock(&*state)
+        .await
+        .map_err(|error| log_command_error("vault_disable_pin_unlock", error))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_unlock_with_pin(
+    state: State<'_, AppState>,
+    request: VaultUnlockWithPinRequestDto,
+) -> Result<(), String> {
+    let pin = request.pin.trim().to_string();
+    build_unlock_use_case(&state)
+        .execute(
+            &*state,
+            UnlockVaultCommand {
+                method: UnlockMethod::Pin { pin },
+            },
+        )
+        .await
+        .map_err(|error| log_command_error("vault_unlock_with_pin", error))
+        .map(|_| ())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn vault_unlock_with_biometric(state: State<'_, AppState>) -> Result<(), String> {
-    UnlockVaultUseCase::with_master_and_biometric_executor(
-        Arc::new(UnlockVaultWithPasswordUseCase::new(
-            state.master_password_unlock_data_port(),
-        )),
-        Arc::new(VaultBiometricUseCase::new(
-            state.sync_service(),
-            state.biometric_unlock_port(),
-        )),
-    )
+    build_unlock_use_case(&state)
         .execute(
             &*state,
             UnlockVaultCommand {
@@ -271,5 +344,21 @@ fn to_vault_user_key_material(user_key: &VaultUserKey) -> VaultUserKeyMaterial {
     VaultUserKeyMaterial {
         enc_key: user_key.enc_key.clone(),
         mac_key: user_key.mac_key.clone(),
+    }
+}
+
+fn to_pin_lock_type(lock_type: VaultPinLockTypeDto) -> PinLockType {
+    match lock_type {
+        VaultPinLockTypeDto::Disabled => PinLockType::Disabled,
+        VaultPinLockTypeDto::Ephemeral => PinLockType::Ephemeral,
+        VaultPinLockTypeDto::Persistent => PinLockType::Persistent,
+    }
+}
+
+fn to_pin_lock_type_dto(lock_type: PinLockType) -> VaultPinLockTypeDto {
+    match lock_type {
+        PinLockType::Disabled => VaultPinLockTypeDto::Disabled,
+        PinLockType::Ephemeral => VaultPinLockTypeDto::Ephemeral,
+        PinLockType::Persistent => VaultPinLockTypeDto::Persistent,
     }
 }

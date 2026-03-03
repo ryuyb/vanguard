@@ -30,11 +30,44 @@ pub struct VaultEnableBiometricUnlockRequestDto {}
 #[serde(rename_all = "camelCase")]
 pub struct VaultDisableBiometricUnlockRequestDto {}
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum VaultPinLockTypeDto {
+    Disabled,
+    Ephemeral,
+    Persistent,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultEnablePinUnlockRequestDto {
+    pub pin: String,
+    pub lock_type: VaultPinLockTypeDto,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultDisablePinUnlockRequestDto {}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultUnlockWithPinRequestDto {
+    pub pin: String,
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultBiometricStatusResponseDto {
     pub supported: bool,
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultPinStatusResponseDto {
+    pub supported: bool,
+    pub enabled: bool,
+    pub lock_type: VaultPinLockTypeDto,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]

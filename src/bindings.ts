@@ -93,6 +93,14 @@ async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto
     else return { status: "error", error: e  as any };
 }
 },
+async vaultGetPinStatus() : Promise<Result<VaultPinStatusResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_get_pin_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultCanUnlockWithBiometric() : Promise<Result<boolean, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock_with_biometric") };
@@ -104,6 +112,30 @@ async vaultCanUnlockWithBiometric() : Promise<Result<boolean, string>> {
 async vaultUnlockWithPassword(request: VaultUnlockWithPasswordRequestDto) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_password", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultEnablePinUnlock(request: VaultEnablePinUnlockRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_enable_pin_unlock", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultDisablePinUnlock(request: VaultDisablePinUnlockRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_disable_pin_unlock", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async vaultUnlockWithPin(request: VaultUnlockWithPinRequestDto) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_unlock_with_pin", { request }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -217,15 +249,20 @@ export type VaultCipherPermissionsDetailDto = { delete: boolean | null; restore:
 export type VaultCipherSecureNoteDetailDto = { type: number | null }
 export type VaultCipherSshKeyDetailDto = { privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
 export type VaultDisableBiometricUnlockRequestDto = Record<string, never>
+export type VaultDisablePinUnlockRequestDto = Record<string, never>
 export type VaultEnableBiometricUnlockRequestDto = Record<string, never>
+export type VaultEnablePinUnlockRequestDto = { pin: string; lockType: VaultPinLockTypeDto }
 export type VaultFolderItemDto = { id: string; name: string | null }
 export type VaultLockRequestDto = Record<string, never>
+export type VaultPinLockTypeDto = "disabled" | "ephemeral" | "persistent"
+export type VaultPinStatusResponseDto = { supported: boolean; enabled: boolean; lockType: VaultPinLockTypeDto }
 export type VaultSyncAuthRequired = { accountId: string; status: number; message: string }
 export type VaultSyncFailed = { accountId: string; code: string; message: string }
 export type VaultSyncLoggedOut = { accountId: string; reason: string }
 export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
 export type VaultUnlockWithPasswordRequestDto = { masterPassword: string }
+export type VaultUnlockWithPinRequestDto = { pin: string }
 export type VaultViewDataRequestDto = { page: number | null; pageSize: number | null }
 export type VaultViewDataResponseDto = { accountId: string; syncStatus: SyncStatusResponseDto; folders: VaultFolderItemDto[]; ciphers: VaultCipherItemDto[]; totalCiphers: number; page: number; pageSize: number }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }
