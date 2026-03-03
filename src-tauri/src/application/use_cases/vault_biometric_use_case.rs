@@ -87,10 +87,7 @@ impl VaultBiometricUseCase {
         self.biometric_unlock_port.has_unlock_bundle(&account_id)
     }
 
-    pub fn enable_biometric_unlock(
-        &self,
-        runtime: &dyn VaultRuntimePort,
-    ) -> AppResult<()> {
+    pub fn enable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         if !self.biometric_unlock_port.is_supported() {
             return Err(AppError::validation(
                 "biometric unlock is only supported on macOS",
@@ -124,10 +121,7 @@ impl VaultBiometricUseCase {
         Ok(())
     }
 
-    pub fn disable_biometric_unlock(
-        &self,
-        runtime: &dyn VaultRuntimePort,
-    ) -> AppResult<()> {
+    pub fn disable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         if !self.biometric_unlock_port.is_supported() {
             return Ok(());
         }

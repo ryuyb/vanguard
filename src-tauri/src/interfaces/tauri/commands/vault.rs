@@ -17,8 +17,8 @@ use crate::interfaces::tauri::dto::vault::{
     VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
     VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
-    VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto,
-    VaultUnlockMethodDto, VaultUnlockRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
+    VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto, VaultUnlockMethodDto,
+    VaultUnlockRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
@@ -110,9 +110,9 @@ pub async fn vault_get_biometric_status(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
     )
-        .biometric_status(&*state)
-        .await
-        .map_err(|error| log_command_error("vault_get_biometric_status", error))?;
+    .biometric_status(&*state)
+    .await
+    .map_err(|error| log_command_error("vault_get_biometric_status", error))?;
     Ok(VaultBiometricStatusResponseDto {
         supported: status.supported,
         enabled: status.enabled,
@@ -126,9 +126,9 @@ pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Resu
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
     )
-        .can_unlock_with_biometric(&*state)
-        .await
-        .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))
+    .can_unlock_with_biometric(&*state)
+    .await
+    .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))
 }
 
 #[tauri::command]
@@ -141,8 +141,8 @@ pub async fn vault_enable_biometric_unlock(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
     )
-        .enable_biometric_unlock(&*state)
-        .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))
+    .enable_biometric_unlock(&*state)
+    .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))
 }
 
 #[tauri::command]
@@ -155,8 +155,8 @@ pub async fn vault_disable_biometric_unlock(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
     )
-        .disable_biometric_unlock(&*state)
-        .map_err(|error| log_command_error("vault_disable_biometric_unlock", error))
+    .disable_biometric_unlock(&*state)
+    .map_err(|error| log_command_error("vault_disable_biometric_unlock", error))
 }
 
 #[tauri::command]
@@ -216,8 +216,8 @@ pub async fn vault_lock(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
     )
-        .lock(&*state)
-        .map_err(|error| log_command_error("vault_lock", error))
+    .lock(&*state)
+    .map_err(|error| log_command_error("vault_lock", error))
 }
 
 #[tauri::command]

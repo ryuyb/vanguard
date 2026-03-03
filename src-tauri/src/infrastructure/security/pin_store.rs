@@ -27,7 +27,10 @@ pub fn is_supported() -> bool {
     cfg!(target_os = "macos")
 }
 
-pub fn save_persistent_pin_envelope(account_id: &str, envelope: &PersistentPinEnvelope) -> AppResult<()> {
+pub fn save_persistent_pin_envelope(
+    account_id: &str,
+    envelope: &PersistentPinEnvelope,
+) -> AppResult<()> {
     imp::save_persistent_pin_envelope(account_id, envelope)
 }
 
@@ -70,8 +73,9 @@ mod imp {
         if envelope.account_id.trim() != account_key {
             return Err(AppError::validation("pin envelope account_id mismatch"));
         }
-        let serialized = serde_json::to_string(envelope)
-            .map_err(|error| AppError::internal(format!("failed to serialize pin envelope: {error}")))?;
+        let serialized = serde_json::to_string(envelope).map_err(|error| {
+            AppError::internal(format!("failed to serialize pin envelope: {error}"))
+        })?;
 
         let mut delete_options = options_for_account(&account_key);
         delete_options.set_access_synchronized(Some(false));

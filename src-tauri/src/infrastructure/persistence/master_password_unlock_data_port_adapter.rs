@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::dto::sync::{
-    SyncKdfParams, SyncMasterPasswordUnlock, SyncUserDecryption,
-};
+use crate::application::dto::sync::{SyncKdfParams, SyncMasterPasswordUnlock, SyncUserDecryption};
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::domain::unlock::{MasterPasswordUnlockData, MasterPasswordUnlockKdf};
@@ -53,7 +51,9 @@ impl MasterPasswordUnlockDataPort for SqliteMasterPasswordUnlockDataPort {
             }),
         };
 
-        self.vault_repository.begin_sync_transaction(account_id).await?;
+        self.vault_repository
+            .begin_sync_transaction(account_id)
+            .await?;
         let update_result = self
             .vault_repository
             .upsert_user_decryption(account_id, Some(payload))
@@ -66,7 +66,11 @@ impl MasterPasswordUnlockDataPort for SqliteMasterPasswordUnlockDataPort {
             return Err(error);
         }
 
-        if let Err(error) = self.vault_repository.commit_sync_transaction(account_id).await {
+        if let Err(error) = self
+            .vault_repository
+            .commit_sync_transaction(account_id)
+            .await
+        {
             let _ = self
                 .vault_repository
                 .rollback_sync_transaction(account_id)
@@ -78,7 +82,9 @@ impl MasterPasswordUnlockDataPort for SqliteMasterPasswordUnlockDataPort {
     }
 
     async fn delete_master_password_unlock_data(&self, account_id: &str) -> AppResult<()> {
-        self.vault_repository.begin_sync_transaction(account_id).await?;
+        self.vault_repository
+            .begin_sync_transaction(account_id)
+            .await?;
         let update_result = self
             .vault_repository
             .upsert_user_decryption(account_id, None)
@@ -91,7 +97,11 @@ impl MasterPasswordUnlockDataPort for SqliteMasterPasswordUnlockDataPort {
             return Err(error);
         }
 
-        if let Err(error) = self.vault_repository.commit_sync_transaction(account_id).await {
+        if let Err(error) = self
+            .vault_repository
+            .commit_sync_transaction(account_id)
+            .await
+        {
             let _ = self
                 .vault_repository
                 .rollback_sync_transaction(account_id)

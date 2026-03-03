@@ -269,7 +269,9 @@ fn decrypt_user_key_with_pin(
     let ciphertext =
         vault_crypto::decode_base64_flexible(&envelope.ciphertext_b64, "pin.ciphertext_b64")?;
     if ciphertext.is_empty() {
-        return Err(AppError::validation("pin envelope ciphertext cannot be empty"));
+        return Err(AppError::validation(
+            "pin envelope ciphertext cannot be empty",
+        ));
     }
 
     let derived_key = derive_pin_key(pin, &salt)?;
@@ -526,8 +528,7 @@ mod tests {
     async fn enable_pin_requires_unlocked_vault() {
         let persistent = Arc::new(Mutex::new(HashMap::new()));
         let pin_port = Arc::new(FakePinUnlockPort::new_with_shared_persistent(
-            true,
-            persistent,
+            true, persistent,
         ));
         let use_case = VaultPinUseCase::new(pin_port);
 
@@ -555,10 +556,9 @@ mod tests {
         let persistent = Arc::new(Mutex::new(HashMap::new()));
         let runtime = FakeRuntime::with_user_key(Some(sample_user_key()));
 
-        let use_case_a = VaultPinUseCase::new(Arc::new(FakePinUnlockPort::new_with_shared_persistent(
-            true,
-            Arc::clone(&persistent),
-        )));
+        let use_case_a = VaultPinUseCase::new(Arc::new(
+            FakePinUnlockPort::new_with_shared_persistent(true, Arc::clone(&persistent)),
+        ));
         use_case_a
             .enable_pin_unlock(
                 &runtime,
@@ -585,10 +585,9 @@ mod tests {
         runtime
             .remove_vault_user_key_material("account-1")
             .expect("lock vault before restart");
-        let use_case_b = VaultPinUseCase::new(Arc::new(FakePinUnlockPort::new_with_shared_persistent(
-            true,
-            persistent,
-        )));
+        let use_case_b = VaultPinUseCase::new(Arc::new(
+            FakePinUnlockPort::new_with_shared_persistent(true, persistent),
+        ));
 
         let status_b = use_case_b.pin_status(&runtime).await.expect("status_b");
         assert!(!status_b.enabled);
@@ -611,10 +610,9 @@ mod tests {
         let persistent = Arc::new(Mutex::new(HashMap::new()));
         let runtime = FakeRuntime::with_user_key(Some(sample_user_key()));
 
-        let use_case_a = VaultPinUseCase::new(Arc::new(FakePinUnlockPort::new_with_shared_persistent(
-            true,
-            Arc::clone(&persistent),
-        )));
+        let use_case_a = VaultPinUseCase::new(Arc::new(
+            FakePinUnlockPort::new_with_shared_persistent(true, Arc::clone(&persistent)),
+        ));
         use_case_a
             .enable_pin_unlock(
                 &runtime,
@@ -630,10 +628,9 @@ mod tests {
             .remove_vault_user_key_material("account-1")
             .expect("lock vault");
 
-        let use_case_b = VaultPinUseCase::new(Arc::new(FakePinUnlockPort::new_with_shared_persistent(
-            true,
-            persistent,
-        )));
+        let use_case_b = VaultPinUseCase::new(Arc::new(
+            FakePinUnlockPort::new_with_shared_persistent(true, persistent),
+        ));
         let status = use_case_b.pin_status(&runtime).await.expect("status");
         assert!(status.enabled);
         assert_eq!(status.lock_type, PinLockType::Persistent);

@@ -104,8 +104,9 @@ impl PinUnlockPort for KeychainPinUnlockPort {
         let account_id = Self::normalize_account_id(account_id)?;
 
         match lock_type {
-            PinLockType::Persistent => pin_store::load_persistent_pin_envelope(&account_id)
-                .map(|payload| payload.envelope),
+            PinLockType::Persistent => {
+                pin_store::load_persistent_pin_envelope(&account_id).map(|payload| payload.envelope)
+            }
             PinLockType::Ephemeral => self.load_ephemeral(&account_id),
             PinLockType::Disabled => Err(AppError::validation(
                 "cannot load pin envelope when pin lock type is disabled",
@@ -123,11 +124,7 @@ impl PinUnlockPort for KeychainPinUnlockPort {
         }
     }
 
-    async fn delete_pin_envelope(
-        &self,
-        account_id: &str,
-        lock_type: PinLockType,
-    ) -> AppResult<()> {
+    async fn delete_pin_envelope(&self, account_id: &str, lock_type: PinLockType) -> AppResult<()> {
         let account_id = Self::normalize_account_id(account_id)?;
 
         match lock_type {

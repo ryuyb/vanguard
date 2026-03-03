@@ -51,7 +51,9 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
             .load_master_password_unlock_data(&unlock_context.account_id)
             .await?
             .ok_or_else(|| {
-                AppError::validation("missing canonical master_password_unlock data in local vault metadata")
+                AppError::validation(
+                    "missing canonical master_password_unlock data in local vault metadata",
+                )
             })?;
 
         let master_key = derive_master_key(
@@ -79,9 +81,13 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
                 error.message()
             ))
         })?;
-        let user_key = vault_crypto::parse_user_key_material(&plaintext_user_key).map_err(|error| {
-            AppError::validation(format!("failed to parse decrypted user_key: {}", error.message()))
-        })?;
+        let user_key =
+            vault_crypto::parse_user_key_material(&plaintext_user_key).map_err(|error| {
+                AppError::validation(format!(
+                    "failed to parse decrypted user_key: {}",
+                    error.message()
+                ))
+            })?;
 
         runtime.set_vault_user_key_material(unlock_context.account_id.clone(), user_key)?;
 

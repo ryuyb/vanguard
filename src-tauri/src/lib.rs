@@ -52,6 +52,7 @@ pub fn run() {
     export_specta_bindings(&specta_builder).expect("failed to export specta bindings");
 
     let app_builder = tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)

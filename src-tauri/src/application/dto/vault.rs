@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::application::dto::sync::SyncMetricsSummary;
-use crate::domain::unlock::{PinLockType, UnlockMethod};
 use crate::domain::sync::SyncContext;
+use crate::domain::unlock::{PinLockType, UnlockMethod};
 
 #[derive(Debug, Clone)]
 pub struct GetCipherDetailQuery {

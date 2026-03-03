@@ -22,9 +22,5 @@ pub trait PinUnlockPort: Send + Sync {
 
     async fn has_pin_envelope(&self, account_id: &str, lock_type: PinLockType) -> AppResult<bool>;
 
-    async fn delete_pin_envelope(
-        &self,
-        account_id: &str,
-        lock_type: PinLockType,
-    ) -> AppResult<()>;
+    async fn delete_pin_envelope(&self, account_id: &str, lock_type: PinLockType) -> AppResult<()>;
 }

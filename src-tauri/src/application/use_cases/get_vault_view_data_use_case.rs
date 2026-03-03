@@ -73,7 +73,10 @@ impl GetVaultViewDataUseCase {
             .into_iter()
             .map(|cipher| {
                 let login_username = vault_crypto::decrypt_optional_field(
-                    cipher.login.as_ref().and_then(|login| login.username.clone()),
+                    cipher
+                        .login
+                        .as_ref()
+                        .and_then(|login| login.username.clone()),
                     &user_key,
                     "cipher.login.username",
                 )?;

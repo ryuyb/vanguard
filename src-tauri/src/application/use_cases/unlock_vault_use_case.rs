@@ -76,7 +76,11 @@ impl UnlockVaultUseCase {
                 }
                 self.pin_executor.execute_pin_unlock(runtime, trimmed).await
             }
-            UnlockMethod::Biometric => self.biometric_executor.execute_biometric_unlock(runtime).await,
+            UnlockMethod::Biometric => {
+                self.biometric_executor
+                    .execute_biometric_unlock(runtime)
+                    .await
+            }
         }
     }
 }
@@ -88,7 +92,8 @@ mod tests {
     use async_trait::async_trait;
 
     use super::{
-        BiometricUnlockExecutor, MasterPasswordUnlockExecutor, PinUnlockExecutor, UnlockVaultUseCase,
+        BiometricUnlockExecutor, MasterPasswordUnlockExecutor, PinUnlockExecutor,
+        UnlockVaultUseCase,
     };
     use crate::application::dto::vault::{
         UnlockVaultCommand, UnlockVaultResult, VaultUnlockContext, VaultUserKeyMaterial,
@@ -196,7 +201,9 @@ mod tests {
         biometric_calls: Arc<Mutex<u32>>,
     ) -> UnlockVaultUseCase {
         UnlockVaultUseCase::new(
-            Arc::new(RecordingMasterExecutor { calls: master_calls }),
+            Arc::new(RecordingMasterExecutor {
+                calls: master_calls,
+            }),
             Arc::new(RecordingPinExecutor { calls: pin_calls }),
             Arc::new(RecordingBiometricExecutor {
                 calls: biometric_calls,
@@ -228,7 +235,10 @@ mod tests {
             .expect("master unlock should dispatch");
 
         assert_eq!(result.account_id, "account-1");
-        assert_eq!(*master_calls.lock().expect("master calls lock"), vec!["secret"]);
+        assert_eq!(
+            *master_calls.lock().expect("master calls lock"),
+            vec!["secret"]
+        );
         assert!(pin_calls.lock().expect("pin calls lock").is_empty());
         assert_eq!(*biometric_calls.lock().expect("biometric calls lock"), 0);
     }
