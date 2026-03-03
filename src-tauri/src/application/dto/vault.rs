@@ -1,5 +1,8 @@
 use serde::Serialize;
 
+use crate::application::dto::sync::SyncMetricsSummary;
+use crate::domain::sync::SyncContext;
+
 #[derive(Debug, Clone)]
 pub struct GetCipherDetailQuery {
     pub account_id: String,
@@ -26,6 +29,55 @@ pub struct VaultUnlockContext {
     pub kdf_iterations: Option<i32>,
     pub kdf_memory: Option<i32>,
     pub kdf_parallelism: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetVaultViewDataQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultFolderItem {
+    pub id: String,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultCipherItem {
+    pub id: String,
+    pub folder_id: Option<String>,
+    pub organization_id: Option<String>,
+    pub r#type: Option<i32>,
+    pub name: Option<String>,
+    pub revision_date: Option<String>,
+    pub deleted_date: Option<String>,
+    pub attachment_count: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetVaultViewDataResult {
+    pub account_id: String,
+    pub sync_context: SyncContext,
+    pub sync_metrics: SyncMetricsSummary,
+    pub folders: Vec<VaultFolderItem>,
+    pub ciphers: Vec<VaultCipherItem>,
+    pub total_ciphers: u32,
+    pub page: u32,
+    pub page_size: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultBiometricStatus {
+    pub supported: bool,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultBiometricBundle {
+    pub account_id: String,
+    pub enc_key_b64: String,
+    pub mac_key_b64: Option<String>,
 }
 
 #[derive(Debug, Clone)]

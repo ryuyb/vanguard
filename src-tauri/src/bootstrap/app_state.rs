@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
+use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
@@ -68,6 +69,7 @@ pub struct AppState {
     auth_service: Arc<AuthService>,
     sync_service: Arc<SyncService>,
     realtime_sync_service: Arc<RealtimeSyncService>,
+    biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
     get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
@@ -81,6 +83,7 @@ impl AppState {
         auth_service: Arc<AuthService>,
         sync_service: Arc<SyncService>,
         realtime_sync_service: Arc<RealtimeSyncService>,
+        biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
         get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
         auth_state_path: PathBuf,
     ) -> Self {
@@ -102,6 +105,7 @@ impl AppState {
             auth_service,
             sync_service,
             realtime_sync_service,
+            biometric_unlock_port,
             get_cipher_detail_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
@@ -121,6 +125,10 @@ impl AppState {
 
     pub fn realtime_sync_service(&self) -> Arc<RealtimeSyncService> {
         Arc::clone(&self.realtime_sync_service)
+    }
+
+    pub fn biometric_unlock_port(&self) -> Arc<dyn BiometricUnlockPort> {
+        Arc::clone(&self.biometric_unlock_port)
     }
 
     pub fn get_cipher_detail_use_case(&self) -> Arc<GetCipherDetailUseCase> {
@@ -371,6 +379,10 @@ impl AppState {
 }
 
 impl VaultRuntimePort for AppState {
+    fn active_account_id(&self) -> AppResult<String> {
+        AppState::active_account_id(self)
+    }
+
     fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
         self.auth_session().map(|value| {
             value.map(|session| VaultUnlockContext {
@@ -399,6 +411,18 @@ impl VaultRuntimePort for AppState {
         })
     }
 
+    fn get_vault_user_key_material(
+        &self,
+        account_id: &str,
+    ) -> AppResult<Option<VaultUserKeyMaterial>> {
+        self.get_vault_user_key(account_id).map(|value| {
+            value.map(|key| VaultUserKeyMaterial {
+                enc_key: key.enc_key,
+                mac_key: key.mac_key,
+            })
+        })
+    }
+
     fn set_vault_user_key_material(
         &self,
         account_id: String,
@@ -411,6 +435,10 @@ impl VaultRuntimePort for AppState {
                 mac_key: key.mac_key,
             },
         )
+    }
+
+    fn remove_vault_user_key_material(&self, account_id: &str) -> AppResult<()> {
+        self.remove_vault_user_key(account_id)
     }
 }
 
