@@ -16,7 +16,7 @@ use crate::interfaces::tauri::dto::vault::{
     VaultEnableBiometricUnlockRequestDto, VaultFolderItemDto, VaultLockRequestDto,
     VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
-use crate::interfaces::tauri::{mapping, session};
+use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
 use crate::support::redaction::redact_sensitive;
 
@@ -73,37 +73,15 @@ pub async fn vault_unlock_with_password(
     request: VaultUnlockWithPasswordRequestDto,
 ) -> Result<(), String> {
     let master_password = request.master_password.trim().to_string();
-    let unlocked = UnlockVaultWithPasswordUseCase::new(state.auth_service(), state.sync_service())
+    UnlockVaultWithPasswordUseCase::new(state.sync_service())
         .execute(
             &*state,
             UnlockVaultWithPasswordCommand {
-                master_password: master_password.clone(),
+                master_password,
             },
         )
         .await
         .map_err(|error| log_command_error("vault_unlock_with_password", error))?;
-
-    if state
-        .auth_session()
-        .map_err(|error| log_command_error("vault_unlock_with_password", error))?
-        .is_none()
-    {
-        if let Err(error) =
-            session::restore_auth_session_with_master_password(&state, &master_password).await
-        {
-            log::warn!(
-                target: "vanguard::tauri::vault",
-                "vault unlock completed but auth session restore failed account_id={} status={} error_code={} message={}",
-                unlocked.account_id,
-                error
-                    .status()
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| String::from("n/a")),
-                error.code(),
-                error.log_message()
-            );
-        }
-    }
 
     Ok(())
 }

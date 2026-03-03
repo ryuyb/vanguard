@@ -5,14 +5,12 @@ use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac_array;
 use sha2::{Digest, Sha256};
 
-use crate::application::dto::auth::PreloginQuery;
 use crate::application::dto::sync::SyncUserDecryption;
 use crate::application::dto::vault::{
     UnlockVaultWithPasswordCommand, UnlockVaultWithPasswordResult, VaultUnlockContext,
     VaultUserKeyMaterial,
 };
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::services::auth_service::AuthService;
 use crate::application::services::sync_service::SyncService;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
@@ -27,7 +25,6 @@ const MASTER_KEY_LEN: usize = 32;
 
 #[derive(Clone)]
 pub struct UnlockVaultWithPasswordUseCase {
-    auth_service: Arc<AuthService>,
     sync_service: Arc<SyncService>,
 }
 
@@ -47,11 +44,8 @@ struct UnlockMaterial {
 }
 
 impl UnlockVaultWithPasswordUseCase {
-    pub fn new(auth_service: Arc<AuthService>, sync_service: Arc<SyncService>) -> Self {
-        Self {
-            auth_service,
-            sync_service,
-        }
+    pub fn new(sync_service: Arc<SyncService>) -> Self {
+        Self { sync_service }
     }
 
     pub async fn execute(
@@ -76,7 +70,7 @@ impl UnlockVaultWithPasswordUseCase {
                 &master_password,
                 &unlock_material,
             )
-            .await?;
+            ?;
         let user_key =
             decrypt_user_key_with_master_keys(&unlock_material.encrypted_user_keys, &master_keys)?;
         runtime.set_vault_user_key_material(unlock_context.account_id.clone(), user_key)?;
@@ -92,7 +86,7 @@ impl UnlockVaultWithPasswordUseCase {
         })
     }
 
-    async fn derive_master_key_candidates_for_unlock(
+    fn derive_master_key_candidates_for_unlock(
         &self,
         unlock_context: &VaultUnlockContext,
         master_password: &str,
@@ -128,43 +122,9 @@ impl UnlockVaultWithPasswordUseCase {
             )?;
         }
 
-        match self
-            .auth_service
-            .prelogin(PreloginQuery {
-                base_url: unlock_context.base_url.clone(),
-                email: unlock_context.email.clone(),
-            })
-            .await
-        {
-            Ok(prelogin) => {
-                maybe_push_master_key(
-                    &mut candidates,
-                    &unlock_context.email,
-                    master_password,
-                    prelogin.kdf,
-                    prelogin.kdf_iterations,
-                    prelogin.kdf_memory,
-                    prelogin.kdf_parallelism,
-                )?;
-            }
-            Err(error) => {
-                log::warn!(
-                    target: "vanguard::application::vault_unlock",
-                    "skip prelogin master key candidate account_id={} status={} error_code={} message={}",
-                    unlock_context.account_id,
-                    error
-                        .status()
-                        .map(|value| value.to_string())
-                        .unwrap_or_else(|| String::from("n/a")),
-                    error.code(),
-                    error.log_message()
-                );
-            }
-        }
-
         if candidates.is_empty() {
             return Err(AppError::validation(
-                "unable to derive any master key candidates for unlock",
+                "unable to derive local master key candidates for unlock; login and sync once to refresh local unlock metadata",
             ));
         }
 
