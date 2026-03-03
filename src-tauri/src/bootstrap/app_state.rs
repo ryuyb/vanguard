@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
@@ -19,7 +20,7 @@ use crate::bootstrap::auth_persistence::{
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct VaultUserKey {
     pub enc_key: Vec<u8>,
     pub mac_key: Option<Vec<u8>>,
@@ -424,8 +425,8 @@ impl VaultRuntimePort for AppState {
     ) -> AppResult<Option<VaultUserKeyMaterial>> {
         self.get_vault_user_key(account_id).map(|value| {
             value.map(|key| VaultUserKeyMaterial {
-                enc_key: key.enc_key,
-                mac_key: key.mac_key,
+                enc_key: key.enc_key.clone(),
+                mac_key: key.mac_key.clone(),
             })
         })
     }

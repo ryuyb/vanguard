@@ -7,6 +7,7 @@ use chacha20poly1305::aead::{Aead, Payload};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -21,7 +22,7 @@ const WRAP_KDF_MEMORY_KIB: u32 = 65_536;
 const WRAP_KDF_ITERATIONS: u32 = 3;
 const WRAP_KDF_PARALLELISM: u32 = 1;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct SessionWrapRuntime {
     key: [u8; WRAP_KEY_LEN],
     kdf_memory_kib: u32,
