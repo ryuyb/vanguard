@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::application::dto::sync::SyncMetricsSummary;
+use crate::domain::unlock::UnlockMethod;
 use crate::domain::sync::SyncContext;
 
 #[derive(Debug, Clone)]
@@ -17,6 +18,16 @@ pub struct UnlockVaultWithPasswordCommand {
 
 #[derive(Debug, Clone)]
 pub struct UnlockVaultWithPasswordResult {
+    pub account_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnlockVaultCommand {
+    pub method: UnlockMethod,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnlockVaultResult {
     pub account_id: String,
 }
 

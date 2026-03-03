@@ -1,4 +1,6 @@
 pub mod biometric_unlock_port;
+pub mod master_password_unlock_data_port;
+pub mod pin_unlock_port;
 pub mod notification_port;
 pub mod remote_vault_port;
 pub mod sync_event_port;
