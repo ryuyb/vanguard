@@ -128,6 +128,11 @@
   }
 }
 
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 button,
 [role="button"] {
   cursor: pointer;

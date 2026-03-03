@@ -1,13 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
-  Fingerprint,
+  ChevronDown,
   FolderOpen,
   KeyRound,
   LoaderCircle,
   Lock,
   LogIn,
   LogOut,
-  RefreshCw,
   Search,
   ShieldAlert,
   UserRound,
@@ -143,10 +142,6 @@ function VaultPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [isEnablingBiometric, setIsEnablingBiometric] = useState(false);
-  const [isDisablingBiometric, setIsDisablingBiometric] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const detailRequestSeqRef = useRef(0);
 
@@ -169,19 +164,6 @@ function VaultPage() {
       }
 
       setRestoreState(restore.data);
-      if (restore.data.status !== "needsLogin") {
-        const biometricStatus = await commands.vaultGetBiometricStatus();
-        if (biometricStatus.status === "ok") {
-          setBiometricSupported(biometricStatus.data.supported);
-          setBiometricEnabled(biometricStatus.data.enabled);
-        } else {
-          setBiometricSupported(false);
-          setBiometricEnabled(false);
-        }
-      } else {
-        setBiometricSupported(false);
-        setBiometricEnabled(false);
-      }
       if (restore.data.status === "needsLogin") {
         setPageState("needsLogin");
         return;
@@ -253,40 +235,6 @@ function VaultPage() {
       setErrorText(errorToText(error));
     } finally {
       setIsLoggingOut(false);
-    }
-  };
-
-  const onEnableBiometric = async () => {
-    setIsEnablingBiometric(true);
-    setErrorText("");
-    try {
-      const result = await commands.vaultEnableBiometricUnlock({});
-      if (result.status === "error") {
-        setErrorText(errorToText(result.error));
-        return;
-      }
-      await loadVaultData();
-    } catch (error) {
-      setErrorText(errorToText(error));
-    } finally {
-      setIsEnablingBiometric(false);
-    }
-  };
-
-  const onDisableBiometric = async () => {
-    setIsDisablingBiometric(true);
-    setErrorText("");
-    try {
-      const result = await commands.vaultDisableBiometricUnlock({});
-      if (result.status === "error") {
-        setErrorText(errorToText(result.error));
-        return;
-      }
-      await loadVaultData();
-    } catch (error) {
-      setErrorText(errorToText(error));
-    } finally {
-      setIsDisablingBiometric(false);
     }
   };
 
@@ -409,164 +357,104 @@ function VaultPage() {
   const userBaseUrl =
     restoreState?.baseUrl ?? viewData?.syncStatus.baseUrl ?? "未知服务";
   const avatarText = useMemo(() => toAvatarText(userEmail), [userEmail]);
-  const isHeaderActionBusy =
-    isLocking ||
-    isLoggingOut ||
-    isRefreshing ||
-    isEnablingBiometric ||
-    isDisablingBiometric;
+  const isHeaderActionBusy = isLocking || isLoggingOut || isRefreshing;
 
   return (
-    <main className="min-h-dvh bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))] p-4 md:p-8">
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-        <header className="rounded-2xl border border-white/80 bg-white/90 p-3 shadow-sm backdrop-blur-sm md:p-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_minmax(0,560px)_320px] md:items-center">
-            <div className="hidden md:block" />
-
-            <div className="relative w-full">
+    <main className="min-h-dvh bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))]">
+      <header
+        data-tauri-drag-region
+        className="w-full border-b border-slate-200/80 bg-slate-100/95 px-4 py-1 shadow-sm backdrop-blur-sm md:px-8 md:py-1.5"
+      >
+        <div data-tauri-drag-region className="mx-auto w-full max-w-7xl">
+          <div
+            data-tauri-drag-region
+            className="grid gap-1.5 md:grid-cols-[minmax(0,1fr)_max-content] md:items-center"
+          >
+            <div
+              data-tauri-drag-region
+              className="relative w-full md:max-w-[420px] md:justify-self-center"
+            >
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
               <Input
                 type="search"
                 placeholder="搜索名称、ID..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-9"
+                className="h-8 pl-9 text-sm"
               />
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-start px-3 py-2"
-                >
-                  <div className="flex size-10 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
-                    {avatarText === "??" ? (
-                      <UserRound className="size-5" />
-                    ) : (
-                      avatarText
-                    )}
-                  </div>
-                  <div className="min-w-0 text-left">
-                    <div className="truncate text-sm font-medium text-slate-900">
+            <div data-tauri-drag-region className="md:justify-self-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-start gap-2 rounded-lg border border-transparent px-2 py-1 transition-colors hover:border-slate-300 hover:bg-slate-200/70 data-[state=open]:border-slate-300 data-[state=open]:bg-slate-200/70 md:w-fit"
+                  >
+                    <div className="flex size-9 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
+                      {avatarText === "??" ? (
+                        <UserRound className="size-4" />
+                      ) : (
+                        avatarText
+                      )}
+                    </div>
+                    <div className="min-w-0 text-left">
+                      <div className="truncate text-sm font-medium text-slate-900">
+                        {userEmail}
+                      </div>
+                      <div className="truncate text-xs text-slate-600">
+                        {userBaseUrl}
+                      </div>
+                    </div>
+                    <ChevronDown className="ml-1 size-4 text-slate-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="space-y-1">
+                    <div className="truncate text-sm text-slate-900">
                       {userEmail}
                     </div>
                     <div className="truncate text-xs text-slate-600">
                       {userBaseUrl}
                     </div>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel className="space-y-1">
-                  <div className="truncate text-sm text-slate-900">
-                    {userEmail}
-                  </div>
-                  <div className="truncate text-xs text-slate-600">
-                    {userBaseUrl}
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={isHeaderActionBusy}
-                  onSelect={() => {
-                    void onLock();
-                  }}
-                >
-                  {isLocking ? (
-                    <LoaderCircle className="animate-spin" />
-                  ) : (
-                    <Lock />
-                  )}
-                  锁定
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  disabled={isHeaderActionBusy}
-                  onSelect={() => {
-                    void onLogout();
-                  }}
-                >
-                  {isLoggingOut ? (
-                    <LoaderCircle className="animate-spin" />
-                  ) : (
-                    <LogOut />
-                  )}
-                  登出
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={isHeaderActionBusy}
+                    onSelect={() => {
+                      void onLock();
+                    }}
+                  >
+                    {isLocking ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Lock />
+                    )}
+                    锁定
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    disabled={isHeaderActionBusy}
+                    onSelect={() => {
+                      void onLogout();
+                    }}
+                  >
+                    {isLoggingOut ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <LogOut />
+                    )}
+                    登出
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
+        </div>
+      </header>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={
-                isRefreshing ||
-                isHeaderActionBusy ||
-                pageState === "needsLogin" ||
-                pageState === "locked"
-              }
-              onClick={loadVaultData}
-            >
-              {isRefreshing ? (
-                <LoaderCircle className="animate-spin" />
-              ) : (
-                <RefreshCw />
-              )}
-              刷新
-            </Button>
-            {pageState === "ready" &&
-              biometricSupported &&
-              !biometricEnabled && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onEnableBiometric}
-                  disabled={
-                    isEnablingBiometric ||
-                    isDisablingBiometric ||
-                    isRefreshing ||
-                    isLocking ||
-                    isLoggingOut
-                  }
-                >
-                  {isEnablingBiometric ? (
-                    <LoaderCircle className="animate-spin" />
-                  ) : (
-                    <Fingerprint />
-                  )}
-                  {isEnablingBiometric ? "启用中..." : "启用 Touch ID"}
-                </Button>
-              )}
-            {pageState === "ready" &&
-              biometricSupported &&
-              biometricEnabled && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onDisableBiometric}
-                  disabled={
-                    isEnablingBiometric ||
-                    isDisablingBiometric ||
-                    isRefreshing ||
-                    isLocking ||
-                    isLoggingOut
-                  }
-                >
-                  {isDisablingBiometric ? (
-                    <LoaderCircle className="animate-spin" />
-                  ) : (
-                    <Fingerprint />
-                  )}
-                  {isDisablingBiometric ? "关闭中..." : "关闭 Touch ID"}
-                </Button>
-              )}
-          </div>
-        </header>
-
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 md:px-8 md:py-8">
         {pageState === "loading" && (
           <Card className="border-white/80 bg-white/90 shadow-sm">
             <CardContent className="flex items-center gap-2 py-6 text-sm text-slate-700">
