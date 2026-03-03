@@ -10,6 +10,7 @@ use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::bootstrap::app_state::AppState;
@@ -68,11 +69,14 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         sync_policy,
         config.device_identifier,
     ));
+    let get_cipher_detail_use_case =
+        Arc::new(GetCipherDetailUseCase::new(Arc::clone(&sync_service)));
 
     Ok(AppState::new(
         auth_service,
         sync_service,
         realtime_sync_service,
+        get_cipher_detail_use_case,
         auth_state_path,
     ))
 }

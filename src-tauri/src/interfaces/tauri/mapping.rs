@@ -4,6 +4,7 @@ use crate::application::dto::auth::{
     WebauthnAllowCredential, WebauthnRequestExtensions,
 };
 use crate::application::dto::sync::{SyncMetricsSummary, SyncOutcome};
+use crate::application::dto::vault::VaultCipherDetail;
 use crate::domain::sync::{SyncContext, SyncState, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
     MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
@@ -13,6 +14,8 @@ use crate::interfaces::tauri::dto::auth::{
 use crate::interfaces::tauri::dto::sync::{
     SyncCountsDto, SyncMetricsDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
 };
+use crate::interfaces::tauri::dto::vault::VaultCipherDetailDto;
+use crate::support::error::AppError;
 use std::collections::HashMap;
 
 pub fn to_password_login_command(dto: PasswordLoginRequestDto) -> PasswordLoginCommand {
@@ -170,6 +173,21 @@ pub fn to_sync_status_response_dto(
 
 pub fn to_sync_outcome_dto(outcome: SyncOutcome) -> SyncStatusResponseDto {
     to_sync_status_response_dto(outcome.context, None)
+}
+
+pub fn to_vault_cipher_detail_dto(
+    detail: VaultCipherDetail,
+) -> Result<VaultCipherDetailDto, AppError> {
+    let raw = serde_json::to_value(detail).map_err(|error| {
+        AppError::internal(format!(
+            "failed to serialize application vault cipher detail: {error}"
+        ))
+    })?;
+    serde_json::from_value::<VaultCipherDetailDto>(raw).map_err(|error| {
+        AppError::internal(format!(
+            "failed to deserialize interface vault cipher detail dto: {error}"
+        ))
+    })
 }
 
 fn to_sync_metrics_dto(metrics: SyncMetricsSummary) -> SyncMetricsDto {

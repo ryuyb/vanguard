@@ -145,7 +145,10 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
     }
 }
 
-async fn refresh_auth_session_locked(state: &AppState, current: AuthSession) -> AppResult<AuthSession> {
+async fn refresh_auth_session_locked(
+    state: &AppState,
+    current: AuthSession,
+) -> AppResult<AuthSession> {
     let refresh_token = current.refresh_token.clone().ok_or_else(|| {
         AppError::validation("current session missing refresh token, please login again")
     })?;

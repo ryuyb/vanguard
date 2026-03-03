@@ -1,19 +1,18 @@
-use aes::Aes256;
-use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
+use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use tauri::State;
 
 use crate::application::dto::auth::PreloginQuery;
+use crate::application::dto::vault::{GetCipherDetailQuery, VaultUserKeyMaterial};
+use crate::application::vault_crypto;
 use crate::bootstrap::app_state::{AppState, PersistedAuthContext, VaultUserKey};
 use crate::infrastructure::security::biometric_store;
 use crate::infrastructure::vaultwarden::password_hash::derive_master_key;
 use crate::interfaces::tauri::dto::vault::{
-    VaultBiometricStatusResponseDto, VaultCipherDetailDto, VaultCipherDetailRequestDto,
-    VaultCipherDetailResponseDto, VaultCipherItemDto, VaultCipherPermissionsDetailDto,
-    VaultCipherSecureNoteDetailDto, VaultDisableBiometricUnlockRequestDto,
+    VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
+    VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultFolderItemDto, VaultLockRequestDto,
     VaultUnlockWithPasswordRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
 };
@@ -22,7 +21,6 @@ use crate::support::error::AppError;
 use crate::support::redaction::redact_sensitive;
 use crate::support::result::AppResult;
 
-type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
 type HmacSha256 = Hmac<Sha256>;
 
 const DEFAULT_PAGE: u32 = 1;
@@ -299,6 +297,7 @@ pub async fn vault_get_view_data(
                 AppError::validation("vault is locked, please unlock with master password first"),
             )
         })?;
+    let user_key_material = to_vault_user_key_material(&user_key);
 
     let context = state
         .sync_service()
@@ -331,7 +330,11 @@ pub async fn vault_get_view_data(
         .map(|folder| {
             Ok(VaultFolderItemDto {
                 id: folder.id,
-                name: decrypt_field_value(folder.name, &user_key, "folder.name")?,
+                name: vault_crypto::decrypt_optional_field(
+                    folder.name,
+                    &user_key_material,
+                    "folder.name",
+                )?,
             })
         })
         .collect();
@@ -345,7 +348,11 @@ pub async fn vault_get_view_data(
                 folder_id: cipher.folder_id,
                 organization_id: cipher.organization_id,
                 r#type: cipher.r#type,
-                name: decrypt_field_value(cipher.name, &user_key, "cipher.name")?,
+                name: vault_crypto::decrypt_optional_field(
+                    cipher.name,
+                    &user_key_material,
+                    "cipher.name",
+                )?,
                 revision_date: cipher.revision_date,
                 deleted_date: cipher.deleted_date,
                 attachment_count: cipher.attachments.len().min(u32::MAX as usize) as u32,
@@ -394,18 +401,15 @@ pub async fn vault_get_cipher_detail(
         })?;
 
     let cipher = state
-        .sync_service()
-        .get_live_cipher(account_id.clone(), String::from(cipher_id))
+        .get_cipher_detail_use_case()
+        .execute(GetCipherDetailQuery {
+            account_id: account_id.clone(),
+            cipher_id: String::from(cipher_id),
+            user_key: to_vault_user_key_material(&user_key),
+        })
         .await
-        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "vault_get_cipher_detail",
-                AppError::validation(format!("cipher not found: {cipher_id}")),
-            )
-        })?;
-
-    let cipher = decrypt_cipher_detail(cipher, &user_key)
+        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+    let cipher = mapping::to_vault_cipher_detail_dto(cipher)
         .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
 
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
@@ -475,592 +479,17 @@ fn normalize_page_size(page_size: Option<u32>) -> u32 {
         .clamp(1, MAX_PAGE_SIZE)
 }
 
-fn decrypt_field_value(
-    value: Option<String>,
-    user_key: &VaultUserKey,
-    field_name: &str,
-) -> Result<Option<String>, AppError> {
-    match value {
-        None => Ok(None),
-        Some(raw) => {
-            if !looks_like_cipher_string(&raw) {
-                return Ok(Some(raw));
-            }
-
-            decrypt_cipher_string(&raw, user_key)
-                .map(Some)
-                .map_err(|error| {
-                    AppError::validation(format!(
-                        "failed to decrypt field `{field_name}`: {}",
-                        error.message()
-                    ))
-                })
-        }
+fn to_vault_user_key_material(user_key: &VaultUserKey) -> VaultUserKeyMaterial {
+    VaultUserKeyMaterial {
+        enc_key: user_key.enc_key.clone(),
+        mac_key: user_key.mac_key.clone(),
     }
 }
 
-fn decrypt_cipher_detail(
-    cipher: crate::application::dto::sync::SyncCipher,
-    user_key: &VaultUserKey,
-) -> Result<VaultCipherDetailDto, AppError> {
-    let detail_key = resolve_cipher_decryption_key(cipher.key.as_deref(), user_key)?;
-
-    Ok(VaultCipherDetailDto {
-        id: cipher.id,
-        organization_id: cipher.organization_id,
-        folder_id: cipher.folder_id,
-        r#type: cipher.r#type,
-        name: decrypt_field_value(cipher.name, &detail_key, "cipher.name")?,
-        notes: decrypt_field_value(cipher.notes, &detail_key, "cipher.notes")?,
-        key: cipher.key,
-        favorite: cipher.favorite,
-        edit: cipher.edit,
-        view_password: cipher.view_password,
-        organization_use_totp: cipher.organization_use_totp,
-        creation_date: cipher.creation_date,
-        revision_date: cipher.revision_date,
-        deleted_date: cipher.deleted_date,
-        archived_date: cipher.archived_date,
-        reprompt: cipher.reprompt,
-        permissions: cipher
-            .permissions
-            .map(|permissions| VaultCipherPermissionsDetailDto {
-                delete: permissions.delete,
-                restore: permissions.restore,
-            }),
-        object: cipher.object,
-        fields: decrypt_cipher_fields(cipher.fields, &detail_key, "cipher.fields")?,
-        password_history: decrypt_password_history(
-            cipher.password_history,
-            &detail_key,
-            "cipher.password_history",
-        )?,
-        collection_ids: cipher.collection_ids,
-        data: decrypt_cipher_data_detail(cipher.data, &detail_key)?,
-        login: decrypt_cipher_login_detail(cipher.login, &detail_key)?,
-        secure_note: cipher
-            .secure_note
-            .map(|note| VaultCipherSecureNoteDetailDto {
-                r#type: note.r#type,
-            }),
-        card: decrypt_cipher_card_detail(cipher.card, &detail_key)?,
-        identity: decrypt_cipher_identity_detail(cipher.identity, &detail_key)?,
-        ssh_key: decrypt_cipher_ssh_key_detail(cipher.ssh_key, &detail_key)?,
-        attachments: decrypt_attachments(cipher.attachments, &detail_key)?,
-    })
-}
-
-fn resolve_cipher_decryption_key(
-    cipher_key: Option<&str>,
-    user_key: &VaultUserKey,
-) -> Result<VaultUserKey, AppError> {
-    let Some(raw) = cipher_key else {
-        return Ok(user_key.clone());
-    };
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(user_key.clone());
-    }
-
-    if looks_like_cipher_string(trimmed) {
-        let decrypted = decrypt_cipher_bytes(trimmed, user_key).map_err(|error| {
-            AppError::validation(format!(
-                "failed to decrypt field `cipher.key`: {}",
-                error.message()
-            ))
-        })?;
-        return parse_user_key_material(&decrypted).map_err(|error| {
-            AppError::validation(format!(
-                "failed to parse decrypted field `cipher.key`: {}",
-                error.message()
-            ))
-        });
-    }
-
-    parse_user_key(trimmed).map_err(|error| {
-        AppError::validation(format!(
-            "failed to parse field `cipher.key`: {}",
-            error.message()
-        ))
-    })
-}
-
-fn decrypt_cipher_fields(
-    fields: Vec<crate::application::dto::sync::SyncCipherField>,
-    user_key: &VaultUserKey,
-    path: &str,
-) -> Result<Vec<crate::interfaces::tauri::dto::vault::VaultCipherFieldDetailDto>, AppError> {
-    fields
-        .into_iter()
-        .enumerate()
-        .map(|(index, field)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherFieldDetailDto {
-                    name: decrypt_field_value(field.name, user_key, &format!("{entry_path}.name"))?,
-                    value: decrypt_field_value(
-                        field.value,
-                        user_key,
-                        &format!("{entry_path}.value"),
-                    )?,
-                    r#type: field.r#type,
-                    linked_id: field.linked_id,
-                },
-            )
-        })
-        .collect()
-}
-
-fn decrypt_password_history(
-    entries: Vec<crate::application::dto::sync::SyncCipherPasswordHistory>,
-    user_key: &VaultUserKey,
-    path: &str,
-) -> Result<Vec<crate::interfaces::tauri::dto::vault::VaultCipherPasswordHistoryDetailDto>, AppError>
-{
-    entries
-        .into_iter()
-        .enumerate()
-        .map(|(index, entry)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherPasswordHistoryDetailDto {
-                    password: decrypt_field_value(
-                        entry.password,
-                        user_key,
-                        &format!("{entry_path}.password"),
-                    )?,
-                    last_used_date: entry.last_used_date,
-                },
-            )
-        })
-        .collect()
-}
-
-fn decrypt_attachments(
-    attachments: Vec<crate::application::dto::sync::SyncAttachment>,
-    user_key: &VaultUserKey,
-) -> Result<Vec<crate::interfaces::tauri::dto::vault::VaultAttachmentDetailDto>, AppError> {
-    attachments
-        .into_iter()
-        .enumerate()
-        .map(|(index, attachment)| {
-            let entry_path = format!("cipher.attachments[{index}]");
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultAttachmentDetailDto {
-                    id: attachment.id,
-                    key: attachment.key,
-                    file_name: decrypt_field_value(
-                        attachment.file_name,
-                        user_key,
-                        &format!("{entry_path}.file_name"),
-                    )?,
-                    size: attachment.size,
-                    size_name: attachment.size_name,
-                    url: attachment.url,
-                    object: attachment.object,
-                },
-            )
-        })
-        .collect()
-}
-
-fn decrypt_cipher_data_detail(
-    data: Option<crate::application::dto::sync::SyncCipherData>,
-    user_key: &VaultUserKey,
-) -> Result<Option<crate::interfaces::tauri::dto::vault::VaultCipherDataDetailDto>, AppError> {
-    data.map(|entry| {
-        Ok(
-            crate::interfaces::tauri::dto::vault::VaultCipherDataDetailDto {
-                name: decrypt_field_value(entry.name, user_key, "cipher.data.name")?,
-                notes: decrypt_field_value(entry.notes, user_key, "cipher.data.notes")?,
-                fields: decrypt_cipher_fields(entry.fields, user_key, "cipher.data.fields")?,
-                password_history: decrypt_password_history(
-                    entry.password_history,
-                    user_key,
-                    "cipher.data.password_history",
-                )?,
-                uri: decrypt_field_value(entry.uri, user_key, "cipher.data.uri")?,
-                uris: decrypt_login_uris(entry.uris, user_key, "cipher.data.uris")?,
-                username: decrypt_field_value(entry.username, user_key, "cipher.data.username")?,
-                password: decrypt_field_value(entry.password, user_key, "cipher.data.password")?,
-                password_revision_date: entry.password_revision_date,
-                totp: decrypt_field_value(entry.totp, user_key, "cipher.data.totp")?,
-                autofill_on_page_load: entry.autofill_on_page_load,
-                fido2_credentials: decrypt_fido2_credentials(
-                    entry.fido2_credentials,
-                    user_key,
-                    "cipher.data.fido2_credentials",
-                )?,
-                r#type: entry.r#type,
-                cardholder_name: decrypt_field_value(
-                    entry.cardholder_name,
-                    user_key,
-                    "cipher.data.cardholder_name",
-                )?,
-                brand: decrypt_field_value(entry.brand, user_key, "cipher.data.brand")?,
-                number: decrypt_field_value(entry.number, user_key, "cipher.data.number")?,
-                exp_month: decrypt_field_value(entry.exp_month, user_key, "cipher.data.exp_month")?,
-                exp_year: decrypt_field_value(entry.exp_year, user_key, "cipher.data.exp_year")?,
-                code: decrypt_field_value(entry.code, user_key, "cipher.data.code")?,
-                title: decrypt_field_value(entry.title, user_key, "cipher.data.title")?,
-                first_name: decrypt_field_value(
-                    entry.first_name,
-                    user_key,
-                    "cipher.data.first_name",
-                )?,
-                middle_name: decrypt_field_value(
-                    entry.middle_name,
-                    user_key,
-                    "cipher.data.middle_name",
-                )?,
-                last_name: decrypt_field_value(entry.last_name, user_key, "cipher.data.last_name")?,
-                address1: decrypt_field_value(entry.address1, user_key, "cipher.data.address1")?,
-                address2: decrypt_field_value(entry.address2, user_key, "cipher.data.address2")?,
-                address3: decrypt_field_value(entry.address3, user_key, "cipher.data.address3")?,
-                city: decrypt_field_value(entry.city, user_key, "cipher.data.city")?,
-                state: decrypt_field_value(entry.state, user_key, "cipher.data.state")?,
-                postal_code: decrypt_field_value(
-                    entry.postal_code,
-                    user_key,
-                    "cipher.data.postal_code",
-                )?,
-                country: decrypt_field_value(entry.country, user_key, "cipher.data.country")?,
-                company: decrypt_field_value(entry.company, user_key, "cipher.data.company")?,
-                email: decrypt_field_value(entry.email, user_key, "cipher.data.email")?,
-                phone: decrypt_field_value(entry.phone, user_key, "cipher.data.phone")?,
-                ssn: decrypt_field_value(entry.ssn, user_key, "cipher.data.ssn")?,
-                passport_number: decrypt_field_value(
-                    entry.passport_number,
-                    user_key,
-                    "cipher.data.passport_number",
-                )?,
-                license_number: decrypt_field_value(
-                    entry.license_number,
-                    user_key,
-                    "cipher.data.license_number",
-                )?,
-                private_key: decrypt_field_value(
-                    entry.private_key,
-                    user_key,
-                    "cipher.data.private_key",
-                )?,
-                public_key: decrypt_field_value(
-                    entry.public_key,
-                    user_key,
-                    "cipher.data.public_key",
-                )?,
-                key_fingerprint: decrypt_field_value(
-                    entry.key_fingerprint,
-                    user_key,
-                    "cipher.data.key_fingerprint",
-                )?,
-            },
-        )
-    })
-    .transpose()
-}
-
-fn decrypt_cipher_login_detail(
-    login: Option<crate::application::dto::sync::SyncCipherLogin>,
-    user_key: &VaultUserKey,
-) -> Result<Option<crate::interfaces::tauri::dto::vault::VaultCipherLoginDetailDto>, AppError> {
-    login
-        .map(|entry| {
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherLoginDetailDto {
-                    uri: decrypt_field_value(entry.uri, user_key, "cipher.login.uri")?,
-                    uris: decrypt_login_uris(entry.uris, user_key, "cipher.login.uris")?,
-                    username: decrypt_field_value(
-                        entry.username,
-                        user_key,
-                        "cipher.login.username",
-                    )?,
-                    password: decrypt_field_value(
-                        entry.password,
-                        user_key,
-                        "cipher.login.password",
-                    )?,
-                    password_revision_date: entry.password_revision_date,
-                    totp: decrypt_field_value(entry.totp, user_key, "cipher.login.totp")?,
-                    autofill_on_page_load: entry.autofill_on_page_load,
-                    fido2_credentials: decrypt_fido2_credentials(
-                        entry.fido2_credentials,
-                        user_key,
-                        "cipher.login.fido2_credentials",
-                    )?,
-                },
-            )
-        })
-        .transpose()
-}
-
-fn decrypt_login_uris(
-    uris: Vec<crate::application::dto::sync::SyncCipherLoginUri>,
-    user_key: &VaultUserKey,
-    path: &str,
-) -> Result<Vec<crate::interfaces::tauri::dto::vault::VaultCipherLoginUriDetailDto>, AppError> {
-    uris.into_iter()
-        .enumerate()
-        .map(|(index, uri)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherLoginUriDetailDto {
-                    uri: decrypt_field_value(uri.uri, user_key, &format!("{entry_path}.uri"))?,
-                    r#match: uri.r#match,
-                    uri_checksum: uri.uri_checksum,
-                },
-            )
-        })
-        .collect()
-}
-
-fn decrypt_fido2_credentials(
-    credentials: Vec<crate::application::dto::sync::SyncCipherLoginFido2Credential>,
-    user_key: &VaultUserKey,
-    path: &str,
-) -> Result<
-    Vec<crate::interfaces::tauri::dto::vault::VaultCipherLoginFido2CredentialDetailDto>,
-    AppError,
-> {
-    credentials
-        .into_iter()
-        .enumerate()
-        .map(|(index, credential)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherLoginFido2CredentialDetailDto {
-                    credential_id: decrypt_field_value(
-                        credential.credential_id,
-                        user_key,
-                        &format!("{entry_path}.credential_id"),
-                    )?,
-                    key_type: decrypt_field_value(
-                        credential.key_type,
-                        user_key,
-                        &format!("{entry_path}.key_type"),
-                    )?,
-                    key_algorithm: decrypt_field_value(
-                        credential.key_algorithm,
-                        user_key,
-                        &format!("{entry_path}.key_algorithm"),
-                    )?,
-                    key_curve: decrypt_field_value(
-                        credential.key_curve,
-                        user_key,
-                        &format!("{entry_path}.key_curve"),
-                    )?,
-                    key_value: decrypt_field_value(
-                        credential.key_value,
-                        user_key,
-                        &format!("{entry_path}.key_value"),
-                    )?,
-                    rp_id: decrypt_field_value(
-                        credential.rp_id,
-                        user_key,
-                        &format!("{entry_path}.rp_id"),
-                    )?,
-                    rp_name: decrypt_field_value(
-                        credential.rp_name,
-                        user_key,
-                        &format!("{entry_path}.rp_name"),
-                    )?,
-                    counter: decrypt_field_value(
-                        credential.counter,
-                        user_key,
-                        &format!("{entry_path}.counter"),
-                    )?,
-                    user_handle: decrypt_field_value(
-                        credential.user_handle,
-                        user_key,
-                        &format!("{entry_path}.user_handle"),
-                    )?,
-                    user_name: decrypt_field_value(
-                        credential.user_name,
-                        user_key,
-                        &format!("{entry_path}.user_name"),
-                    )?,
-                    user_display_name: decrypt_field_value(
-                        credential.user_display_name,
-                        user_key,
-                        &format!("{entry_path}.user_display_name"),
-                    )?,
-                    discoverable: decrypt_field_value(
-                        credential.discoverable,
-                        user_key,
-                        &format!("{entry_path}.discoverable"),
-                    )?,
-                    creation_date: decrypt_field_value(
-                        credential.creation_date,
-                        user_key,
-                        &format!("{entry_path}.creation_date"),
-                    )?,
-                },
-            )
-        })
-        .collect()
-}
-
-fn decrypt_cipher_card_detail(
-    card: Option<crate::application::dto::sync::SyncCipherCard>,
-    user_key: &VaultUserKey,
-) -> Result<Option<crate::interfaces::tauri::dto::vault::VaultCipherCardDetailDto>, AppError> {
-    card.map(|entry| {
-        Ok(
-            crate::interfaces::tauri::dto::vault::VaultCipherCardDetailDto {
-                cardholder_name: decrypt_field_value(
-                    entry.cardholder_name,
-                    user_key,
-                    "cipher.card.cardholder_name",
-                )?,
-                brand: decrypt_field_value(entry.brand, user_key, "cipher.card.brand")?,
-                number: decrypt_field_value(entry.number, user_key, "cipher.card.number")?,
-                exp_month: decrypt_field_value(entry.exp_month, user_key, "cipher.card.exp_month")?,
-                exp_year: decrypt_field_value(entry.exp_year, user_key, "cipher.card.exp_year")?,
-                code: decrypt_field_value(entry.code, user_key, "cipher.card.code")?,
-            },
-        )
-    })
-    .transpose()
-}
-
-fn decrypt_cipher_identity_detail(
-    identity: Option<crate::application::dto::sync::SyncCipherIdentity>,
-    user_key: &VaultUserKey,
-) -> Result<Option<crate::interfaces::tauri::dto::vault::VaultCipherIdentityDetailDto>, AppError> {
-    identity
-        .map(|entry| {
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherIdentityDetailDto {
-                    title: decrypt_field_value(entry.title, user_key, "cipher.identity.title")?,
-                    first_name: decrypt_field_value(
-                        entry.first_name,
-                        user_key,
-                        "cipher.identity.first_name",
-                    )?,
-                    middle_name: decrypt_field_value(
-                        entry.middle_name,
-                        user_key,
-                        "cipher.identity.middle_name",
-                    )?,
-                    last_name: decrypt_field_value(
-                        entry.last_name,
-                        user_key,
-                        "cipher.identity.last_name",
-                    )?,
-                    address1: decrypt_field_value(
-                        entry.address1,
-                        user_key,
-                        "cipher.identity.address1",
-                    )?,
-                    address2: decrypt_field_value(
-                        entry.address2,
-                        user_key,
-                        "cipher.identity.address2",
-                    )?,
-                    address3: decrypt_field_value(
-                        entry.address3,
-                        user_key,
-                        "cipher.identity.address3",
-                    )?,
-                    city: decrypt_field_value(entry.city, user_key, "cipher.identity.city")?,
-                    state: decrypt_field_value(entry.state, user_key, "cipher.identity.state")?,
-                    postal_code: decrypt_field_value(
-                        entry.postal_code,
-                        user_key,
-                        "cipher.identity.postal_code",
-                    )?,
-                    country: decrypt_field_value(
-                        entry.country,
-                        user_key,
-                        "cipher.identity.country",
-                    )?,
-                    company: decrypt_field_value(
-                        entry.company,
-                        user_key,
-                        "cipher.identity.company",
-                    )?,
-                    email: decrypt_field_value(entry.email, user_key, "cipher.identity.email")?,
-                    phone: decrypt_field_value(entry.phone, user_key, "cipher.identity.phone")?,
-                    ssn: decrypt_field_value(entry.ssn, user_key, "cipher.identity.ssn")?,
-                    username: decrypt_field_value(
-                        entry.username,
-                        user_key,
-                        "cipher.identity.username",
-                    )?,
-                    passport_number: decrypt_field_value(
-                        entry.passport_number,
-                        user_key,
-                        "cipher.identity.passport_number",
-                    )?,
-                    license_number: decrypt_field_value(
-                        entry.license_number,
-                        user_key,
-                        "cipher.identity.license_number",
-                    )?,
-                },
-            )
-        })
-        .transpose()
-}
-
-fn decrypt_cipher_ssh_key_detail(
-    ssh_key: Option<crate::application::dto::sync::SyncCipherSshKey>,
-    user_key: &VaultUserKey,
-) -> Result<Option<crate::interfaces::tauri::dto::vault::VaultCipherSshKeyDetailDto>, AppError> {
-    ssh_key
-        .map(|entry| {
-            Ok(
-                crate::interfaces::tauri::dto::vault::VaultCipherSshKeyDetailDto {
-                    private_key: decrypt_field_value(
-                        entry.private_key,
-                        user_key,
-                        "cipher.ssh_key.private_key",
-                    )?,
-                    public_key: decrypt_field_value(
-                        entry.public_key,
-                        user_key,
-                        "cipher.ssh_key.public_key",
-                    )?,
-                    key_fingerprint: decrypt_field_value(
-                        entry.key_fingerprint,
-                        user_key,
-                        "cipher.ssh_key.key_fingerprint",
-                    )?,
-                },
-            )
-        })
-        .transpose()
-}
-
-fn parse_user_key(raw: &str) -> Result<VaultUserKey, AppError> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err(AppError::validation("user_key cannot be empty"));
-    }
-
-    if let Some((enc, mac)) = trimmed.split_once('|') {
-        let enc_key = decode_base64_flexible(enc.trim(), "user_key.enc_key")?;
-        let mac_key = decode_base64_flexible(mac.trim(), "user_key.mac_key")?;
-        validate_key_lengths(&enc_key, Some(&mac_key))?;
-        return Ok(VaultUserKey {
-            enc_key,
-            mac_key: Some(mac_key),
-        });
-    }
-
-    let raw_bytes = decode_base64_flexible(trimmed, "user_key")?;
-    match raw_bytes.len() {
-        32 => Ok(VaultUserKey {
-            enc_key: raw_bytes,
-            mac_key: None,
-        }),
-        64 => Ok(VaultUserKey {
-            enc_key: raw_bytes[..32].to_vec(),
-            mac_key: Some(raw_bytes[32..].to_vec()),
-        }),
-        len => Err(AppError::validation(format!(
-            "user_key length must be 32 or 64 bytes after base64 decode, got {len}"
-        ))),
+fn from_vault_user_key_material(user_key: VaultUserKeyMaterial) -> VaultUserKey {
+    VaultUserKey {
+        enc_key: user_key.enc_key,
+        mac_key: user_key.mac_key,
     }
 }
 
@@ -1068,7 +497,7 @@ fn vault_user_key_to_biometric_bundle(
     account_id: &str,
     user_key: &VaultUserKey,
 ) -> Result<biometric_store::BiometricUnlockBundle, AppError> {
-    validate_key_lengths(&user_key.enc_key, user_key.mac_key.as_deref())?;
+    vault_crypto::validate_key_lengths(&user_key.enc_key, user_key.mac_key.as_deref())?;
     Ok(biometric_store::BiometricUnlockBundle::new(
         String::from(account_id),
         STANDARD_NO_PAD.encode(&user_key.enc_key),
@@ -1087,13 +516,14 @@ fn biometric_bundle_to_vault_user_key(
             "biometric unlock bundle account_id is empty",
         ));
     }
-    let enc_key = decode_base64_flexible(&bundle.enc_key_b64, "biometric.enc_key_b64")?;
+    let enc_key =
+        vault_crypto::decode_base64_flexible(&bundle.enc_key_b64, "biometric.enc_key_b64")?;
     let mac_key = bundle
         .mac_key_b64
         .as_ref()
-        .map(|value| decode_base64_flexible(value, "biometric.mac_key_b64"))
+        .map(|value| vault_crypto::decode_base64_flexible(value, "biometric.mac_key_b64"))
         .transpose()?;
-    validate_key_lengths(&enc_key, mac_key.as_deref())?;
+    vault_crypto::validate_key_lengths(&enc_key, mac_key.as_deref())?;
     Ok(VaultUserKey { enc_key, mac_key })
 }
 
@@ -1365,8 +795,9 @@ fn decrypt_user_key_with_master_keys(
             continue;
         }
 
-        if !looks_like_cipher_string(trimmed) {
-            if let Ok(parsed) = parse_user_key(trimmed) {
+        if !vault_crypto::looks_like_cipher_string(trimmed) {
+            if let Ok(parsed) = vault_crypto::parse_user_key(trimmed) {
+                let parsed = from_vault_user_key_material(parsed);
                 return Ok(parsed);
             }
             continue;
@@ -1374,8 +805,13 @@ fn decrypt_user_key_with_master_keys(
 
         for master_key in master_keys {
             for candidate in candidate_keys_from_master_key(master_key) {
-                if let Ok(plaintext_user_key) = decrypt_cipher_bytes(trimmed, &candidate) {
-                    if let Ok(user_key) = parse_user_key_material(&plaintext_user_key) {
+                if let Ok(plaintext_user_key) = vault_crypto::decrypt_cipher_bytes(
+                    trimmed,
+                    &to_vault_user_key_material(&candidate),
+                ) {
+                    if let Ok(user_key) = vault_crypto::parse_user_key_material(&plaintext_user_key)
+                    {
+                        let user_key = from_vault_user_key_material(user_key);
                         return Ok(user_key);
                     }
                 }
@@ -1504,150 +940,12 @@ fn hkdf_expand_from_prk(prk: &[u8], info: &[u8], len: usize) -> Vec<u8> {
     okm
 }
 
-fn validate_key_lengths(enc_key: &[u8], mac_key: Option<&[u8]>) -> Result<(), AppError> {
-    if enc_key.len() != 32 {
-        return Err(AppError::validation(format!(
-            "enc key must be 32 bytes, got {}",
-            enc_key.len()
-        )));
-    }
-    if let Some(mac_key) = mac_key {
-        if mac_key.len() != 32 {
-            return Err(AppError::validation(format!(
-                "mac key must be 32 bytes, got {}",
-                mac_key.len()
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn decrypt_cipher_string(value: &str, key: &VaultUserKey) -> Result<String, AppError> {
-    let plaintext = decrypt_cipher_bytes(value, key)?;
-    String::from_utf8(plaintext)
-        .map_err(|error| AppError::validation(format!("plaintext is not utf-8: {error}")))
-}
-
-fn decrypt_cipher_bytes(value: &str, key: &VaultUserKey) -> Result<Vec<u8>, AppError> {
-    let trimmed = value.trim();
-    let (enc_type, payload) = trimmed
-        .split_once('.')
-        .ok_or_else(|| AppError::validation("cipher string missing encryption type"))?;
-    if enc_type.is_empty() || payload.is_empty() {
-        return Err(AppError::validation("cipher string has empty segments"));
-    }
-    let enc_type = enc_type
-        .parse::<u8>()
-        .map_err(|_| AppError::validation("cipher string has invalid encryption type"))?;
-
-    match enc_type {
-        0 => {
-            let parts = split_cipher_payload(payload, 2)?;
-            decrypt_aes_cbc(
-                &decode_base64_flexible(parts[0], "cipher.iv")?,
-                &decode_base64_flexible(parts[1], "cipher.data")?,
-                &key.enc_key,
-            )
-        }
-        2 => {
-            let parts = split_cipher_payload(payload, 3)?;
-            let iv = decode_base64_flexible(parts[0], "cipher.iv")?;
-            let ciphertext = decode_base64_flexible(parts[1], "cipher.data")?;
-            let mac = decode_base64_flexible(parts[2], "cipher.mac")?;
-            verify_mac(&iv, &ciphertext, &mac, key.mac_key.as_deref())?;
-            decrypt_aes_cbc(&iv, &ciphertext, &key.enc_key)
-        }
-        _ => Err(AppError::validation(format!(
-            "unsupported cipher string encryption type: {enc_type}"
-        ))),
-    }
-}
-
-fn split_cipher_payload(payload: &str, expected: usize) -> Result<Vec<&str>, AppError> {
-    let parts: Vec<&str> = payload.split('|').collect();
-    if parts.len() != expected || parts.iter().any(|part| part.trim().is_empty()) {
-        return Err(AppError::validation(
-            "cipher string payload shape is invalid",
-        ));
-    }
-    Ok(parts)
-}
-
-fn verify_mac(
-    iv: &[u8],
-    ciphertext: &[u8],
-    mac: &[u8],
-    mac_key: Option<&[u8]>,
-) -> Result<(), AppError> {
-    let mac_key =
-        mac_key.ok_or_else(|| AppError::validation("mac key required for encryption type 2"))?;
-    let mut signer = HmacSha256::new_from_slice(mac_key)
-        .map_err(|error| AppError::validation(format!("invalid mac key: {error}")))?;
-    signer.update(iv);
-    signer.update(ciphertext);
-    signer
-        .verify_slice(mac)
-        .map_err(|_| AppError::validation("cipher string mac verification failed"))?;
-    Ok(())
-}
-
-fn decrypt_aes_cbc(iv: &[u8], ciphertext: &[u8], enc_key: &[u8]) -> Result<Vec<u8>, AppError> {
-    let mut buffer = ciphertext.to_vec();
-    let decryptor = Aes256CbcDecryptor::new_from_slices(enc_key, iv)
-        .map_err(|error| AppError::validation(format!("invalid aes key/iv: {error}")))?;
-    let plaintext = decryptor
-        .decrypt_padded_mut::<Pkcs7>(&mut buffer)
-        .map_err(|_| AppError::validation("ciphertext decryption failed"))?;
-    Ok(plaintext.to_vec())
-}
-
-fn decode_base64_flexible(value: &str, label: &str) -> Result<Vec<u8>, AppError> {
-    STANDARD
-        .decode(value)
-        .or_else(|_| STANDARD_NO_PAD.decode(value))
-        .or_else(|_| URL_SAFE.decode(value))
-        .or_else(|_| URL_SAFE_NO_PAD.decode(value))
-        .map_err(|_| AppError::validation(format!("{label} is not valid base64")))
-}
-
-fn looks_like_cipher_string(value: &str) -> bool {
-    let trimmed = value.trim();
-    let Some((enc_type, payload)) = trimmed.split_once('.') else {
-        return false;
-    };
-    !enc_type.is_empty()
-        && enc_type.chars().all(|char| char.is_ascii_digit())
-        && !payload.is_empty()
-        && payload.contains('|')
-}
-
-fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKey, AppError> {
-    match raw.len() {
-        32 => {
-            return Ok(VaultUserKey {
-                enc_key: raw.to_vec(),
-                mac_key: None,
-            });
-        }
-        64 => {
-            return Ok(VaultUserKey {
-                enc_key: raw[..32].to_vec(),
-                mac_key: Some(raw[32..].to_vec()),
-            });
-        }
-        _ => {}
-    }
-
-    let text = std::str::from_utf8(raw).map_err(|error| {
-        AppError::validation(format!("user_key plaintext is not utf-8: {error}"))
-    })?;
-    parse_user_key(text)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cbc::cipher::{BlockEncryptMut, KeyIvInit};
+    use aes::Aes256;
+    use base64::engine::general_purpose::STANDARD;
+    use cbc::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
 
     type Aes256CbcEncryptor = cbc::Encryptor<Aes256>;
 
@@ -1660,7 +958,9 @@ mod tests {
             .for_each(|(idx, value)| *value = idx as u8);
         let encoded = STANDARD.encode(&key_material);
 
-        let parsed = parse_user_key(&encoded).expect("parse user key");
+        let parsed = from_vault_user_key_material(
+            vault_crypto::parse_user_key(&encoded).expect("parse user key"),
+        );
         assert_eq!(parsed.enc_key.len(), 32);
         assert_eq!(parsed.mac_key.as_ref().map(Vec::len), Some(32));
     }
@@ -1675,7 +975,9 @@ mod tests {
         };
 
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
-        let plaintext = decrypt_cipher_string(&cipher, &key).expect("decrypt type2");
+        let plaintext =
+            vault_crypto::decrypt_cipher_string(&cipher, &to_vault_user_key_material(&key))
+                .expect("decrypt type2");
         assert_eq!(plaintext, "hello-vault");
     }
 
@@ -1689,237 +991,8 @@ mod tests {
         };
 
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
-        let error = decrypt_cipher_string(&cipher, &key).expect_err("must fail");
-        assert_eq!(error.code(), "validation_error");
-    }
-
-    #[test]
-    fn decrypt_cipher_detail_decrypts_whitelisted_fields_only() {
-        let enc_key = [1u8; 32];
-        let mac_key = [2u8; 32];
-        let user_key = VaultUserKey {
-            enc_key: enc_key.to_vec(),
-            mac_key: Some(mac_key.to_vec()),
-        };
-        let encrypted_name = encrypt_type2("demo", &enc_key, &mac_key);
-        let encrypted_password = encrypt_type2("history-pass", &enc_key, &mac_key);
-        let encrypted_login_uri = encrypt_type2("https://example.com/login", &enc_key, &mac_key);
-        let cipher = crate::application::dto::sync::SyncCipher {
-            id: String::from("cipher-1"),
-            organization_id: None,
-            folder_id: None,
-            r#type: Some(1),
-            name: Some(encrypted_name),
-            notes: Some(String::from("note")),
-            key: None,
-            favorite: Some(false),
-            edit: Some(true),
-            view_password: Some(true),
-            organization_use_totp: Some(false),
-            creation_date: Some(String::from("2026-03-01T00:00:00Z")),
-            revision_date: Some(String::from("2026-03-01T00:00:00Z")),
-            deleted_date: None,
-            archived_date: None,
-            reprompt: Some(0),
-            permissions: None,
-            object: Some(String::from("cipher")),
-            fields: Vec::new(),
-            password_history: vec![crate::application::dto::sync::SyncCipherPasswordHistory {
-                password: Some(encrypted_password),
-                last_used_date: Some(String::from("2026-03-01T00:00:00Z")),
-            }],
-            collection_ids: Vec::new(),
-            data: None,
-            login: Some(crate::application::dto::sync::SyncCipherLogin {
-                uri: None,
-                uris: vec![crate::application::dto::sync::SyncCipherLoginUri {
-                    uri: Some(encrypted_login_uri),
-                    r#match: Some(0),
-                    uri_checksum: Some(String::from("2.not-a-cipher|string|shape")),
-                }],
-                username: None,
-                password: None,
-                password_revision_date: None,
-                totp: None,
-                autofill_on_page_load: Some(false),
-                fido2_credentials: Vec::new(),
-            }),
-            secure_note: None,
-            card: None,
-            identity: None,
-            ssh_key: None,
-            attachments: Vec::new(),
-        };
-
-        let detail = decrypt_cipher_detail(cipher, &user_key).expect("detail deserialize");
-        assert_eq!(detail.id, "cipher-1");
-        assert_eq!(detail.name.as_deref(), Some("demo"));
-        assert_eq!(detail.key, None);
-        assert_eq!(detail.password_history.len(), 1);
-        assert_eq!(
-            detail.password_history[0].password.as_deref(),
-            Some("history-pass")
-        );
-        assert_eq!(
-            detail.password_history[0].last_used_date.as_deref(),
-            Some("2026-03-01T00:00:00Z")
-        );
-        assert_eq!(
-            detail.login.as_ref().expect("login").uris[0].uri.as_deref(),
-            Some("https://example.com/login")
-        );
-        assert_eq!(
-            detail.login.as_ref().expect("login").uris[0]
-                .uri_checksum
-                .as_deref(),
-            Some("2.not-a-cipher|string|shape")
-        );
-    }
-
-    #[test]
-    fn decrypt_cipher_detail_uses_cipher_key_for_field_decryption() {
-        let user_enc_key = [1u8; 32];
-        let user_mac_key = [2u8; 32];
-        let user_key = VaultUserKey {
-            enc_key: user_enc_key.to_vec(),
-            mac_key: Some(user_mac_key.to_vec()),
-        };
-
-        let cipher_enc_key = [3u8; 32];
-        let cipher_mac_key = [4u8; 32];
-        let mut cipher_key_material = Vec::with_capacity(64);
-        cipher_key_material.extend_from_slice(&cipher_enc_key);
-        cipher_key_material.extend_from_slice(&cipher_mac_key);
-        let plain_cipher_key = STANDARD.encode(&cipher_key_material);
-
-        let encrypted_cipher_key = encrypt_type2(&plain_cipher_key, &user_enc_key, &user_mac_key);
-        let encrypted_name = encrypt_type2("cipher-name", &cipher_enc_key, &cipher_mac_key);
-        let encrypted_password = encrypt_type2("cipher-pass", &cipher_enc_key, &cipher_mac_key);
-
-        let cipher = crate::application::dto::sync::SyncCipher {
-            id: String::from("cipher-key-1"),
-            organization_id: None,
-            folder_id: None,
-            r#type: Some(1),
-            name: Some(encrypted_name),
-            notes: None,
-            key: Some(encrypted_cipher_key.clone()),
-            favorite: None,
-            edit: None,
-            view_password: None,
-            organization_use_totp: None,
-            creation_date: None,
-            revision_date: None,
-            deleted_date: None,
-            archived_date: None,
-            reprompt: None,
-            permissions: None,
-            object: None,
-            fields: Vec::new(),
-            password_history: vec![crate::application::dto::sync::SyncCipherPasswordHistory {
-                password: Some(encrypted_password),
-                last_used_date: None,
-            }],
-            collection_ids: Vec::new(),
-            data: None,
-            login: None,
-            secure_note: None,
-            card: None,
-            identity: None,
-            ssh_key: None,
-            attachments: Vec::new(),
-        };
-
-        let detail = decrypt_cipher_detail(cipher, &user_key).expect("detail decrypt");
-        assert_eq!(detail.name.as_deref(), Some("cipher-name"));
-        assert_eq!(
-            detail.password_history[0].password.as_deref(),
-            Some("cipher-pass")
-        );
-        assert_eq!(detail.key.as_deref(), Some(encrypted_cipher_key.as_str()));
-    }
-
-    #[test]
-    fn decrypt_cipher_detail_rejects_invalid_cipher_on_whitelisted_field() {
-        let user_key = VaultUserKey {
-            enc_key: [1u8; 32].to_vec(),
-            mac_key: Some([2u8; 32].to_vec()),
-        };
-        let cipher = crate::application::dto::sync::SyncCipher {
-            id: String::from("cipher-1"),
-            organization_id: None,
-            folder_id: None,
-            r#type: Some(1),
-            name: Some(String::from("2.not-base64|still-not-base64|bad-mac")),
-            notes: None,
-            key: None,
-            favorite: None,
-            edit: None,
-            view_password: None,
-            organization_use_totp: None,
-            creation_date: None,
-            revision_date: None,
-            deleted_date: None,
-            archived_date: None,
-            reprompt: None,
-            permissions: None,
-            object: None,
-            fields: Vec::new(),
-            password_history: Vec::new(),
-            collection_ids: Vec::new(),
-            data: None,
-            login: None,
-            secure_note: None,
-            card: None,
-            identity: None,
-            ssh_key: None,
-            attachments: Vec::new(),
-        };
-
-        let error = decrypt_cipher_detail(cipher, &user_key)
-            .expect_err("invalid encrypted field must fail");
-        assert_eq!(error.code(), "validation_error");
-    }
-
-    #[test]
-    fn decrypt_cipher_detail_rejects_invalid_cipher_key() {
-        let user_key = VaultUserKey {
-            enc_key: [1u8; 32].to_vec(),
-            mac_key: Some([2u8; 32].to_vec()),
-        };
-        let cipher = crate::application::dto::sync::SyncCipher {
-            id: String::from("cipher-1"),
-            organization_id: None,
-            folder_id: None,
-            r#type: Some(1),
-            name: Some(String::from("plain-name")),
-            notes: None,
-            key: Some(String::from("2.not-base64|still-not-base64|bad-mac")),
-            favorite: None,
-            edit: None,
-            view_password: None,
-            organization_use_totp: None,
-            creation_date: None,
-            revision_date: None,
-            deleted_date: None,
-            archived_date: None,
-            reprompt: None,
-            permissions: None,
-            object: None,
-            fields: Vec::new(),
-            password_history: Vec::new(),
-            collection_ids: Vec::new(),
-            data: None,
-            login: None,
-            secure_note: None,
-            card: None,
-            identity: None,
-            ssh_key: None,
-            attachments: Vec::new(),
-        };
-
-        let error =
-            decrypt_cipher_detail(cipher, &user_key).expect_err("invalid cipher key must fail");
+        let error = vault_crypto::decrypt_cipher_string(&cipher, &to_vault_user_key_material(&key))
+            .expect_err("must fail");
         assert_eq!(error.code(), "validation_error");
     }
 

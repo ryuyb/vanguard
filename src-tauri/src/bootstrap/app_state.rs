@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, SessionWrapRuntime,
@@ -65,6 +66,7 @@ pub struct AppState {
     auth_service: Arc<AuthService>,
     sync_service: Arc<SyncService>,
     realtime_sync_service: Arc<RealtimeSyncService>,
+    get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
     auth_state_path: Arc<PathBuf>,
@@ -77,6 +79,7 @@ impl AppState {
         auth_service: Arc<AuthService>,
         sync_service: Arc<SyncService>,
         realtime_sync_service: Arc<RealtimeSyncService>,
+        get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
         auth_state_path: PathBuf,
     ) -> Self {
         let persisted_auth_state = match load_persisted_auth_state_from_disk(&auth_state_path) {
@@ -97,6 +100,7 @@ impl AppState {
             auth_service,
             sync_service,
             realtime_sync_service,
+            get_cipher_detail_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
             auth_state_path: Arc::new(auth_state_path),
@@ -115,6 +119,10 @@ impl AppState {
 
     pub fn realtime_sync_service(&self) -> Arc<RealtimeSyncService> {
         Arc::clone(&self.realtime_sync_service)
+    }
+
+    pub fn get_cipher_detail_use_case(&self) -> Arc<GetCipherDetailUseCase> {
+        Arc::clone(&self.get_cipher_detail_use_case)
     }
 
     pub fn set_vault_user_key(&self, account_id: String, key: VaultUserKey) -> AppResult<()> {
