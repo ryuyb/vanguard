@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import {
   Archive,
   ArrowUpDown,
@@ -40,8 +40,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { resolveSessionRoute } from "@/lib/route-session";
 
 export const Route = createFileRoute("/vault")({
+  beforeLoad: async () => {
+    const target = await resolveSessionRoute();
+    if (target !== "/vault") {
+      throw redirect({ to: target });
+    }
+  },
   component: VaultPage,
 });
 

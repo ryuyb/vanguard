@@ -1,4 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useNavigate,
+} from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
@@ -28,8 +33,15 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
+import { resolveSessionRoute } from "@/lib/route-session";
 
 export const Route = createFileRoute("/unlock")({
+  beforeLoad: async () => {
+    const target = await resolveSessionRoute();
+    if (target !== "/unlock") {
+      throw redirect({ to: target });
+    }
+  },
   component: UnlockPage,
 });
 

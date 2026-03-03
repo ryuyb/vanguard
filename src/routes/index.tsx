@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import {
   Eye,
   EyeOff,
@@ -35,8 +35,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { resolveSessionRoute } from "@/lib/route-session";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    const target = await resolveSessionRoute();
+    if (target !== "/") {
+      throw redirect({ to: target });
+    }
+  },
   component: Index,
 });
 
