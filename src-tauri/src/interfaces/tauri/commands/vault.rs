@@ -7,9 +7,7 @@ use crate::application::dto::vault::{
     VaultUserKeyMaterial,
 };
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
-use crate::application::use_cases::unlock_vault_with_password_use_case::{
-    UnlockVaultWithPasswordUseCase,
-};
+use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
 use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
 use crate::application::use_cases::vault_biometric_use_case::VaultBiometricUseCase;
 use crate::application::use_cases::vault_pin_use_case::VaultPinUseCase;
@@ -40,12 +38,12 @@ fn log_command_error(command: &str, error: AppError) -> String {
 
 fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
     UnlockVaultUseCase::new(
-        Arc::new(UnlockVaultWithPasswordUseCase::new(
+        Arc::new(MasterPasswordUnlockUseCase::new(
             state.master_password_unlock_data_port(),
         )),
         Arc::new(VaultPinUseCase::new(state.pin_unlock_port())),
         Arc::new(VaultBiometricUseCase::new(
-            state.sync_service(),
+            state.master_password_unlock_data_port(),
             state.biometric_unlock_port(),
         )),
     )
@@ -108,7 +106,10 @@ pub async fn vault_unlock(
 pub async fn vault_get_biometric_status(
     state: State<'_, AppState>,
 ) -> Result<VaultBiometricStatusResponseDto, String> {
-    let status = VaultBiometricUseCase::new(state.sync_service(), state.biometric_unlock_port())
+    let status = VaultBiometricUseCase::new(
+        state.master_password_unlock_data_port(),
+        state.biometric_unlock_port(),
+    )
         .biometric_status(&*state)
         .await
         .map_err(|error| log_command_error("vault_get_biometric_status", error))?;
@@ -121,7 +122,10 @@ pub async fn vault_get_biometric_status(
 #[tauri::command]
 #[specta::specta]
 pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Result<bool, String> {
-    VaultBiometricUseCase::new(state.sync_service(), state.biometric_unlock_port())
+    VaultBiometricUseCase::new(
+        state.master_password_unlock_data_port(),
+        state.biometric_unlock_port(),
+    )
         .can_unlock_with_biometric(&*state)
         .await
         .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))
@@ -133,7 +137,10 @@ pub async fn vault_enable_biometric_unlock(
     state: State<'_, AppState>,
     _request: VaultEnableBiometricUnlockRequestDto,
 ) -> Result<(), String> {
-    VaultBiometricUseCase::new(state.sync_service(), state.biometric_unlock_port())
+    VaultBiometricUseCase::new(
+        state.master_password_unlock_data_port(),
+        state.biometric_unlock_port(),
+    )
         .enable_biometric_unlock(&*state)
         .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))
 }
@@ -144,7 +151,10 @@ pub async fn vault_disable_biometric_unlock(
     state: State<'_, AppState>,
     _request: VaultDisableBiometricUnlockRequestDto,
 ) -> Result<(), String> {
-    VaultBiometricUseCase::new(state.sync_service(), state.biometric_unlock_port())
+    VaultBiometricUseCase::new(
+        state.master_password_unlock_data_port(),
+        state.biometric_unlock_port(),
+    )
         .disable_biometric_unlock(&*state)
         .map_err(|error| log_command_error("vault_disable_biometric_unlock", error))
 }
@@ -202,7 +212,10 @@ pub async fn vault_lock(
     state: State<'_, AppState>,
     _request: VaultLockRequestDto,
 ) -> Result<(), String> {
-    VaultBiometricUseCase::new(state.sync_service(), state.biometric_unlock_port())
+    VaultBiometricUseCase::new(
+        state.master_password_unlock_data_port(),
+        state.biometric_unlock_port(),
+    )
         .lock(&*state)
         .map_err(|error| log_command_error("vault_lock", error))
 }

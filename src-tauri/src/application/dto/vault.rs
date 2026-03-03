@@ -12,16 +12,6 @@ pub struct GetCipherDetailQuery {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnlockVaultWithPasswordCommand {
-    pub master_password: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct UnlockVaultWithPasswordResult {
-    pub account_id: String,
-}
-
-#[derive(Debug, Clone)]
 pub struct UnlockVaultCommand {
     pub method: UnlockMethod,
 }

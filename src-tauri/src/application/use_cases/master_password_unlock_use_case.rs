@@ -6,16 +6,11 @@ use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac_array;
 use sha2::{Digest, Sha256};
 
-use crate::application::dto::sync::SyncUserDecryption;
-use crate::application::dto::vault::{
-    UnlockVaultResult, UnlockVaultWithPasswordCommand, UnlockVaultWithPasswordResult,
-    VaultUnlockContext, VaultUserKeyMaterial,
-};
+use crate::application::dto::vault::{UnlockVaultResult, VaultUnlockContext, VaultUserKeyMaterial};
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::use_cases::unlock_vault_use_case::MasterPasswordUnlockExecutor;
 use crate::application::vault_crypto;
-use crate::domain::unlock::{MasterPasswordUnlockData, MasterPasswordUnlockKdf};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -26,23 +21,26 @@ const KDF_ARGON2ID: i32 = 1;
 const MASTER_KEY_LEN: usize = 32;
 
 #[derive(Clone)]
-pub struct UnlockVaultWithPasswordUseCase {
+pub struct MasterPasswordUnlockUseCase {
     master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
 }
 
-impl UnlockVaultWithPasswordUseCase {
+impl MasterPasswordUnlockUseCase {
     pub fn new(master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>) -> Self {
         Self {
             master_password_unlock_data_port,
         }
     }
+}
 
-    pub async fn execute(
+#[async_trait]
+impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
+    async fn execute_master_password_unlock(
         &self,
         runtime: &dyn VaultRuntimePort,
-        command: UnlockVaultWithPasswordCommand,
-    ) -> AppResult<UnlockVaultWithPasswordResult> {
-        let master_password = command.master_password.trim().to_string();
+        master_password: String,
+    ) -> AppResult<UnlockVaultResult> {
+        let master_password = master_password.trim().to_string();
         if master_password.is_empty() {
             return Err(AppError::validation("master_password cannot be empty"));
         }
@@ -93,33 +91,9 @@ impl UnlockVaultWithPasswordUseCase {
             unlock_context.account_id
         );
 
-        Ok(UnlockVaultWithPasswordResult {
+        Ok(UnlockVaultResult {
             account_id: unlock_context.account_id,
         })
-    }
-}
-
-#[async_trait]
-impl MasterPasswordUnlockExecutor for UnlockVaultWithPasswordUseCase {
-    async fn execute_master_password_unlock(
-        &self,
-        runtime: &dyn VaultRuntimePort,
-        master_password: String,
-    ) -> AppResult<UnlockVaultResult> {
-        let result = self
-            .execute(runtime, UnlockVaultWithPasswordCommand { master_password })
-            .await?;
-        Ok(UnlockVaultResult {
-            account_id: result.account_id,
-        })
-    }
-}
-
-pub fn has_master_password_unlock_material(value: Option<SyncUserDecryption>) -> AppResult<bool> {
-    match extract_master_password_unlock_data(value) {
-        Ok(_) => Ok(true),
-        Err(error) if is_unlock_material_missing(&error) => Ok(false),
-        Err(error) => Err(error),
     }
 }
 
@@ -133,68 +107,6 @@ fn resolve_unlock_context(runtime: &dyn VaultRuntimePort) -> AppResult<VaultUnlo
             "no authenticated or persisted account state found, please login first",
         )
     })
-}
-
-fn extract_master_password_unlock_data(
-    value: Option<SyncUserDecryption>,
-) -> Result<MasterPasswordUnlockData, AppError> {
-    let value = value.ok_or_else(|| {
-        AppError::validation("missing local user_decryption data; run vault sync first")
-    })?;
-    let unlock = value.master_password_unlock.ok_or_else(|| {
-        AppError::validation("missing master_password_unlock in local vault metadata")
-    })?;
-    let kdf = unlock.kdf.ok_or_else(|| {
-        AppError::validation("missing master_password_unlock.kdf in local vault metadata")
-    })?;
-
-    let kdf_type = kdf.kdf_type.ok_or_else(|| {
-        AppError::validation("missing master_password_unlock.kdf_type in local vault metadata")
-    })?;
-    let iterations = kdf.iterations.ok_or_else(|| {
-        AppError::validation("missing master_password_unlock.iterations in local vault metadata")
-    })?;
-    let salt = unlock
-        .salt
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            AppError::validation("missing master_password_unlock.salt in local vault metadata")
-        })?;
-    let master_key_wrapped_user_key = unlock
-        .master_key_wrapped_user_key
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            AppError::validation("missing master_key_wrapped_user_key in local vault metadata")
-        })?;
-
-    if !vault_crypto::looks_like_cipher_string(&master_key_wrapped_user_key) {
-        return Err(AppError::validation(
-            "master_key_wrapped_user_key is not a valid cipher string",
-        ));
-    }
-
-    Ok(MasterPasswordUnlockData {
-        kdf: MasterPasswordUnlockKdf {
-            kdf_type,
-            iterations,
-            memory: kdf.memory,
-            parallelism: kdf.parallelism,
-        },
-        salt,
-        master_key_wrapped_user_key,
-    })
-}
-
-fn is_unlock_material_missing(error: &AppError) -> bool {
-    let AppError::Validation(message) = error else {
-        return false;
-    };
-
-    message.contains("missing local user_decryption data")
-        || message.contains("missing master_password_unlock")
-        || message.contains("missing master_key_wrapped_user_key")
 }
 
 fn derive_wrapping_key_material(master_key: &[u8]) -> Result<VaultUserKeyMaterial, AppError> {
@@ -287,53 +199,4 @@ fn to_u32(value: i32) -> Result<u32, &'static str> {
     }
 
     value.try_into().map_err(|_| "invalid kdf parameter")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn has_material_accepts_canonical_payload() {
-        let payload = Some(crate::application::dto::sync::SyncUserDecryption {
-            master_password_unlock: Some(crate::application::dto::sync::SyncMasterPasswordUnlock {
-                kdf: Some(crate::application::dto::sync::SyncKdfParams {
-                    kdf_type: Some(0),
-                    iterations: Some(600_000),
-                    memory: None,
-                    parallelism: None,
-                }),
-                master_key_encrypted_user_key: Some(String::from("2.encrypted|payload|mac")),
-                master_key_wrapped_user_key: Some(String::from("2.wrapped|payload|mac")),
-                salt: Some(String::from("test@example.com")),
-            }),
-        });
-
-        let allowed = has_master_password_unlock_material(payload)
-            .expect("canonical payload should be accepted");
-
-        assert!(allowed);
-    }
-
-    #[test]
-    fn has_material_rejects_payload_without_wrapped_user_key() {
-        let payload = Some(crate::application::dto::sync::SyncUserDecryption {
-            master_password_unlock: Some(crate::application::dto::sync::SyncMasterPasswordUnlock {
-                kdf: Some(crate::application::dto::sync::SyncKdfParams {
-                    kdf_type: Some(0),
-                    iterations: Some(600_000),
-                    memory: None,
-                    parallelism: None,
-                }),
-                master_key_encrypted_user_key: Some(String::from("2.encrypted|payload|mac")),
-                master_key_wrapped_user_key: None,
-                salt: Some(String::from("test@example.com")),
-            }),
-        });
-
-        let allowed = has_master_password_unlock_material(payload)
-            .expect("missing wrapped key should be treated as not unlockable");
-
-        assert!(!allowed);
-    }
 }

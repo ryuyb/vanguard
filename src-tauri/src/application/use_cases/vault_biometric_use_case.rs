@@ -8,27 +8,26 @@ use crate::application::dto::vault::{
     UnlockVaultResult, VaultBiometricBundle, VaultBiometricStatus, VaultUserKeyMaterial,
 };
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
+use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::unlock_vault_use_case::BiometricUnlockExecutor;
-use crate::application::use_cases::unlock_vault_with_password_use_case::has_master_password_unlock_material;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 #[derive(Clone)]
 pub struct VaultBiometricUseCase {
-    sync_service: Arc<SyncService>,
+    master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
     biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
 }
 
 impl VaultBiometricUseCase {
     pub fn new(
-        sync_service: Arc<SyncService>,
+        master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
         biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
     ) -> Self {
         Self {
-            sync_service,
+            master_password_unlock_data_port,
             biometric_unlock_port,
         }
     }
@@ -76,11 +75,12 @@ impl VaultBiometricUseCase {
             Err(error) => return Err(error),
         };
 
-        let user_decryption = self
-            .sync_service
-            .load_live_user_decryption(account_id.clone())
-            .await?;
-        if !has_master_password_unlock_material(user_decryption)? {
+        if self
+            .master_password_unlock_data_port
+            .load_master_password_unlock_data(&account_id)
+            .await?
+            .is_none()
+        {
             return Ok(false);
         }
 
