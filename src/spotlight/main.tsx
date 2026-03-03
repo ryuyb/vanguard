@@ -1,5 +1,4 @@
-import { emitTo } from "@tauri-apps/api/event";
-import { getCurrentWindow, Window } from "@tauri-apps/api/window";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
@@ -7,9 +6,8 @@ import type { KeyboardEvent } from "react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { commands, type VaultCipherItemDto } from "@/bindings";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardFooter } from "@/components/ui/card";
-import { Command, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandItem } from "@/components/ui/command";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,11 +18,9 @@ import "./spotlight.css";
 
 type SpotlightItem = {
   id: string;
-  kind: "cipher";
   title: string;
   subtitle: string;
-  badge: string;
-  cipherId: string;
+  searchText: string;
 };
 
 function errorToText(error: unknown) {
@@ -42,13 +38,15 @@ function logClientError(context: string, error: unknown) {
 }
 
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
+  const rawName = cipher.name?.trim() ?? "";
+  const rawUsername = cipher.username?.trim() ?? "";
+  const title = rawName || "Untitled Cipher";
+  const subtitle = rawUsername || "Vault item";
   return {
     id: `cipher-${cipher.id}`,
-    kind: "cipher",
-    cipherId: cipher.id,
-    title: cipher.name?.trim() ? cipher.name : "Untitled Cipher",
-    subtitle: "Vault item",
-    badge: "Cipher",
+    title,
+    subtitle,
+    searchText: `${rawName} ${rawUsername}`.toLowerCase(),
   };
 }
 
@@ -63,15 +61,6 @@ function SpotlightApp() {
     } catch (error) {
       logClientError("Failed to hide spotlight", error);
     }
-  }, []);
-
-  const focusMainWindow = useCallback(async () => {
-    const mainWindow = await Window.getByLabel("main");
-    if (!mainWindow) {
-      return;
-    }
-    await mainWindow.show();
-    await mainWindow.setFocus();
   }, []);
 
   const loadVaultItems = useCallback(async () => {
@@ -102,39 +91,31 @@ function SpotlightApp() {
     void loadVaultItems();
   }, [loadVaultItems]);
 
+  const normalizedQuery = query.trim().toLowerCase();
+  const hasQuery = normalizedQuery.length > 0;
+
   const visibleItems = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return vaultItems;
+    if (!hasQuery) {
+      return [];
     }
 
-    return vaultItems.filter((item) => {
-      const haystack = `${item.title} ${item.subtitle}`.toLowerCase();
-      return haystack.includes(normalized);
-    });
-  }, [query, vaultItems]);
-
-  const executeItem = useCallback(
-    async (_item: SpotlightItem) => {
-      try {
-        await emitTo("main", "spotlight:navigate", { to: "/vault" });
-        await focusMainWindow();
-        await hideSpotlight();
-      } catch (error) {
-        logClientError("Action failed", error);
-      }
-    },
-    [focusMainWindow, hideSpotlight],
-  );
+    return vaultItems.filter((item) => item.searchText.includes(normalizedQuery));
+  }, [hasQuery, normalizedQuery, vaultItems]);
+  const hasVisibleResults = visibleItems.length > 0;
+  const shouldShowResults = (isLoadingVault && hasQuery) || visibleItems.length > 0;
 
   const onCommandInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        if (query.trim().length > 0) {
+          setQuery("");
+          return;
+        }
         void hideSpotlight();
       }
     },
-    [hideSpotlight],
+    [hideSpotlight, query],
   );
 
   useEffect(() => {
@@ -161,8 +142,6 @@ function SpotlightApp() {
       <Card id="spotlight-card" className="spotlight-card">
         <Command
           className="spotlight-command"
-          value={query}
-          onValueChange={setQuery}
           shouldFilter={false}
           loop
         >
@@ -171,11 +150,13 @@ function SpotlightApp() {
               <CommandPrimitive.Input
                 id="spotlight-search-input"
                 className="spotlight-input"
+                value={query}
+                onValueChange={setQuery}
                 autoFocus
                 spellCheck={false}
                 autoCorrect="off"
                 autoCapitalize="off"
-                placeholder="Search passwords, commands, or pages"
+                placeholder="Search vault ciphers by keyword"
                 aria-label="Search"
                 onKeyDown={onCommandInputKeyDown}
               />
@@ -187,62 +168,81 @@ function SpotlightApp() {
               </InputGroupAddon>
             </InputGroup>
           </div>
-          <ScrollArea className="spotlight-results">
-            {isLoadingVault ? (
-              <div className="spotlight-skeleton-list" aria-hidden>
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div
-                    key={`skeleton-${index}`}
-                    className="spotlight-skeleton-item"
-                  >
-                    <Skeleton className="h-4 w-3/5" />
-                    <Skeleton className="h-3 w-2/5" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <CommandList className="spotlight-command-list">
-                {visibleItems.map((item) => (
-                  <CommandItem
-                    key={item.id}
-                    value={item.id}
-                    className="spotlight-item"
-                    onSelect={() => {
-                      void executeItem(item);
-                    }}
-                  >
-                    <div>
-                      <p className="spotlight-item-title">{item.title}</p>
-                      <p className="spotlight-item-subtitle">{item.subtitle}</p>
+          {shouldShowResults ? (
+            <ScrollArea className="spotlight-results">
+              {isLoadingVault && hasQuery ? (
+                <div className="spotlight-skeleton-list" aria-hidden>
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <div
+                      key={`skeleton-${index}`}
+                      className="spotlight-skeleton-item"
+                    >
+                      <Skeleton className="h-4 w-3/5" />
+                      <Skeleton className="h-3 w-2/5" />
                     </div>
-                    <Badge variant="secondary" className="spotlight-item-badge">
-                      {item.badge}
-                    </Badge>
-                  </CommandItem>
-                ))}
-              </CommandList>
-            )}
-          </ScrollArea>
+                  ))}
+                </div>
+              ) : (
+                <CommandPrimitive.List className="spotlight-command-list">
+                  {visibleItems.map((item) => (
+                    <CommandItem
+                      key={item.id}
+                      value={item.id}
+                      className="spotlight-item"
+                    >
+                      <div>
+                        <p className="spotlight-item-title">{item.title}</p>
+                        <p className="spotlight-item-subtitle">{item.subtitle}</p>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandPrimitive.List>
+              )}
+            </ScrollArea>
+          ) : null}
         </Command>
 
         <Separator className="spotlight-meta-separator" />
 
         <CardFooter className="spotlight-meta">
-          <span className="spotlight-meta-item">
-            <KbdGroup>
-              <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd>
-            </KbdGroup>
-            Navigate
-          </span>
-          <span className="spotlight-meta-item">
-            <Kbd>Enter</Kbd>
-            Run
-          </span>
-          <span className="spotlight-meta-item">
-            <Kbd>Esc</Kbd>
-            Close
-          </span>
+          {hasVisibleResults ? (
+            <>
+              <span className="spotlight-meta-item">
+                <KbdGroup>
+                  <Kbd>⌘</Kbd>
+                  <Kbd>C</Kbd>
+                </KbdGroup>
+                复制 用户名
+              </span>
+              <span className="spotlight-meta-item">
+                <KbdGroup>
+                  <Kbd>⌘</Kbd>
+                  <Kbd>⇧</Kbd>
+                  <Kbd>C</Kbd>
+                </KbdGroup>
+                复制 密码
+              </span>
+              <span className="spotlight-meta-item">
+                <Kbd>→</Kbd>
+                更多操作
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="spotlight-meta-item">
+                <KbdGroup>
+                  <Kbd>⇧</Kbd>
+                  <Kbd>⌃</Kbd>
+                  <Kbd>Space</Kbd>
+                </KbdGroup>
+                Open quick access
+              </span>
+              <span className="spotlight-meta-item">
+                <Kbd>Esc</Kbd>
+                Close
+              </span>
+            </>
+          )}
         </CardFooter>
       </Card>
     </main>
