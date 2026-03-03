@@ -89,6 +89,17 @@ impl UnlockVaultUseCase {
         )
     }
 
+    pub fn with_master_and_biometric_executor(
+        master_password_executor: Arc<dyn MasterPasswordUnlockExecutor>,
+        biometric_executor: Arc<dyn BiometricUnlockExecutor>,
+    ) -> Self {
+        Self::new(
+            master_password_executor,
+            Arc::new(UnsupportedPinUnlockExecutor),
+            biometric_executor,
+        )
+    }
+
     pub async fn execute(
         &self,
         runtime: &dyn VaultRuntimePort,

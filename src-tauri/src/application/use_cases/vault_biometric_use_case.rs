@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 
 use crate::application::dto::vault::{
-    VaultBiometricBundle, VaultBiometricStatus, VaultUserKeyMaterial,
+    UnlockVaultResult, VaultBiometricBundle, VaultBiometricStatus, VaultUserKeyMaterial,
 };
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::unlock_vault_use_case::BiometricUnlockExecutor;
 use crate::application::use_cases::unlock_vault_with_password_use_case::has_master_password_unlock_material;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
@@ -17,19 +19,25 @@ use crate::support::result::AppResult;
 #[derive(Clone)]
 pub struct VaultBiometricUseCase {
     sync_service: Arc<SyncService>,
+    biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
 }
 
 impl VaultBiometricUseCase {
-    pub fn new(sync_service: Arc<SyncService>) -> Self {
-        Self { sync_service }
+    pub fn new(
+        sync_service: Arc<SyncService>,
+        biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
+    ) -> Self {
+        Self {
+            sync_service,
+            biometric_unlock_port,
+        }
     }
 
     pub async fn biometric_status(
         &self,
         runtime: &dyn VaultRuntimePort,
-        biometric_port: &dyn BiometricUnlockPort,
     ) -> AppResult<VaultBiometricStatus> {
-        if !biometric_port.is_supported() {
+        if !self.biometric_unlock_port.is_supported() {
             return Ok(VaultBiometricStatus {
                 supported: false,
                 enabled: false,
@@ -47,7 +55,7 @@ impl VaultBiometricUseCase {
             Err(error) => return Err(error),
         };
 
-        let enabled = biometric_port.has_unlock_bundle(&account_id)?;
+        let enabled = self.biometric_unlock_port.has_unlock_bundle(&account_id)?;
         Ok(VaultBiometricStatus {
             supported: true,
             enabled,
@@ -57,9 +65,8 @@ impl VaultBiometricUseCase {
     pub async fn can_unlock_with_biometric(
         &self,
         runtime: &dyn VaultRuntimePort,
-        biometric_port: &dyn BiometricUnlockPort,
     ) -> AppResult<bool> {
-        if !biometric_port.is_supported() {
+        if !self.biometric_unlock_port.is_supported() {
             return Ok(false);
         }
 
@@ -77,15 +84,14 @@ impl VaultBiometricUseCase {
             return Ok(false);
         }
 
-        biometric_port.has_unlock_bundle(&account_id)
+        self.biometric_unlock_port.has_unlock_bundle(&account_id)
     }
 
     pub fn enable_biometric_unlock(
         &self,
         runtime: &dyn VaultRuntimePort,
-        biometric_port: &dyn BiometricUnlockPort,
     ) -> AppResult<()> {
-        if !biometric_port.is_supported() {
+        if !self.biometric_unlock_port.is_supported() {
             return Err(AppError::validation(
                 "biometric unlock is only supported on macOS",
             ));
@@ -101,8 +107,9 @@ impl VaultBiometricUseCase {
             })?;
 
         let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key)?;
-        biometric_port.save_unlock_bundle(&account_id, &bundle)?;
-        let verified_bundle = biometric_port.load_unlock_bundle(&account_id)?;
+        self.biometric_unlock_port
+            .save_unlock_bundle(&account_id, &bundle)?;
+        let verified_bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
         if verified_bundle.account_id != account_id {
             return Err(AppError::internal(
                 "biometric verification returned mismatched account id",
@@ -120,9 +127,8 @@ impl VaultBiometricUseCase {
     pub fn disable_biometric_unlock(
         &self,
         runtime: &dyn VaultRuntimePort,
-        biometric_port: &dyn BiometricUnlockPort,
     ) -> AppResult<()> {
-        if !biometric_port.is_supported() {
+        if !self.biometric_unlock_port.is_supported() {
             return Ok(());
         }
 
@@ -132,7 +138,8 @@ impl VaultBiometricUseCase {
             Err(error) => return Err(error),
         };
 
-        biometric_port.delete_unlock_bundle(&account_id)?;
+        self.biometric_unlock_port
+            .delete_unlock_bundle(&account_id)?;
         log::info!(
             target: "vanguard::application::vault_biometric",
             "biometric unlock disabled account_id={}",
@@ -144,16 +151,15 @@ impl VaultBiometricUseCase {
     pub fn unlock_with_biometric(
         &self,
         runtime: &dyn VaultRuntimePort,
-        biometric_port: &dyn BiometricUnlockPort,
-    ) -> AppResult<()> {
-        if !biometric_port.is_supported() {
+    ) -> AppResult<UnlockVaultResult> {
+        if !self.biometric_unlock_port.is_supported() {
             return Err(AppError::validation(
                 "biometric unlock is only supported on macOS",
             ));
         }
 
         let account_id = runtime.active_account_id()?;
-        let bundle = biometric_port.load_unlock_bundle(&account_id)?;
+        let bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
         if bundle.account_id != account_id {
             return Err(AppError::validation(
                 "biometric unlock account does not match current account",
@@ -168,12 +174,22 @@ impl VaultBiometricUseCase {
             "vault unlocked with biometric account_id={}",
             account_id
         );
-        Ok(())
+        Ok(UnlockVaultResult { account_id })
     }
 
     pub fn lock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         let account_id = runtime.active_account_id()?;
         runtime.remove_vault_user_key_material(&account_id)
+    }
+}
+
+#[async_trait]
+impl BiometricUnlockExecutor for VaultBiometricUseCase {
+    async fn execute_biometric_unlock(
+        &self,
+        runtime: &dyn VaultRuntimePort,
+    ) -> AppResult<UnlockVaultResult> {
+        self.unlock_with_biometric(runtime)
     }
 }
 
