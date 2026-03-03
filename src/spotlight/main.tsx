@@ -37,6 +37,11 @@ function logClientError(context: string, error: unknown) {
   void logError(`[spotlight] ${context}: ${errorToText(error)}`);
 }
 
+const DETAIL_ACTIONS = [
+  { label: "复制 用户名", shortcut: ["⌘", "C"] },
+  { label: "复制 密码", shortcut: ["⌘", "⇧", "C"] },
+] as const;
+
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   const rawName = cipher.name?.trim() ?? "";
   const rawUsername = cipher.username?.trim() ?? "";
@@ -54,6 +59,8 @@ function SpotlightApp() {
   const [query, setQuery] = useState("");
   const [vaultItems, setVaultItems] = useState<SpotlightItem[]>([]);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
+  const [detailActionIndex, setDetailActionIndex] = useState(0);
 
   const hideSpotlight = useCallback(async () => {
     try {
@@ -99,15 +106,99 @@ function SpotlightApp() {
       return [];
     }
 
-    return vaultItems.filter((item) => item.searchText.includes(normalizedQuery));
+    return vaultItems.filter((item) =>
+      item.searchText.includes(normalizedQuery),
+    );
   }, [hasQuery, normalizedQuery, vaultItems]);
+  const detailItem = useMemo(() => {
+    if (!detailItemId) {
+      return null;
+    }
+    return visibleItems.find((item) => item.id === detailItemId) ?? null;
+  }, [detailItemId, visibleItems]);
   const hasVisibleResults = visibleItems.length > 0;
-  const shouldShowResults = (isLoadingVault && hasQuery) || visibleItems.length > 0;
+  const shouldShowResults =
+    (isLoadingVault && hasQuery) || visibleItems.length > 0;
+
+  useEffect(() => {
+    if (!hasVisibleResults) {
+      setDetailItemId(null);
+      return;
+    }
+    if (!detailItemId) {
+      return;
+    }
+    const isVisible = visibleItems.some((item) => item.id === detailItemId);
+    if (!isVisible) {
+      setDetailItemId(null);
+    }
+  }, [detailItemId, hasVisibleResults, visibleItems]);
+
+  useEffect(() => {
+    if (!detailItem) {
+      setDetailActionIndex(0);
+    }
+  }, [detailItem]);
+
+  const resolveSelectedItemId = useCallback(() => {
+    const selectedElement = document.querySelector<HTMLElement>(
+      "#spotlight-card .spotlight-item[data-selected='true']",
+    );
+    const selectedValue = selectedElement?.getAttribute("data-value");
+    if (
+      selectedValue &&
+      visibleItems.some((item) => item.id === selectedValue)
+    ) {
+      return selectedValue;
+    }
+    return visibleItems[0]?.id ?? null;
+  }, [visibleItems]);
 
   const onCommandInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
+      if (
+        detailItem &&
+        (event.key === "ArrowDown" || event.key === "ArrowUp")
+      ) {
+        event.preventDefault();
+        setDetailActionIndex((current) => {
+          if (event.key === "ArrowDown") {
+            return (current + 1) % DETAIL_ACTIONS.length;
+          }
+          return (current - 1 + DETAIL_ACTIONS.length) % DETAIL_ACTIONS.length;
+        });
+        return;
+      }
+
+      if (event.key === "ArrowRight" && hasVisibleResults && !detailItem) {
+        const inputElement = event.currentTarget;
+        const inputValueLength = inputElement.value.length;
+        const isCaretAtEnd =
+          inputElement.selectionStart === inputValueLength &&
+          inputElement.selectionEnd === inputValueLength;
+        if (!isCaretAtEnd) {
+          return;
+        }
+        event.preventDefault();
+        const selectedItemId = resolveSelectedItemId();
+        if (selectedItemId) {
+          setDetailItemId(selectedItemId);
+        }
+        return;
+      }
+
+      if (event.key === "ArrowLeft" && detailItem) {
+        event.preventDefault();
+        setDetailItemId(null);
+        return;
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
+        if (detailItem) {
+          setDetailItemId(null);
+          return;
+        }
         if (query.trim().length > 0) {
           setQuery("");
           return;
@@ -115,7 +206,13 @@ function SpotlightApp() {
         void hideSpotlight();
       }
     },
-    [hideSpotlight, query],
+    [
+      detailItem,
+      hasVisibleResults,
+      hideSpotlight,
+      query,
+      resolveSelectedItemId,
+    ],
   );
 
   useEffect(() => {
@@ -140,11 +237,7 @@ function SpotlightApp() {
   return (
     <main className="spotlight-shell">
       <Card id="spotlight-card" className="spotlight-card">
-        <Command
-          className="spotlight-command"
-          shouldFilter={false}
-          loop
-        >
+        <Command className="spotlight-command" shouldFilter={false} loop>
           <div className="spotlight-search">
             <InputGroup className="spotlight-search-group">
               <CommandPrimitive.Input
@@ -182,6 +275,36 @@ function SpotlightApp() {
                     </div>
                   ))}
                 </div>
+              ) : detailItem ? (
+                <section
+                  className="spotlight-detail"
+                  aria-label="Cipher detail"
+                >
+                  <p className="spotlight-detail-title">{detailItem.title}</p>
+                  <p className="spotlight-detail-subtitle">
+                    {detailItem.subtitle}
+                  </p>
+                  <div className="spotlight-detail-actions" role="listbox">
+                    {DETAIL_ACTIONS.map((action, index) => (
+                      <div
+                        key={action.label}
+                        role="option"
+                        tabIndex={-1}
+                        aria-selected={detailActionIndex === index}
+                        className={`spotlight-detail-action${detailActionIndex === index ? " is-selected" : ""}`}
+                      >
+                        <span>{action.label}</span>
+                        <KbdGroup className="spotlight-detail-action-shortcut">
+                          {action.shortcut.map((shortcutKey) => (
+                            <Kbd key={`${action.label}-${shortcutKey}`}>
+                              {shortcutKey}
+                            </Kbd>
+                          ))}
+                        </KbdGroup>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               ) : (
                 <CommandPrimitive.List className="spotlight-command-list">
                   {visibleItems.map((item) => (
@@ -192,7 +315,9 @@ function SpotlightApp() {
                     >
                       <div>
                         <p className="spotlight-item-title">{item.title}</p>
-                        <p className="spotlight-item-subtitle">{item.subtitle}</p>
+                        <p className="spotlight-item-subtitle">
+                          {item.subtitle}
+                        </p>
                       </div>
                     </CommandItem>
                   ))}
@@ -207,25 +332,38 @@ function SpotlightApp() {
         <CardFooter className="spotlight-meta">
           {hasVisibleResults ? (
             <>
+              {detailItem ? null : (
+                <>
+                  <span className="spotlight-meta-item">
+                    <KbdGroup>
+                      <Kbd>⌘</Kbd>
+                      <Kbd>C</Kbd>
+                    </KbdGroup>
+                    复制 用户名
+                  </span>
+                  <span className="spotlight-meta-item">
+                    <KbdGroup>
+                      <Kbd>⌘</Kbd>
+                      <Kbd>⇧</Kbd>
+                      <Kbd>C</Kbd>
+                    </KbdGroup>
+                    复制 密码
+                  </span>
+                </>
+              )}
               <span className="spotlight-meta-item">
-                <KbdGroup>
-                  <Kbd>⌘</Kbd>
-                  <Kbd>C</Kbd>
-                </KbdGroup>
-                复制 用户名
+                <Kbd>{detailItem ? "←" : "→"}</Kbd>
+                {detailItem ? "返回结果" : "更多操作"}
               </span>
-              <span className="spotlight-meta-item">
-                <KbdGroup>
-                  <Kbd>⌘</Kbd>
-                  <Kbd>⇧</Kbd>
-                  <Kbd>C</Kbd>
-                </KbdGroup>
-                复制 密码
-              </span>
-              <span className="spotlight-meta-item">
-                <Kbd>→</Kbd>
-                更多操作
-              </span>
+              {detailItem ? (
+                <span className="spotlight-meta-item">
+                  <KbdGroup>
+                    <Kbd>↑</Kbd>
+                    <Kbd>↓</Kbd>
+                  </KbdGroup>
+                  选择
+                </span>
+              ) : null}
             </>
           ) : (
             <>
