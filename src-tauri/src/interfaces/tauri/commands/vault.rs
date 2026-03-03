@@ -1,15 +1,18 @@
+use std::sync::Arc;
+
 use tauri::State;
 
 use crate::application::dto::vault::{
-    GetCipherDetailQuery, GetVaultViewDataQuery, UnlockVaultWithPasswordCommand,
-    VaultUserKeyMaterial,
+    GetCipherDetailQuery, GetVaultViewDataQuery, UnlockVaultCommand, VaultUserKeyMaterial,
 };
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
 use crate::application::use_cases::unlock_vault_with_password_use_case::{
-    has_master_password_unlock_material, UnlockVaultWithPasswordUseCase,
+    UnlockVaultWithPasswordUseCase,
 };
+use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
 use crate::application::use_cases::vault_biometric_use_case::VaultBiometricUseCase;
 use crate::bootstrap::app_state::{AppState, VaultUserKey};
+use crate::domain::unlock::UnlockMethod;
 use crate::interfaces::tauri::dto::vault::{
     VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
     VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto,
@@ -41,14 +44,13 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String
         Err(error) => return Err(log_command_error("vault_can_unlock", error)),
     };
 
-    let user_decryption = state
-        .sync_service()
-        .load_live_user_decryption(account_id)
+    let unlock_data = state
+        .master_password_unlock_data_port()
+        .load_master_password_unlock_data(&account_id)
         .await
         .map_err(|error| log_command_error("vault_can_unlock", error))?;
 
-    has_master_password_unlock_material(user_decryption)
-        .map_err(|error| log_command_error("vault_can_unlock", error))
+    Ok(unlock_data.is_some())
 }
 
 #[tauri::command]
@@ -73,11 +75,15 @@ pub async fn vault_unlock_with_password(
     request: VaultUnlockWithPasswordRequestDto,
 ) -> Result<(), String> {
     let master_password = request.master_password.trim().to_string();
-    UnlockVaultWithPasswordUseCase::new(state.sync_service())
+    UnlockVaultUseCase::with_master_password_executor(Arc::new(
+        UnlockVaultWithPasswordUseCase::new(state.master_password_unlock_data_port()),
+    ))
         .execute(
             &*state,
-            UnlockVaultWithPasswordCommand {
-                master_password,
+            UnlockVaultCommand {
+                method: UnlockMethod::MasterPassword {
+                    password: master_password,
+                },
             },
         )
         .await

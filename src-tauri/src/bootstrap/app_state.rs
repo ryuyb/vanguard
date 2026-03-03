@@ -8,6 +8,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
+use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
@@ -71,6 +72,7 @@ pub struct AppState {
     auth_service: Arc<AuthService>,
     sync_service: Arc<SyncService>,
     realtime_sync_service: Arc<RealtimeSyncService>,
+    master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
     biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
     get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
@@ -86,6 +88,7 @@ impl AppState {
         auth_service: Arc<AuthService>,
         sync_service: Arc<SyncService>,
         realtime_sync_service: Arc<RealtimeSyncService>,
+        master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
         biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
         get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
         auth_state_path: PathBuf,
@@ -108,6 +111,7 @@ impl AppState {
             auth_service,
             sync_service,
             realtime_sync_service,
+            master_password_unlock_data_port,
             biometric_unlock_port,
             get_cipher_detail_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
@@ -133,6 +137,10 @@ impl AppState {
 
     pub fn biometric_unlock_port(&self) -> Arc<dyn BiometricUnlockPort> {
         Arc::clone(&self.biometric_unlock_port)
+    }
+
+    pub fn master_password_unlock_data_port(&self) -> Arc<dyn MasterPasswordUnlockDataPort> {
+        Arc::clone(&self.master_password_unlock_data_port)
     }
 
     pub fn get_cipher_detail_use_case(&self) -> Arc<GetCipherDetailUseCase> {

@@ -1,51 +1,40 @@
 use std::sync::Arc;
 
 use argon2::{Algorithm, Argon2, Params, Version};
+use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac_array;
 use sha2::{Digest, Sha256};
 
 use crate::application::dto::sync::SyncUserDecryption;
 use crate::application::dto::vault::{
-    UnlockVaultWithPasswordCommand, UnlockVaultWithPasswordResult, VaultUnlockContext,
-    VaultUserKeyMaterial,
+    UnlockVaultResult, UnlockVaultWithPasswordCommand, UnlockVaultWithPasswordResult,
+    VaultUnlockContext, VaultUserKeyMaterial,
 };
+use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::unlock_vault_use_case::MasterPasswordUnlockExecutor;
 use crate::application::vault_crypto;
+use crate::domain::unlock::{MasterPasswordUnlockData, MasterPasswordUnlockKdf};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 type HmacSha256 = Hmac<Sha256>;
 
-const BITWARDEN_HKDF_SALT: &[u8] = b"bitwarden";
 const KDF_PBKDF2: i32 = 0;
 const KDF_ARGON2ID: i32 = 1;
 const MASTER_KEY_LEN: usize = 32;
 
 #[derive(Clone)]
 pub struct UnlockVaultWithPasswordUseCase {
-    sync_service: Arc<SyncService>,
-}
-
-#[derive(Debug, Clone)]
-struct UnlockKdfParams {
-    kdf_type: i32,
-    iterations: i32,
-    memory: Option<i32>,
-    parallelism: Option<i32>,
-}
-
-#[derive(Debug, Clone)]
-struct UnlockMaterial {
-    encrypted_user_keys: Vec<String>,
-    kdf: Option<UnlockKdfParams>,
-    salt: Option<String>,
+    master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
 }
 
 impl UnlockVaultWithPasswordUseCase {
-    pub fn new(sync_service: Arc<SyncService>) -> Self {
-        Self { sync_service }
+    pub fn new(master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>) -> Self {
+        Self {
+            master_password_unlock_data_port,
+        }
     }
 
     pub async fn execute(
@@ -59,20 +48,43 @@ impl UnlockVaultWithPasswordUseCase {
         }
 
         let unlock_context = resolve_unlock_context(runtime)?;
-        let unlock_material = self
-            .sync_service
-            .load_live_user_decryption(unlock_context.account_id.clone())
-            .await
-            .and_then(extract_unlock_material)?;
-        let master_keys = self
-            .derive_master_key_candidates_for_unlock(
-                &unlock_context,
-                &master_password,
-                &unlock_material,
-            )
-            ?;
-        let user_key =
-            decrypt_user_key_with_master_keys(&unlock_material.encrypted_user_keys, &master_keys)?;
+        let unlock_data = self
+            .master_password_unlock_data_port
+            .load_master_password_unlock_data(&unlock_context.account_id)
+            .await?
+            .ok_or_else(|| {
+                AppError::validation("missing canonical master_password_unlock data in local vault metadata")
+            })?;
+
+        let master_key = derive_master_key(
+            &unlock_data.salt,
+            &master_password,
+            unlock_data.kdf.kdf_type,
+            unlock_data.kdf.iterations,
+            unlock_data.kdf.memory,
+            unlock_data.kdf.parallelism,
+        )
+        .map_err(|error| {
+            AppError::validation(format!(
+                "failed to derive master key with canonical kdf params: {error}"
+            ))
+        })?;
+
+        let wrapping_key = derive_wrapping_key_material(&master_key)?;
+        let plaintext_user_key = vault_crypto::decrypt_cipher_bytes(
+            unlock_data.master_key_wrapped_user_key.trim(),
+            &wrapping_key,
+        )
+        .map_err(|error| {
+            AppError::validation(format!(
+                "failed to decrypt master_key_wrapped_user_key: {}",
+                error.message()
+            ))
+        })?;
+        let user_key = vault_crypto::parse_user_key_material(&plaintext_user_key).map_err(|error| {
+            AppError::validation(format!("failed to parse decrypted user_key: {}", error.message()))
+        })?;
+
         runtime.set_vault_user_key_material(unlock_context.account_id.clone(), user_key)?;
 
         log::info!(
@@ -85,55 +97,26 @@ impl UnlockVaultWithPasswordUseCase {
             account_id: unlock_context.account_id,
         })
     }
+}
 
-    fn derive_master_key_candidates_for_unlock(
+#[async_trait]
+impl MasterPasswordUnlockExecutor for UnlockVaultWithPasswordUseCase {
+    async fn execute_master_password_unlock(
         &self,
-        unlock_context: &VaultUnlockContext,
-        master_password: &str,
-        unlock_material: &UnlockMaterial,
-    ) -> AppResult<Vec<Vec<u8>>> {
-        let mut candidates = Vec::new();
-
-        if let Some(kdf) = &unlock_material.kdf {
-            let salt = unlock_material
-                .salt
-                .clone()
-                .unwrap_or_else(|| unlock_context.email.clone());
-            maybe_push_master_key(
-                &mut candidates,
-                &salt,
-                master_password,
-                kdf.kdf_type,
-                kdf.iterations,
-                kdf.memory,
-                kdf.parallelism,
-            )?;
-        }
-
-        if let (Some(kdf), Some(iterations)) = (unlock_context.kdf, unlock_context.kdf_iterations) {
-            maybe_push_master_key(
-                &mut candidates,
-                &unlock_context.email,
-                master_password,
-                kdf,
-                iterations,
-                unlock_context.kdf_memory,
-                unlock_context.kdf_parallelism,
-            )?;
-        }
-
-        if candidates.is_empty() {
-            return Err(AppError::validation(
-                "unable to derive local master key candidates for unlock; login and sync once to refresh local unlock metadata",
-            ));
-        }
-
-        Ok(candidates)
+        runtime: &dyn VaultRuntimePort,
+        master_password: String,
+    ) -> AppResult<UnlockVaultResult> {
+        let result = self
+            .execute(runtime, UnlockVaultWithPasswordCommand { master_password })
+            .await?;
+        Ok(UnlockVaultResult {
+            account_id: result.account_id,
+        })
     }
 }
 
 pub fn has_master_password_unlock_material(value: Option<SyncUserDecryption>) -> AppResult<bool> {
-    match extract_unlock_material(value) {
+    match extract_master_password_unlock_data(value) {
         Ok(_) => Ok(true),
         Err(error) if is_unlock_material_missing(&error) => Ok(false),
         Err(error) => Err(error),
@@ -152,51 +135,55 @@ fn resolve_unlock_context(runtime: &dyn VaultRuntimePort) -> AppResult<VaultUnlo
     })
 }
 
-fn extract_unlock_material(value: Option<SyncUserDecryption>) -> Result<UnlockMaterial, AppError> {
+fn extract_master_password_unlock_data(
+    value: Option<SyncUserDecryption>,
+) -> Result<MasterPasswordUnlockData, AppError> {
     let value = value.ok_or_else(|| {
         AppError::validation("missing local user_decryption data; run vault sync first")
     })?;
     let unlock = value.master_password_unlock.ok_or_else(|| {
         AppError::validation("missing master_password_unlock in local vault metadata")
     })?;
+    let kdf = unlock.kdf.ok_or_else(|| {
+        AppError::validation("missing master_password_unlock.kdf in local vault metadata")
+    })?;
 
-    let mut encrypted_user_keys = Vec::new();
-    if let Some(value) = unlock.master_key_wrapped_user_key {
-        let trimmed = value.trim();
-        if !trimmed.is_empty() {
-            encrypted_user_keys.push(String::from(trimmed));
-        }
-    }
-    if let Some(value) = unlock.master_key_encrypted_user_key {
-        let trimmed = value.trim();
-        if !trimmed.is_empty() && encrypted_user_keys.iter().all(|item| item != trimmed) {
-            encrypted_user_keys.push(String::from(trimmed));
-        }
-    }
-    if encrypted_user_keys.is_empty() {
-        return Err(AppError::validation(
-            "encrypted user key is missing in local vault metadata",
-        ));
-    }
-
-    let kdf = unlock.kdf.and_then(|value| {
-        Some(UnlockKdfParams {
-            kdf_type: value.kdf_type?,
-            iterations: value.iterations?,
-            memory: value.memory,
-            parallelism: value.parallelism,
-        })
-    });
-
+    let kdf_type = kdf.kdf_type.ok_or_else(|| {
+        AppError::validation("missing master_password_unlock.kdf_type in local vault metadata")
+    })?;
+    let iterations = kdf.iterations.ok_or_else(|| {
+        AppError::validation("missing master_password_unlock.iterations in local vault metadata")
+    })?;
     let salt = unlock
         .salt
         .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            AppError::validation("missing master_password_unlock.salt in local vault metadata")
+        })?;
+    let master_key_wrapped_user_key = unlock
+        .master_key_wrapped_user_key
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            AppError::validation("missing master_key_wrapped_user_key in local vault metadata")
+        })?;
 
-    Ok(UnlockMaterial {
-        encrypted_user_keys,
-        kdf,
+    if !vault_crypto::looks_like_cipher_string(&master_key_wrapped_user_key) {
+        return Err(AppError::validation(
+            "master_key_wrapped_user_key is not a valid cipher string",
+        ));
+    }
+
+    Ok(MasterPasswordUnlockData {
+        kdf: MasterPasswordUnlockKdf {
+            kdf_type,
+            iterations,
+            memory: kdf.memory,
+            parallelism: kdf.parallelism,
+        },
         salt,
+        master_key_wrapped_user_key,
     })
 }
 
@@ -207,169 +194,21 @@ fn is_unlock_material_missing(error: &AppError) -> bool {
 
     message.contains("missing local user_decryption data")
         || message.contains("missing master_password_unlock")
-        || message.contains("encrypted user key is missing")
+        || message.contains("missing master_key_wrapped_user_key")
 }
 
-fn maybe_push_master_key(
-    candidates: &mut Vec<Vec<u8>>,
-    email_or_salt: &str,
-    master_password: &str,
-    kdf: i32,
-    kdf_iterations: i32,
-    kdf_memory: Option<i32>,
-    kdf_parallelism: Option<i32>,
-) -> Result<(), AppError> {
-    let key = derive_master_key(
-        email_or_salt,
-        master_password,
-        kdf,
-        kdf_iterations,
-        kdf_memory,
-        kdf_parallelism,
-    )
-    .map_err(|error| {
-        AppError::validation(format!(
-            "failed to derive master key with provided kdf params: {error}"
-        ))
-    })?;
-    if candidates.iter().all(|existing| existing != &key) {
-        candidates.push(key);
-    }
-    Ok(())
-}
-
-fn decrypt_user_key_with_master_keys(
-    encrypted_user_keys: &[String],
-    master_keys: &[Vec<u8>],
-) -> Result<VaultUserKeyMaterial, AppError> {
-    if encrypted_user_keys.is_empty() {
-        return Err(AppError::validation(
-            "encrypted_user_key list cannot be empty",
-        ));
+fn derive_wrapping_key_material(master_key: &[u8]) -> Result<VaultUserKeyMaterial, AppError> {
+    if master_key.len() != MASTER_KEY_LEN {
+        return Err(AppError::validation(format!(
+            "master key length must be {MASTER_KEY_LEN} bytes, got {}",
+            master_key.len()
+        )));
     }
 
-    for encrypted_user_key in encrypted_user_keys {
-        let trimmed = encrypted_user_key.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if !vault_crypto::looks_like_cipher_string(trimmed) {
-            if let Ok(parsed) = vault_crypto::parse_user_key(trimmed) {
-                return Ok(parsed);
-            }
-            continue;
-        }
-
-        for master_key in master_keys {
-            for candidate in candidate_keys_from_master_key(master_key) {
-                if let Ok(plaintext_user_key) =
-                    vault_crypto::decrypt_cipher_bytes(trimmed, &candidate)
-                {
-                    if let Ok(user_key) = vault_crypto::parse_user_key_material(&plaintext_user_key)
-                    {
-                        return Ok(user_key);
-                    }
-                }
-            }
-        }
-    }
-
-    let enc_types: Vec<String> = encrypted_user_keys
-        .iter()
-        .filter_map(|value| value.trim().split_once('.').map(|(enc_type, _)| enc_type))
-        .map(String::from)
-        .collect();
-
-    log::warn!(
-        target: "vanguard::application::vault_unlock",
-        "failed to decrypt encrypted_user_key candidates_count={} master_key_candidates={} enc_types={:?}",
-        encrypted_user_keys.len(),
-        master_keys.len(),
-        enc_types
-    );
-
-    Err(AppError::validation(
-        "unable to unlock encrypted_user_key with provided password",
-    ))
-}
-
-fn candidate_keys_from_master_key(master_key: &[u8]) -> Vec<VaultUserKeyMaterial> {
-    let mut candidates = Vec::new();
-
-    if master_key.len() == 32 {
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: hkdf_expand_from_prk(master_key, b"enc", 32),
-            mac_key: Some(hkdf_expand_from_prk(master_key, b"mac", 32)),
-        });
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: master_key.to_vec(),
-            mac_key: None,
-        });
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: master_key.to_vec(),
-            mac_key: Some(hmac_derive(master_key, b"mac")),
-        });
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: hkdf_expand_with_salt(master_key, &[0u8; 32], b"enc", 32),
-            mac_key: Some(hkdf_expand_with_salt(master_key, &[0u8; 32], b"mac", 32)),
-        });
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: hkdf_expand_with_salt(master_key, BITWARDEN_HKDF_SALT, b"enc", 32),
-            mac_key: Some(hkdf_expand_with_salt(
-                master_key,
-                BITWARDEN_HKDF_SALT,
-                b"mac",
-                32,
-            )),
-        });
-        let hashed = Sha256::digest(master_key).to_vec();
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: hashed.clone(),
-            mac_key: Some(hmac_derive(&hashed, b"mac")),
-        });
-    } else if master_key.len() == 64 {
-        candidates.push(VaultUserKeyMaterial {
-            enc_key: master_key[..32].to_vec(),
-            mac_key: Some(master_key[32..].to_vec()),
-        });
-    }
-
-    candidates
-}
-
-fn hmac_derive(key: &[u8], label: &[u8]) -> Vec<u8> {
-    let mut mac = HmacSha256::new_from_slice(key).expect("hmac key must be valid");
-    mac.update(label);
-    mac.finalize().into_bytes().to_vec()
-}
-
-fn hkdf_expand_with_salt(ikm: &[u8], salt: &[u8], info: &[u8], len: usize) -> Vec<u8> {
-    let mut extract = HmacSha256::new_from_slice(salt).expect("hkdf salt");
-    extract.update(ikm);
-    let prk = extract.finalize().into_bytes();
-
-    let mut okm = Vec::with_capacity(len);
-    let mut previous = Vec::new();
-    let mut counter: u8 = 1;
-
-    while okm.len() < len {
-        let mut expand = HmacSha256::new_from_slice(&prk).expect("hkdf prk");
-        if !previous.is_empty() {
-            expand.update(&previous);
-        }
-        expand.update(info);
-        expand.update(&[counter]);
-        previous = expand.finalize().into_bytes().to_vec();
-        okm.extend_from_slice(&previous);
-        counter = counter.saturating_add(1);
-        if counter == 0 {
-            break;
-        }
-    }
-
-    okm.truncate(len);
-    okm
+    Ok(VaultUserKeyMaterial {
+        enc_key: hkdf_expand_from_prk(master_key, b"enc", 32),
+        mac_key: Some(hkdf_expand_from_prk(master_key, b"mac", 32)),
+    })
 }
 
 fn hkdf_expand_from_prk(prk: &[u8], info: &[u8], len: usize) -> Vec<u8> {
@@ -453,124 +292,48 @@ fn to_u32(value: i32) -> Result<u32, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aes::Aes256;
-    use base64::engine::general_purpose::STANDARD;
-    use base64::Engine;
-    use cbc::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
-
-    type Aes256CbcEncryptor = cbc::Encryptor<Aes256>;
 
     #[test]
-    fn decrypt_user_key_with_master_keys_supports_hmac_derived_mac_key() {
-        let master_key = [7u8; 32];
-        let enc_key = master_key;
-        let mac_key_vec = hmac_derive(&master_key, b"mac");
-        let mac_key: [u8; 32] = mac_key_vec
-            .try_into()
-            .expect("hmac output should be 32 bytes");
-        let plain_user_key = STANDARD.encode([3u8; 64]);
-        let encrypted_user_key = encrypt_type2(&plain_user_key, &enc_key, &mac_key);
+    fn has_material_accepts_canonical_payload() {
+        let payload = Some(crate::application::dto::sync::SyncUserDecryption {
+            master_password_unlock: Some(crate::application::dto::sync::SyncMasterPasswordUnlock {
+                kdf: Some(crate::application::dto::sync::SyncKdfParams {
+                    kdf_type: Some(0),
+                    iterations: Some(600_000),
+                    memory: None,
+                    parallelism: None,
+                }),
+                master_key_encrypted_user_key: Some(String::from("2.encrypted|payload|mac")),
+                master_key_wrapped_user_key: Some(String::from("2.wrapped|payload|mac")),
+                salt: Some(String::from("test@example.com")),
+            }),
+        });
 
-        let parsed =
-            decrypt_user_key_with_master_keys(&[encrypted_user_key], &[master_key.to_vec()])
-                .expect("unlock with password candidate key");
-        assert_eq!(parsed.enc_key.len(), 32);
-        assert_eq!(parsed.mac_key.as_ref().map(Vec::len), Some(32));
+        let allowed = has_master_password_unlock_material(payload)
+            .expect("canonical payload should be accepted");
+
+        assert!(allowed);
     }
 
     #[test]
-    fn decrypt_user_key_with_master_keys_supports_raw_64_byte_material() {
-        let master_key = [7u8; 32];
-        let enc_key = hkdf_expand_from_prk(&master_key, b"enc", 32);
-        let mac_key_vec = hkdf_expand_from_prk(&master_key, b"mac", 32);
-        let mac_key: [u8; 32] = mac_key_vec
-            .try_into()
-            .expect("hkdf output should be 32 bytes");
-        let plain_user_key = vec![3u8; 64];
-        let encrypted_user_key = encrypt_type2_bytes(&plain_user_key, &enc_key, &mac_key);
+    fn has_material_rejects_payload_without_wrapped_user_key() {
+        let payload = Some(crate::application::dto::sync::SyncUserDecryption {
+            master_password_unlock: Some(crate::application::dto::sync::SyncMasterPasswordUnlock {
+                kdf: Some(crate::application::dto::sync::SyncKdfParams {
+                    kdf_type: Some(0),
+                    iterations: Some(600_000),
+                    memory: None,
+                    parallelism: None,
+                }),
+                master_key_encrypted_user_key: Some(String::from("2.encrypted|payload|mac")),
+                master_key_wrapped_user_key: None,
+                salt: Some(String::from("test@example.com")),
+            }),
+        });
 
-        let parsed =
-            decrypt_user_key_with_master_keys(&[encrypted_user_key], &[master_key.to_vec()])
-                .expect("unlock with password candidate key");
-        assert_eq!(parsed.enc_key.len(), 32);
-        assert_eq!(parsed.mac_key.as_ref().map(Vec::len), Some(32));
-    }
+        let allowed = has_master_password_unlock_material(payload)
+            .expect("missing wrapped key should be treated as not unlockable");
 
-    #[test]
-    fn extract_unlock_material_prefers_wrapped_variant() {
-        let extracted =
-            extract_unlock_material(Some(crate::application::dto::sync::SyncUserDecryption {
-                master_password_unlock: Some(
-                    crate::application::dto::sync::SyncMasterPasswordUnlock {
-                        kdf: None,
-                        master_key_encrypted_user_key: Some(String::from(
-                            "2.encrypted|payload|mac",
-                        )),
-                        master_key_wrapped_user_key: Some(String::from("2.wrapped|payload|mac")),
-                        salt: None,
-                    },
-                ),
-            }))
-            .expect("extract wrapped");
-
-        assert_eq!(
-            extracted.encrypted_user_keys,
-            vec![
-                String::from("2.wrapped|payload|mac"),
-                String::from("2.encrypted|payload|mac")
-            ]
-        );
-    }
-
-    #[test]
-    fn extract_unlock_material_fallbacks_to_encrypted_variant() {
-        let extracted =
-            extract_unlock_material(Some(crate::application::dto::sync::SyncUserDecryption {
-                master_password_unlock: Some(
-                    crate::application::dto::sync::SyncMasterPasswordUnlock {
-                        kdf: None,
-                        master_key_encrypted_user_key: Some(String::from(
-                            "2.encrypted|payload|mac",
-                        )),
-                        master_key_wrapped_user_key: None,
-                        salt: None,
-                    },
-                ),
-            }))
-            .expect("extract encrypted");
-
-        assert_eq!(
-            extracted.encrypted_user_keys,
-            vec![String::from("2.encrypted|payload|mac")]
-        );
-    }
-
-    fn encrypt_type2(plaintext: &str, enc_key: &[u8; 32], mac_key: &[u8; 32]) -> String {
-        encrypt_type2_bytes(plaintext.as_bytes(), enc_key, mac_key)
-    }
-
-    fn encrypt_type2_bytes(plaintext: &[u8], enc_key: &[u8], mac_key: &[u8]) -> String {
-        let iv = [9u8; 16];
-        let mut buffer = plaintext.to_vec();
-        let message_len = buffer.len();
-        buffer.resize(message_len + 16, 0);
-
-        let ciphertext = Aes256CbcEncryptor::new_from_slices(enc_key, &iv)
-            .expect("build encryptor")
-            .encrypt_padded_mut::<Pkcs7>(&mut buffer, message_len)
-            .expect("encrypt")
-            .to_vec();
-
-        let mut mac = HmacSha256::new_from_slice(mac_key).expect("build hmac");
-        mac.update(&iv);
-        mac.update(&ciphertext);
-        let mac = mac.finalize().into_bytes();
-
-        format!(
-            "2.{}|{}|{}",
-            STANDARD.encode(iv),
-            STANDARD.encode(ciphertext),
-            STANDARD.encode(mac)
-        )
+        assert!(!allowed);
     }
 }

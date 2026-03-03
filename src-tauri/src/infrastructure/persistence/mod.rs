@@ -1,3 +1,5 @@
+pub mod master_password_unlock_data_port_adapter;
 pub mod sqlite_vault_repository;
 
+pub use master_password_unlock_data_port_adapter::SqliteMasterPasswordUnlockDataPort;
 pub use sqlite_vault_repository::SqliteVaultRepository;
