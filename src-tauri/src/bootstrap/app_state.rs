@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -74,6 +75,7 @@ pub struct AppState {
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
     auth_state_path: Arc<PathBuf>,
+    auth_state_persist_lock: Arc<Mutex<()>>,
     persisted_auth_state: Arc<Mutex<Option<PersistedAuthState>>>,
     auth_wrap_runtime: Arc<Mutex<Option<SessionWrapRuntime>>>,
 }
@@ -110,6 +112,7 @@ impl AppState {
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
             auth_state_path: Arc::new(auth_state_path),
+            auth_state_persist_lock: Arc::new(Mutex::new(())),
             persisted_auth_state: Arc::new(Mutex::new(persisted_auth_state)),
             auth_wrap_runtime: Arc::new(Mutex::new(None)),
         }
@@ -368,6 +371,10 @@ impl AppState {
     }
 
     fn store_persisted_auth_state(&self, value: Option<PersistedAuthState>) -> AppResult<()> {
+        let _persist_guard = self
+            .auth_state_persist_lock
+            .lock()
+            .map_err(|_| AppError::internal("failed to lock auth state persistence"))?;
         persist_persisted_auth_state_to_disk(self.auth_state_path.as_ref(), value.as_ref())?;
         let mut store = self
             .persisted_auth_state
@@ -499,8 +506,7 @@ fn persist_persisted_auth_state_to_disk(
                     path.display()
                 ))
             })?;
-            let mut temp_path = path.to_path_buf();
-            temp_path.set_extension("json.tmp");
+            let temp_path = build_temp_auth_state_path(path);
             std::fs::write(&temp_path, serialized).map_err(|error| {
                 AppError::internal(format!(
                     "failed to write temp auth state {}: {error}",
@@ -515,5 +521,27 @@ fn persist_persisted_auth_state_to_disk(
             })?;
             Ok(())
         }
+    }
+}
+
+static AUTH_STATE_TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn next_auth_state_temp_file_id() -> u64 {
+    AUTH_STATE_TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+fn build_temp_auth_state_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("auth-state.json");
+    let temp_file_name = format!(
+        "{file_name}.tmp.{}.{}",
+        std::process::id(),
+        next_auth_state_temp_file_id()
+    );
+    match path.parent() {
+        Some(parent) => parent.join(temp_file_name),
+        None => PathBuf::from(temp_file_name),
     }
 }
