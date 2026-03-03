@@ -5,3 +5,4 @@ pub mod sync_vault_use_case;
 pub mod unlock_vault_use_case;
 pub mod unlock_vault_with_password_use_case;
 pub mod vault_biometric_use_case;
+pub mod vault_pin_use_case;

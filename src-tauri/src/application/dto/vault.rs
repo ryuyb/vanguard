@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::application::dto::sync::SyncMetricsSummary;
-use crate::domain::unlock::UnlockMethod;
+use crate::domain::unlock::{PinLockType, UnlockMethod};
 use crate::domain::sync::SyncContext;
 
 #[derive(Debug, Clone)]
@@ -29,6 +29,19 @@ pub struct UnlockVaultCommand {
 #[derive(Debug, Clone)]
 pub struct UnlockVaultResult {
     pub account_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnablePinUnlockCommand {
+    pub pin: String,
+    pub lock_type: PinLockType,
+}
+
+#[derive(Debug, Clone)]
+pub struct VaultPinStatus {
+    pub supported: bool,
+    pub enabled: bool,
+    pub lock_type: PinLockType,
 }
 
 #[derive(Debug, Clone)]

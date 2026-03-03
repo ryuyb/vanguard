@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnlockMethod {
     MasterPassword { password: String },
@@ -27,7 +29,8 @@ pub struct MasterPasswordUnlockData {
     pub master_key_wrapped_user_key: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PinProtectedUserKeyEnvelope {
     pub algorithm: String,
     pub kdf: String,
