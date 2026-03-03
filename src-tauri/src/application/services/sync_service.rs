@@ -57,19 +57,6 @@ impl SyncService {
         let endpoint = sync_endpoint(&command.base_url);
         let trigger = command.trigger;
 
-        if let Err(error) = self.enforce_debounce(&account_id) {
-            log::warn!(
-                target: "vanguard::sync",
-                "sync rejected account_id={} endpoint={} status={} error_code={} message={}",
-                account_id,
-                endpoint,
-                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                error.code(),
-                error
-            );
-            return Err(error);
-        }
-
         if let Err(error) = self.acquire_running_slot(&account_id) {
             log::warn!(
                 target: "vanguard::sync",
@@ -83,6 +70,20 @@ impl SyncService {
             return Err(error);
         }
         let _guard = RunningSlotGuard::new(Arc::clone(&self.running_accounts), account_id.clone());
+
+        if let Err(error) = self.enforce_debounce(&account_id) {
+            log::warn!(
+                target: "vanguard::sync",
+                "sync rejected account_id={} endpoint={} status={} error_code={} message={}",
+                account_id,
+                endpoint,
+                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error
+            );
+            return Err(error);
+        }
+
         self.sync_event_port.emit_sync_started(&account_id);
         let started_at = Instant::now();
 
