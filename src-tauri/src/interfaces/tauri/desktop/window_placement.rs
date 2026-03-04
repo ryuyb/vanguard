@@ -1,7 +1,7 @@
-use tauri::{LogicalPosition, Monitor, Runtime, WebviewWindow};
+use tauri::{LogicalPosition, Manager, Monitor, Runtime, WebviewWindow};
 use tauri_plugin_positioner::{Position, WindowExt};
 
-use crate::interfaces::tauri::desktop::constants::SPOTLIGHT_WIDTH;
+use crate::interfaces::tauri::desktop::constants::{SPOTLIGHT_WIDTH, SPOTLIGHT_WINDOW_LABEL};
 use crate::interfaces::tauri::desktop::monitor::{
     find_monitor_from_cursor_flexible, find_monitor_from_logical_point,
     find_monitor_from_tray_click_snapshot, monitor_logical_work_area,
@@ -14,8 +14,10 @@ impl WindowPlacementPolicy {
     pub(super) fn recenter_main_window_on_active_monitor<R: Runtime>(
         app_handle: &tauri::AppHandle<R>,
         main_window: &WebviewWindow<R>,
+        prefer_tray_snapshot: bool,
     ) {
-        let Some(target_monitor) = Self::resolve_monitor_for_main_window(app_handle, main_window)
+        let Some(target_monitor) =
+            Self::resolve_monitor_for_main_window(app_handle, main_window, prefer_tray_snapshot)
         else {
             log::warn!(
                 target: "vanguard::tray",
@@ -97,21 +99,42 @@ impl WindowPlacementPolicy {
     fn resolve_monitor_for_main_window<R: Runtime>(
         app_handle: &tauri::AppHandle<R>,
         main_window: &WebviewWindow<R>,
+        prefer_tray_snapshot: bool,
     ) -> Option<Monitor> {
-        if let Some(snapshot) = TrayClickSnapshotStore::latest() {
-            if let Some(monitor) = find_monitor_from_tray_click_snapshot(app_handle, snapshot)
-                .or_else(|| {
-                    app_handle
-                        .monitor_from_point(snapshot.position.x, snapshot.position.y)
-                        .ok()
-                        .flatten()
-                })
-            {
-                return Some(monitor);
+        if prefer_tray_snapshot {
+            if let Some(snapshot) = TrayClickSnapshotStore::latest() {
+                if let Some(monitor) = find_monitor_from_tray_click_snapshot(app_handle, snapshot)
+                    .or_else(|| {
+                        app_handle
+                            .monitor_from_point(snapshot.position.x, snapshot.position.y)
+                            .ok()
+                            .flatten()
+                    })
+                {
+                    return Some(monitor);
+                }
+            }
+        }
+
+        if !prefer_tray_snapshot {
+            if let Some(spotlight_window) = app_handle.get_webview_window(SPOTLIGHT_WINDOW_LABEL) {
+                if let Some(monitor) = spotlight_window.current_monitor().ok().flatten() {
+                    return Some(monitor);
+                }
             }
         }
 
         if let Ok(cursor_position) = app_handle.cursor_position() {
+            if let Some(monitor) = find_monitor_from_cursor_flexible(app_handle, cursor_position) {
+                return Some(monitor);
+            }
+            if let Some(monitor) = app_handle
+                .monitor_from_point(cursor_position.x, cursor_position.y)
+                .ok()
+                .flatten()
+            {
+                return Some(monitor);
+            }
             if let Some(monitor) = find_monitor_from_logical_point(app_handle, cursor_position) {
                 return Some(monitor);
             }

@@ -13,6 +13,7 @@ import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { resolveSessionRoute } from "@/lib/route-session";
 import "@/main.css";
 import "./spotlight.css";
 
@@ -70,6 +71,38 @@ function SpotlightApp() {
     }
   }, []);
 
+  const openMainWindow = useCallback(async () => {
+    try {
+      const result = await commands.desktopOpenMainWindow();
+      if (result.status === "error") {
+        logClientError(
+          "Failed to open main window via desktop command",
+          result.error,
+        );
+      }
+    } catch (error) {
+      logClientError("Failed to open main window via desktop command", error);
+    } finally {
+      await hideSpotlight();
+    }
+  }, [hideSpotlight]);
+
+  const ensureSpotlightSession = useCallback(async () => {
+    try {
+      const target = await resolveSessionRoute();
+      if (target === "/vault") {
+        return true;
+      }
+
+      await openMainWindow();
+      return false;
+    } catch (error) {
+      logClientError("Failed to resolve spotlight session route", error);
+      await hideSpotlight();
+      return false;
+    }
+  }, [hideSpotlight, openMainWindow]);
+
   const loadVaultItems = useCallback(async () => {
     setIsLoadingVault(true);
 
@@ -94,9 +127,66 @@ function SpotlightApp() {
     }
   }, []);
 
+  const refreshSpotlightState = useCallback(async () => {
+    const canUseSpotlight = await ensureSpotlightSession();
+    if (!canUseSpotlight) {
+      return;
+    }
+    await loadVaultItems();
+  }, [ensureSpotlightSession, loadVaultItems]);
+
   useEffect(() => {
-    void loadVaultItems();
-  }, [loadVaultItems]);
+    void refreshSpotlightState();
+  }, [refreshSpotlightState]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    void getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (!focused) {
+          return;
+        }
+        void refreshSpotlightState();
+      })
+      .then((unsubscribe) => {
+        if (disposed) {
+          unsubscribe();
+          return;
+        }
+        unlisten = unsubscribe;
+      })
+      .catch((error) => {
+        logClientError("Failed to subscribe spotlight focus events", error);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [refreshSpotlightState]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      void refreshSpotlightState();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      void refreshSpotlightState();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    window.addEventListener("pageshow", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      window.removeEventListener("pageshow", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshSpotlightState]);
 
   const normalizedQuery = query.trim().toLowerCase();
   const hasQuery = normalizedQuery.length > 0;

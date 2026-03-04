@@ -45,6 +45,14 @@ async authLogout(request: LogoutRequestDto) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async desktopOpenMainWindow() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("desktop_open_main_window") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_now", { request }) };

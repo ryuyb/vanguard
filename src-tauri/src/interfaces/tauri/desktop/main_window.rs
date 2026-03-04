@@ -44,6 +44,14 @@ impl MainWindowFeature {
     }
 
     pub(super) fn open_from_tray<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+        Self::open(app_handle, true);
+    }
+
+    pub(super) fn open_from_shortcut<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+        Self::open(app_handle, false);
+    }
+
+    fn open<R: Runtime>(app_handle: &tauri::AppHandle<R>, prefer_tray_snapshot: bool) {
         #[cfg(target_os = "macos")]
         if let Err(error) = app_handle.set_activation_policy(ActivationPolicy::Regular) {
             log::warn!(
@@ -55,29 +63,33 @@ impl MainWindowFeature {
         let Some(main_window) = app_handle.get_webview_window(MAIN_WINDOW_LABEL) else {
             log::warn!(
                 target: "vanguard::tray",
-                "main window not found, cannot restore from tray"
+                "main window not found, cannot restore"
             );
             return;
         };
 
-        WindowPlacementPolicy::recenter_main_window_on_active_monitor(app_handle, &main_window);
+        WindowPlacementPolicy::recenter_main_window_on_active_monitor(
+            app_handle,
+            &main_window,
+            prefer_tray_snapshot,
+        );
 
         if let Err(error) = main_window.unminimize() {
             log::warn!(
                 target: "vanguard::tray",
-                "failed to unminimize main window from tray: {error}"
+                "failed to unminimize main window: {error}"
             );
         }
         if let Err(error) = main_window.show() {
             log::warn!(
                 target: "vanguard::tray",
-                "failed to show main window from tray: {error}"
+                "failed to show main window: {error}"
             );
         }
         if let Err(error) = main_window.set_focus() {
             log::warn!(
                 target: "vanguard::tray",
-                "failed to focus main window from tray: {error}"
+                "failed to focus main window: {error}"
             );
         }
     }

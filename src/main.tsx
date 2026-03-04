@@ -3,9 +3,32 @@ import ReactDOM from "react-dom/client";
 import "./main.css";
 
 import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { resolveSessionRoute } from "@/lib/route-session";
 import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree });
+
+async function syncRouteWithSession() {
+  try {
+    const target = await resolveSessionRoute();
+    const currentPath = router.state.location.pathname;
+    if (currentPath === target) {
+      return;
+    }
+    await router.navigate({ to: target });
+  } catch {
+    // ignored: session probe failure should not crash app boot
+  }
+}
+
+void syncRouteWithSession();
+void getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+  if (!focused) {
+    return;
+  }
+  void syncRouteWithSession();
+});
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {
