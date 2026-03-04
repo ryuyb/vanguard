@@ -19,6 +19,7 @@ import "./spotlight.css";
 
 type SpotlightItem = {
   id: string;
+  cipherId: string;
   title: string;
   subtitle: string;
   searchText: string;
@@ -39,9 +40,10 @@ function logClientError(context: string, error: unknown) {
 }
 
 const DETAIL_ACTIONS = [
-  { label: "复制 用户名", shortcut: ["⌘", "C"] },
-  { label: "复制 密码", shortcut: ["⌘", "⇧", "C"] },
+  { label: "复制 用户名", shortcut: ["⌘", "C"], field: "username" },
+  { label: "复制 密码", shortcut: ["⌘", "⇧", "C"], field: "password" },
 ] as const;
+const COPY_FLASH_DURATION_MS = 180;
 
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   const rawName = cipher.name?.trim() ?? "";
@@ -50,6 +52,7 @@ function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   const subtitle = rawUsername || "Vault item";
   return {
     id: `cipher-${cipher.id}`,
+    cipherId: cipher.id,
     title,
     subtitle,
     searchText: `${rawName} ${rawUsername}`.toLowerCase(),
@@ -62,6 +65,11 @@ function SpotlightApp() {
   const [isLoadingVault, setIsLoadingVault] = useState(false);
   const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [detailActionIndex, setDetailActionIndex] = useState(0);
+  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [copiedDetailField, setCopiedDetailField] = useState<
+    "username" | "password" | null
+  >(null);
+  const [isCopying, setIsCopying] = useState(false);
 
   const hideSpotlight = useCallback(async () => {
     try {
@@ -241,8 +249,75 @@ function SpotlightApp() {
     return visibleItems[0]?.id ?? null;
   }, [visibleItems]);
 
+  const runCopyAction = useCallback(
+    async (item: SpotlightItem, field: "username" | "password") => {
+      if (isCopying) {
+        return;
+      }
+
+      setIsCopying(true);
+      try {
+        const result = await commands.vaultCopyCipherField({
+          cipherId: item.cipherId,
+          field,
+          clearAfterMs: null,
+        });
+        if (result.status === "error") {
+          logClientError("Failed to copy cipher field", result.error);
+          return;
+        }
+
+        setCopiedItemId(item.id);
+        setCopiedDetailField(field);
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, COPY_FLASH_DURATION_MS),
+        );
+        setCopiedItemId(null);
+        setCopiedDetailField(null);
+        await hideSpotlight();
+      } catch (error) {
+        logClientError("Failed to copy cipher field", error);
+      } finally {
+        setIsCopying(false);
+      }
+    },
+    [hideSpotlight, isCopying],
+  );
+
   const onCommandInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
+      const normalizedKey = event.key.toLowerCase();
+      const isCopyShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        normalizedKey === "c";
+      if (isCopyShortcut) {
+        event.preventDefault();
+        const field = event.shiftKey ? "password" : "username";
+        if (detailItem) {
+          void runCopyAction(detailItem, field);
+          return;
+        }
+        const selectedItemId = resolveSelectedItemId();
+        if (!selectedItemId) {
+          return;
+        }
+        const selectedItem =
+          visibleItems.find((item) => item.id === selectedItemId) ?? null;
+        if (!selectedItem) {
+          return;
+        }
+        void runCopyAction(selectedItem, field);
+        return;
+      }
+
+      if (event.key === "Enter" && detailItem) {
+        event.preventDefault();
+        const field = DETAIL_ACTIONS[detailActionIndex]?.field ?? "username";
+        void runCopyAction(detailItem, field);
+        return;
+      }
+
       if (
         detailItem &&
         (event.key === "ArrowDown" || event.key === "ArrowUp")
@@ -294,11 +369,14 @@ function SpotlightApp() {
       }
     },
     [
+      detailActionIndex,
       detailItem,
       hasVisibleResults,
       hideSpotlight,
       query,
       resolveSelectedItemId,
+      runCopyAction,
+      visibleItems,
     ],
   );
 
@@ -378,7 +456,7 @@ function SpotlightApp() {
                         role="option"
                         tabIndex={-1}
                         aria-selected={detailActionIndex === index}
-                        className={`spotlight-detail-action${detailActionIndex === index ? " is-selected" : ""}`}
+                        className={`spotlight-detail-action${detailActionIndex === index ? " is-selected" : ""}${copiedDetailField === action.field ? " is-copied" : ""}`}
                       >
                         <span>{action.label}</span>
                         <KbdGroup className="spotlight-detail-action-shortcut">
@@ -398,7 +476,7 @@ function SpotlightApp() {
                     <CommandItem
                       key={item.id}
                       value={item.id}
-                      className="spotlight-item"
+                      className={`spotlight-item${copiedItemId === item.id ? " is-copied" : ""}`}
                     >
                       <div>
                         <p className="spotlight-item-title">{item.title}</p>
