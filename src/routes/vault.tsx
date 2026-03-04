@@ -56,7 +56,7 @@ const ALL_ITEMS_ID = "__all_items__";
 const FAVORITES_ID = "__favorites__";
 const TRASH_ID = "__trash__";
 
-type VaultPageState = "loading" | "needsLogin" | "locked" | "ready" | "error";
+type VaultPageState = "loading" | "ready" | "error";
 type CipherTypeFilter =
   | "all"
   | "login"
@@ -304,6 +304,12 @@ function VaultPage() {
     setPageState("loading");
 
     try {
+      const target = await resolveSessionRoute();
+      if (target !== "/vault") {
+        await navigate({ to: target });
+        return;
+      }
+
       const restore = await commands.authRestoreState({});
       if (restore.status === "error") {
         setPageState("error");
@@ -315,25 +321,13 @@ function VaultPage() {
 
       setUserEmail(restore.data.email ?? "未登录");
       setUserBaseUrl(restore.data.baseUrl ?? "未知服务");
-      if (restore.data.status === "needsLogin") {
-        setPageState("needsLogin");
-        setViewData(null);
-        return;
-      }
-
-      const unlockResult = await commands.vaultIsUnlocked();
-      if (unlockResult.status === "error" || !unlockResult.data) {
-        setPageState("locked");
-        setViewData(null);
-        return;
-      }
 
       const result = await commands.vaultGetViewData();
 
       if (result.status === "error") {
         const text = errorToText(result.error);
         if (text.toLowerCase().includes("vault is locked")) {
-          setPageState("locked");
+          await navigate({ to: "/unlock" });
         } else {
           setPageState("error");
           setErrorText(text);
@@ -351,7 +345,7 @@ function VaultPage() {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     void loadVaultData();
@@ -618,7 +612,7 @@ function VaultPage() {
   const logoutLabel = isLoggingOut ? "登出中..." : "登出";
 
   return (
-    <main className="flex h-dvh flex-col bg-[radial-gradient(circle_at_12%_8%,_hsl(212_95%_96%),_transparent_36%),radial-gradient(circle_at_92%_92%,_hsl(215_95%_97%),_transparent_40%),linear-gradient(145deg,_hsl(216_55%_98%),_hsl(0_0%_100%))]">
+    <main className="flex h-dvh flex-col bg-[radial-gradient(circle_at_12%_8%,hsl(212_95%_96%),transparent_36%),radial-gradient(circle_at_92%_92%,hsl(215_95%_97%),transparent_40%),linear-gradient(145deg,hsl(216_55%_98%),hsl(0_0%_100%))]">
       <header
         data-tauri-drag-region
         className="w-full border-b border-slate-200/80 bg-slate-100/95 px-4 py-1 shadow-sm backdrop-blur-sm md:px-8 md:py-1.5"
@@ -630,7 +624,7 @@ function VaultPage() {
           >
             <div
               data-tauri-drag-region
-              className="relative w-full md:max-w-[420px] md:justify-self-center"
+              className="relative w-full md:max-w-105 md:justify-self-center"
             >
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
               <Input
@@ -717,18 +711,6 @@ function VaultPage() {
         {pageState === "loading" && (
           <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
             正在加载 vault 数据...
-          </div>
-        )}
-
-        {pageState === "needsLogin" && (
-          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
-            当前未登录，请先登录后访问 vault。
-          </div>
-        )}
-
-        {pageState === "locked" && (
-          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
-            当前 vault 已锁定，请先解锁。
           </div>
         )}
 
@@ -1018,9 +1000,6 @@ function VaultPage() {
                       key={cipher.id}
                       cipher={cipher}
                       selected={cipher.id === selectedCipherId}
-                      loading={
-                        isCipherDetailLoading && cipher.id === selectedCipherId
-                      }
                       onClick={() => {
                         void loadCipherDetail(cipher.id);
                       }}
@@ -1038,7 +1017,7 @@ function VaultPage() {
             <section className="h-full min-h-0 bg-white/80 shadow-sm">
               <ScrollArea className="h-full">
                 <div className="p-3">
-                  {!selectedCipherId && <div className="min-h-[320px]" />}
+                  {!selectedCipherId && <div className="min-h-80" />}
 
                   {selectedCipherId && isCipherDetailLoading && (
                     <div className="flex items-center gap-2 text-sm text-slate-700">
@@ -1168,12 +1147,10 @@ function FolderTreeMenuItem({
 function CipherRow({
   cipher,
   selected,
-  loading,
   onClick,
 }: {
   cipher: VaultCipherItemDto;
   selected: boolean;
-  loading: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1193,12 +1170,6 @@ function CipherRow({
       <div className="mt-1 truncate text-xs text-slate-600">
         {cipher.username ?? ""}
       </div>
-      {loading && (
-        <div className="mt-1 flex items-center gap-1 text-xs text-sky-700">
-          <LoaderCircle className="size-3 animate-spin" />
-          加载中...
-        </div>
-      )}
     </button>
   );
 }
