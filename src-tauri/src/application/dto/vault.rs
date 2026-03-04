@@ -46,12 +46,6 @@ pub struct VaultUnlockContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct GetVaultViewDataQuery {
-    pub page: Option<u32>,
-    pub page_size: Option<u32>,
-}
-
-#[derive(Debug, Clone)]
 pub struct VaultFolderItem {
     pub id: String,
     pub name: Option<String>,
@@ -79,8 +73,6 @@ pub struct GetVaultViewDataResult {
     pub folders: Vec<VaultFolderItem>,
     pub ciphers: Vec<VaultCipherItem>,
     pub total_ciphers: u32,
-    pub page: u32,
-    pub page_size: u32,
 }
 
 #[derive(Debug, Clone)]

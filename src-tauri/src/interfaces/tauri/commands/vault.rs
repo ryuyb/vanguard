@@ -3,8 +3,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::application::dto::vault::{
-    EnablePinUnlockCommand, GetCipherDetailQuery, GetVaultViewDataQuery, UnlockVaultCommand,
-    VaultUserKeyMaterial,
+    EnablePinUnlockCommand, GetCipherDetailQuery, UnlockVaultCommand, VaultUserKeyMaterial,
 };
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
 use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
@@ -18,7 +17,7 @@ use crate::interfaces::tauri::dto::vault::{
     VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
     VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto, VaultUnlockMethodDto,
-    VaultUnlockRequestDto, VaultViewDataRequestDto, VaultViewDataResponseDto,
+    VaultUnlockRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
@@ -224,16 +223,9 @@ pub async fn vault_lock(
 #[specta::specta]
 pub async fn vault_get_view_data(
     state: State<'_, AppState>,
-    request: VaultViewDataRequestDto,
 ) -> Result<VaultViewDataResponseDto, String> {
     let view_data = GetVaultViewDataUseCase::new(state.sync_service())
-        .execute(
-            &*state,
-            GetVaultViewDataQuery {
-                page: request.page,
-                page_size: request.page_size,
-            },
-        )
+        .execute(&*state)
         .await
         .map_err(|error| log_command_error("vault_get_view_data", error))?;
 
@@ -268,8 +260,6 @@ pub async fn vault_get_view_data(
             })
             .collect(),
         total_ciphers: view_data.total_ciphers,
-        page: view_data.page,
-        page_size: view_data.page_size,
     })
 }
 

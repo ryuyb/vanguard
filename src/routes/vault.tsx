@@ -328,10 +328,7 @@ function VaultPage() {
         return;
       }
 
-      const result = await commands.vaultGetViewData({
-        page: 1,
-        pageSize: 500,
-      });
+      const result = await commands.vaultGetViewData();
 
       if (result.status === "error") {
         const text = errorToText(result.error);

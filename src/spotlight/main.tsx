@@ -107,10 +107,7 @@ function SpotlightApp() {
     setIsLoadingVault(true);
 
     try {
-      const viewData = await commands.vaultGetViewData({
-        page: 1,
-        pageSize: 200,
-      });
+      const viewData = await commands.vaultGetViewData();
       if (viewData.status === "error") {
         logClientError("Failed to load vault data", viewData.error);
         setVaultItems([]);

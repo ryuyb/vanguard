@@ -165,9 +165,9 @@ async vaultLock(request: VaultLockRequestDto) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetViewData(request: VaultViewDataRequestDto) : Promise<Result<VaultViewDataResponseDto, string>> {
+async vaultGetViewData() : Promise<Result<VaultViewDataResponseDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_get_view_data", { request }) };
+    return { status: "ok", data: await TAURI_INVOKE("vault_get_view_data") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -255,8 +255,7 @@ export type VaultSyncStarted = { accountId: string }
 export type VaultSyncSucceeded = { accountId: string; status: SyncStatusResponseDto }
 export type VaultUnlockMethodDto = { type: "masterPassword"; password: string } | { type: "pin"; pin: string } | { type: "biometric" }
 export type VaultUnlockRequestDto = { method: VaultUnlockMethodDto }
-export type VaultViewDataRequestDto = { page: number | null; pageSize: number | null }
-export type VaultViewDataResponseDto = { accountId: string; syncStatus: SyncStatusResponseDto; folders: VaultFolderItemDto[]; ciphers: VaultCipherItemDto[]; totalCiphers: number; page: number; pageSize: number }
+export type VaultViewDataResponseDto = { accountId: string; syncStatus: SyncStatusResponseDto; folders: VaultFolderItemDto[]; ciphers: VaultCipherItemDto[]; totalCiphers: number }
 export type VerifyEmailTokenRequestDto = { baseUrl: string; userId: string; token: string }
 export type WebauthnAllowCredentialDto = { type: string | null; id: string | null; transports: string[] }
 export type WebauthnRequestExtensionsDto = { appid: string | null }

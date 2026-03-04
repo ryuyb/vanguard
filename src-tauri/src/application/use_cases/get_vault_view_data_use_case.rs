@@ -1,17 +1,11 @@
 use std::sync::Arc;
 
-use crate::application::dto::vault::{
-    GetVaultViewDataQuery, GetVaultViewDataResult, VaultCipherItem, VaultFolderItem,
-};
+use crate::application::dto::vault::{GetVaultViewDataResult, VaultCipherItem, VaultFolderItem};
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::sync_service::SyncService;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
-
-const DEFAULT_PAGE: u32 = 1;
-const DEFAULT_PAGE_SIZE: u32 = 50;
-const MAX_PAGE_SIZE: u32 = 200;
 
 #[derive(Clone)]
 pub struct GetVaultViewDataUseCase {
@@ -26,13 +20,8 @@ impl GetVaultViewDataUseCase {
     pub async fn execute(
         &self,
         runtime: &dyn VaultRuntimePort,
-        query: GetVaultViewDataQuery,
     ) -> AppResult<GetVaultViewDataResult> {
         let account_id = runtime.active_account_id()?;
-        let page = normalize_page(query.page);
-        let page_size = normalize_page_size(query.page_size);
-        let offset = (u64::from(page.saturating_sub(1)) * u64::from(page_size))
-            .min(u64::from(u32::MAX)) as u32;
 
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
@@ -46,14 +35,17 @@ impl GetVaultViewDataUseCase {
             .sync_service
             .list_live_folders(account_id.clone())
             .await?;
-        let ciphers = self
-            .sync_service
-            .list_live_ciphers(account_id.clone(), offset, page_size)
-            .await?;
         let total_ciphers = self
             .sync_service
             .count_live_ciphers(account_id.clone())
             .await?;
+        let ciphers = if total_ciphers == 0 {
+            Vec::new()
+        } else {
+            self.sync_service
+                .list_live_ciphers(account_id.clone(), 0, total_ciphers)
+                .await?
+        };
 
         let folders = folders
             .into_iter()
@@ -112,20 +104,8 @@ impl GetVaultViewDataUseCase {
             folders,
             ciphers,
             total_ciphers,
-            page,
-            page_size,
         })
     }
-}
-
-fn normalize_page(page: Option<u32>) -> u32 {
-    page.unwrap_or(DEFAULT_PAGE).max(1)
-}
-
-fn normalize_page_size(page_size: Option<u32>) -> u32 {
-    page_size
-        .unwrap_or(DEFAULT_PAGE_SIZE)
-        .clamp(1, MAX_PAGE_SIZE)
 }
 
 fn first_non_empty(left: Option<String>, right: Option<String>) -> Option<String> {

@@ -5,13 +5,6 @@ use crate::interfaces::tauri::dto::sync::SyncStatusResponseDto;
 
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct VaultViewDataRequestDto {
-    pub page: Option<u32>,
-    pub page_size: Option<u32>,
-}
-
-#[derive(Debug, Clone, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
 pub struct VaultCipherDetailRequestDto {
     pub cipher_id: String,
 }
@@ -106,8 +99,6 @@ pub struct VaultViewDataResponseDto {
     pub folders: Vec<VaultFolderItemDto>,
     pub ciphers: Vec<VaultCipherItemDto>,
     pub total_ciphers: u32,
-    pub page: u32,
-    pub page_size: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
