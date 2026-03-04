@@ -37,7 +37,8 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_disable_biometric_unlock,
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data,
-            interfaces::tauri::commands::vault::vault_get_cipher_detail
+            interfaces::tauri::commands::vault::vault_get_cipher_detail,
+            interfaces::tauri::commands::vault::vault_copy_cipher_field
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,

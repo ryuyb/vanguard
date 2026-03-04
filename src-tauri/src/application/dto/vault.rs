@@ -11,6 +11,25 @@ pub struct GetCipherDetailQuery {
     pub user_key: VaultUserKeyMaterial,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum VaultCopyField {
+    Username,
+    Password,
+}
+
+#[derive(Debug, Clone)]
+pub struct CopyCipherFieldCommand {
+    pub cipher_id: String,
+    pub field: VaultCopyField,
+    pub clear_after_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CopyCipherFieldResult {
+    pub copied: bool,
+    pub clear_after_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone)]
 pub struct UnlockVaultCommand {
     pub method: UnlockMethod,

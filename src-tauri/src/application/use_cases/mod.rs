@@ -1,3 +1,4 @@
+pub mod copy_cipher_field_use_case;
 pub mod get_cipher_detail_use_case;
 pub mod get_vault_view_data_use_case;
 pub mod master_password_unlock_use_case;

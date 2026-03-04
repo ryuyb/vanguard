@@ -9,6 +9,28 @@ pub struct VaultCipherDetailRequestDto {
     pub cipher_id: String,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum VaultCopyFieldDto {
+    Username,
+    Password,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultCopyCipherFieldRequestDto {
+    pub cipher_id: String,
+    pub field: VaultCopyFieldDto,
+    pub clear_after_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultCopyCipherFieldResponseDto {
+    pub copied: bool,
+    pub clear_after_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultUnlockRequestDto {

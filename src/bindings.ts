@@ -180,6 +180,14 @@ async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Resul
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Result<VaultCopyCipherFieldResponseDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_copy_cipher_field", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -240,6 +248,9 @@ export type VaultCipherPasswordHistoryDetailDto = { password: string | null; las
 export type VaultCipherPermissionsDetailDto = { delete: boolean | null; restore: boolean | null }
 export type VaultCipherSecureNoteDetailDto = { type: number | null }
 export type VaultCipherSshKeyDetailDto = { privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
+export type VaultCopyCipherFieldRequestDto = { cipherId: string; field: VaultCopyFieldDto; clearAfterMs: number | null }
+export type VaultCopyCipherFieldResponseDto = { copied: boolean; clearAfterMs: number | null }
+export type VaultCopyFieldDto = "username" | "password"
 export type VaultDisableBiometricUnlockRequestDto = Record<string, never>
 export type VaultDisablePinUnlockRequestDto = Record<string, never>
 export type VaultEnableBiometricUnlockRequestDto = Record<string, never>

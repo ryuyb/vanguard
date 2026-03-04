@@ -3,8 +3,10 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::application::dto::vault::{
-    EnablePinUnlockCommand, GetCipherDetailQuery, UnlockVaultCommand, VaultUserKeyMaterial,
+    CopyCipherFieldCommand, EnablePinUnlockCommand, GetCipherDetailQuery, UnlockVaultCommand,
+    VaultCopyField, VaultUserKeyMaterial,
 };
+use crate::application::use_cases::copy_cipher_field_use_case::CopyCipherFieldUseCase;
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
 use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
 use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
@@ -14,7 +16,8 @@ use crate::bootstrap::app_state::{AppState, VaultUserKey};
 use crate::domain::unlock::{PinLockType, UnlockMethod};
 use crate::interfaces::tauri::dto::vault::{
     VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
-    VaultCipherItemDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
+    VaultCipherItemDto, VaultCopyCipherFieldRequestDto, VaultCopyCipherFieldResponseDto,
+    VaultCopyFieldDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
     VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto, VaultUnlockMethodDto,
     VaultUnlockRequestDto, VaultViewDataResponseDto,
@@ -305,6 +308,31 @@ pub async fn vault_get_cipher_detail(
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
 }
 
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_copy_cipher_field(
+    state: State<'_, AppState>,
+    request: VaultCopyCipherFieldRequestDto,
+) -> Result<VaultCopyCipherFieldResponseDto, String> {
+    let result =
+        CopyCipherFieldUseCase::new(state.get_cipher_detail_use_case(), state.clipboard_port())
+            .execute(
+                &*state,
+                CopyCipherFieldCommand {
+                    cipher_id: request.cipher_id,
+                    field: request.field.into(),
+                    clear_after_ms: request.clear_after_ms,
+                },
+            )
+            .await
+            .map_err(|error| log_command_error("vault_copy_cipher_field", error))?;
+
+    Ok(VaultCopyCipherFieldResponseDto {
+        copied: result.copied,
+        clear_after_ms: result.clear_after_ms,
+    })
+}
+
 impl From<&VaultUserKey> for VaultUserKeyMaterial {
     fn from(user_key: &VaultUserKey) -> Self {
         Self {
@@ -332,6 +360,15 @@ impl From<VaultPinLockTypeDto> for PinLockType {
             VaultPinLockTypeDto::Disabled => PinLockType::Disabled,
             VaultPinLockTypeDto::Ephemeral => PinLockType::Ephemeral,
             VaultPinLockTypeDto::Persistent => PinLockType::Persistent,
+        }
+    }
+}
+
+impl From<VaultCopyFieldDto> for VaultCopyField {
+    fn from(field: VaultCopyFieldDto) -> Self {
+        match field {
+            VaultCopyFieldDto::Username => VaultCopyField::Username,
+            VaultCopyFieldDto::Password => VaultCopyField::Password,
         }
     }
 }

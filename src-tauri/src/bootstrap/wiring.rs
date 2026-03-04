@@ -4,6 +4,7 @@ use tauri::{Manager, Runtime};
 
 use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
+use crate::application::ports::clipboard_port::ClipboardPort;
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::notification_port::NotificationPort;
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
@@ -22,6 +23,7 @@ use crate::infrastructure::persistence::{
     SqliteMasterPasswordUnlockDataPort, SqliteVaultRepository,
 };
 use crate::infrastructure::security::biometric_unlock_port_adapter::KeychainBiometricUnlockPort;
+use crate::infrastructure::security::clipboard_port_adapter::TauriClipboardPortAdapter;
 use crate::infrastructure::security::pin_unlock_port_adapter::KeychainPinUnlockPort;
 use crate::infrastructure::vaultwarden::{
     VaultwardenClient, VaultwardenConfig, VaultwardenNotificationPort, VaultwardenRemotePort,
@@ -52,6 +54,8 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     );
     let pin_unlock_port: Arc<dyn PinUnlockPort> = Arc::new(KeychainPinUnlockPort::new());
     let biometric_unlock_port: Arc<dyn BiometricUnlockPort> = Arc::new(KeychainBiometricUnlockPort);
+    let clipboard_port: Arc<dyn ClipboardPort> =
+        Arc::new(TauriClipboardPortAdapter::new(manager.app_handle().clone()));
     let sync_event_port: Arc<dyn SyncEventPort> =
         Arc::new(TauriSyncEventAdapter::new(manager.app_handle().clone()));
     let auth_service = Arc::new(AuthService::new(Arc::clone(&remote_vault)));
@@ -91,6 +95,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         master_password_unlock_data_port,
         pin_unlock_port,
         biometric_unlock_port,
+        clipboard_port,
         get_cipher_detail_use_case,
         auth_state_path,
     ))

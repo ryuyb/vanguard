@@ -8,6 +8,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
+use crate::application::ports::clipboard_port::ClipboardPort;
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
@@ -76,6 +77,7 @@ pub struct AppState {
     master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
     pin_unlock_port: Arc<dyn PinUnlockPort>,
     biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
+    clipboard_port: Arc<dyn ClipboardPort>,
     get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
@@ -94,6 +96,7 @@ impl AppState {
         master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
         pin_unlock_port: Arc<dyn PinUnlockPort>,
         biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
+        clipboard_port: Arc<dyn ClipboardPort>,
         get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
         auth_state_path: PathBuf,
     ) -> Self {
@@ -118,6 +121,7 @@ impl AppState {
             master_password_unlock_data_port,
             pin_unlock_port,
             biometric_unlock_port,
+            clipboard_port,
             get_cipher_detail_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
@@ -150,6 +154,10 @@ impl AppState {
 
     pub fn pin_unlock_port(&self) -> Arc<dyn PinUnlockPort> {
         Arc::clone(&self.pin_unlock_port)
+    }
+
+    pub fn clipboard_port(&self) -> Arc<dyn ClipboardPort> {
+        Arc::clone(&self.clipboard_port)
     }
 
     pub fn get_cipher_detail_use_case(&self) -> Arc<GetCipherDetailUseCase> {
