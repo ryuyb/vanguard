@@ -53,7 +53,7 @@ pub fn run() {
     #[cfg(debug_assertions)]
     export_specta_bindings(&specta_builder).expect("failed to export specta bindings");
 
-    let app_builder = tauri::Builder::default()
+    let mut app_builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -62,6 +62,15 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init());
+
+    #[cfg(desktop)]
+    {
+        app_builder = app_builder.plugin(tauri_plugin_single_instance::init(
+            |app, _args, _cwd| {
+                interfaces::tauri::desktop::open_main_window(app);
+            },
+        ));
+    }
 
     app_builder
         .setup(move |app| {
