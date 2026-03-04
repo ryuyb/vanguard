@@ -4,6 +4,8 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
   LoaderCircle,
   Lock,
   LogOut,
@@ -39,6 +41,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { resolveSessionRoute } from "@/lib/route-session";
 
@@ -106,34 +113,174 @@ function toAvatarText(email: string | null | undefined) {
   return (compacted.slice(0, 2) || "??").toUpperCase();
 }
 
-function toCipherTypeLabel(type: number | null) {
-  if (type === 1) {
-    return "Login";
+type TotpHashAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
+
+type TotpConfig = {
+  secret: Uint8Array;
+  hashAlgorithm: TotpHashAlgorithm;
+  digits: number;
+  period: number;
+};
+
+const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function parsePositiveInteger(value: string) {
+  if (!/^\d+$/.test(value)) {
+    return null;
   }
-  if (type === 2) {
-    return "Secure Note";
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed)) {
+    return null;
   }
-  if (type === 3) {
-    return "Card";
-  }
-  if (type === 4) {
-    return "Identity";
-  }
-  if (type === 5) {
-    return "SSH Key";
-  }
-  return "Unknown";
+  return parsed;
 }
 
-function formatRevisionDate(value: string | null) {
+function normalizeTotpHashAlgorithm(value: string | null) {
   if (!value) {
-    return "Unknown";
+    return "SHA-1" as TotpHashAlgorithm;
   }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
+  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (normalized === "SHA1") {
+    return "SHA-1" as TotpHashAlgorithm;
   }
-  return parsed.toLocaleString();
+  if (normalized === "SHA256") {
+    return "SHA-256" as TotpHashAlgorithm;
+  }
+  if (normalized === "SHA512") {
+    return "SHA-512" as TotpHashAlgorithm;
+  }
+  return null;
+}
+
+function decodeBase32Secret(value: string) {
+  const sanitized = value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "")
+    .replace(/=+$/g, "");
+  if (!sanitized) {
+    return null;
+  }
+
+  const output: number[] = [];
+  let buffer = 0;
+  let bitsInBuffer = 0;
+
+  for (const character of sanitized) {
+    const index = BASE32_ALPHABET.indexOf(character);
+    if (index === -1) {
+      return null;
+    }
+
+    buffer = (buffer << 5) | index;
+    bitsInBuffer += 5;
+
+    while (bitsInBuffer >= 8) {
+      output.push((buffer >>> (bitsInBuffer - 8)) & 0xff);
+      bitsInBuffer -= 8;
+    }
+  }
+
+  if (output.length === 0) {
+    return null;
+  }
+
+  return new Uint8Array(output);
+}
+
+function parseTotpConfig(rawTotp: string | null) {
+  const raw = (rawTotp ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  let secretText: string | null = null;
+  let hashAlgorithm: TotpHashAlgorithm = "SHA-1";
+  let digits = 6;
+  let period = 30;
+
+  if (raw.toLowerCase().startsWith("otpauth://")) {
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return null;
+    }
+
+    if (url.protocol !== "otpauth:" || url.hostname.toLowerCase() !== "totp") {
+      return null;
+    }
+
+    secretText = url.searchParams.get("secret");
+    if (!secretText) {
+      return null;
+    }
+
+    const parsedAlgorithm = normalizeTotpHashAlgorithm(
+      url.searchParams.get("algorithm"),
+    );
+    if (!parsedAlgorithm) {
+      return null;
+    }
+    hashAlgorithm = parsedAlgorithm;
+
+    const digitsParam = url.searchParams.get("digits");
+    if (digitsParam) {
+      const parsedDigits = parsePositiveInteger(digitsParam);
+      if (parsedDigits == null || parsedDigits < 6 || parsedDigits > 10) {
+        return null;
+      }
+      digits = parsedDigits;
+    }
+
+    const periodParam = url.searchParams.get("period");
+    if (periodParam) {
+      const parsedPeriod = parsePositiveInteger(periodParam);
+      if (parsedPeriod == null || parsedPeriod <= 0 || parsedPeriod > 300) {
+        return null;
+      }
+      period = parsedPeriod;
+    }
+  } else {
+    secretText = raw;
+  }
+
+  const secret = decodeBase32Secret(secretText);
+  if (!secret) {
+    return null;
+  }
+
+  return {
+    secret,
+    hashAlgorithm,
+    digits,
+    period,
+  } satisfies TotpConfig;
+}
+
+async function generateTotpCode(
+  key: CryptoKey,
+  counter: number,
+  digits: number,
+): Promise<string> {
+  const data = new ArrayBuffer(8);
+  const view = new DataView(data);
+  const high = Math.floor(counter / 0x1_0000_0000);
+  const low = counter >>> 0;
+  view.setUint32(0, high);
+  view.setUint32(4, low);
+
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
+  const offset = signature[signature.length - 1] & 0x0f;
+  const binary =
+    ((signature[offset] & 0x7f) << 24) |
+    ((signature[offset + 1] & 0xff) << 16) |
+    ((signature[offset + 2] & 0xff) << 8) |
+    (signature[offset + 3] & 0xff);
+
+  const divisor = 10 ** digits;
+  const otp = binary % divisor;
+  return otp.toString().padStart(digits, "0");
 }
 
 function sortFolders(folders: VaultFolderItemDto[]) {
@@ -721,329 +868,345 @@ function VaultPage() {
         )}
 
         {pageState === "ready" && viewData && (
-          <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)] grid-rows-1 gap-0">
-            <aside className="h-full min-h-0 border border-slate-300/35 bg-slate-300/30 shadow-sm backdrop-blur-md">
-              <ScrollArea className="h-full">
-                <div className="space-y-2 p-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMenuId(ALL_ITEMS_ID)}
-                    className={[
-                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                      selectedMenuId === ALL_ITEMS_ID
-                        ? "bg-sky-100/90 font-medium text-sky-800"
-                        : "text-slate-700 hover:bg-slate-100",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2">
-                        <Archive className="size-4 text-slate-500" />
-                        All items
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {viewData.ciphers.length}
-                      </span>
-                    </div>
-                  </button>
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="min-h-0 flex-1"
+          >
+            <ResizablePanel defaultSize={22} minSize={16}>
+              <aside className="h-full min-h-0 border border-slate-300/35 bg-slate-300/30 shadow-sm backdrop-blur-md">
+                <ScrollArea className="h-full">
+                  <div className="space-y-2 p-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMenuId(ALL_ITEMS_ID)}
+                      className={[
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        selectedMenuId === ALL_ITEMS_ID
+                          ? "bg-sky-100/90 font-medium text-sky-800"
+                          : "text-slate-700 hover:bg-slate-100",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2">
+                          <Archive className="size-4 text-slate-500" />
+                          All items
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {viewData.ciphers.length}
+                        </span>
+                      </div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMenuId(FAVORITES_ID)}
-                    className={[
-                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                      selectedMenuId === FAVORITES_ID
-                        ? "bg-sky-100/90 font-medium text-sky-800"
-                        : "text-slate-700 hover:bg-slate-100",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2">
-                        <Star className="size-4 text-slate-500" />
-                        Favorites
-                      </span>
-                      <span className="text-xs text-slate-500">-</span>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMenuId(FAVORITES_ID)}
+                      className={[
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        selectedMenuId === FAVORITES_ID
+                          ? "bg-sky-100/90 font-medium text-sky-800"
+                          : "text-slate-700 hover:bg-slate-100",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2">
+                          <Star className="size-4 text-slate-500" />
+                          Favorites
+                        </span>
+                        <span className="text-xs text-slate-500">-</span>
+                      </div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMenuId(TRASH_ID)}
-                    className={[
-                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                      selectedMenuId === TRASH_ID
-                        ? "bg-sky-100/90 font-medium text-sky-800"
-                        : "text-slate-700 hover:bg-slate-100",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2">
-                        <Trash2 className="size-4 text-slate-500" />
-                        Trash
-                      </span>
-                      <span className="text-xs text-slate-500">-</span>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMenuId(TRASH_ID)}
+                      className={[
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        selectedMenuId === TRASH_ID
+                          ? "bg-sky-100/90 font-medium text-sky-800"
+                          : "text-slate-700 hover:bg-slate-100",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2">
+                          <Trash2 className="size-4 text-slate-500" />
+                          Trash
+                        </span>
+                        <span className="text-xs text-slate-500">-</span>
+                      </div>
+                    </button>
 
-                  <div className="space-y-1">
-                    {folderTree.map((node) => (
-                      <FolderTreeMenuItem
-                        key={node.key}
-                        node={node}
-                        depth={0}
-                        selectedMenuId={selectedMenuId}
-                        expandedNodeKeys={expandedNodeKeys}
-                        folderCipherCount={folderCipherCount}
-                        onFolderSelect={setSelectedMenuId}
-                        onOpenChange={onFolderTreeOpenChange}
-                      />
-                    ))}
+                    <div className="space-y-1">
+                      {folderTree.map((node) => (
+                        <FolderTreeMenuItem
+                          key={node.key}
+                          node={node}
+                          depth={0}
+                          selectedMenuId={selectedMenuId}
+                          expandedNodeKeys={expandedNodeKeys}
+                          folderCipherCount={folderCipherCount}
+                          onFolderSelect={setSelectedMenuId}
+                          onOpenChange={onFolderTreeOpenChange}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </ScrollArea>
-            </aside>
+                </ScrollArea>
+              </aside>
+            </ResizablePanel>
 
-            <section className="flex h-full min-h-0 flex-col bg-white/80 shadow-sm">
-              <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
-                <div className="relative h-8 min-w-0 flex-1">
-                  <div className="absolute inset-y-0 left-0 flex items-center">
+            <ResizableHandle withHandle className="bg-slate-300/60" />
+
+            <ResizablePanel defaultSize={39} minSize={22}>
+              <section className="flex h-full min-h-0 flex-col bg-white/80 shadow-sm">
+                <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
+                  <div className="relative h-8 min-w-0 flex-1">
+                    <div className="absolute inset-y-0 left-0 flex items-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 justify-start gap-1 rounded-md px-2 text-xs font-medium text-slate-700 hover:bg-slate-200/70 data-[state=open]:bg-slate-200/70"
+                            aria-label="筛选类型"
+                            title="筛选类型"
+                          >
+                            <span>{toTypeFilterLabel(typeFilter)}</span>
+                            <ChevronDown className="size-3.5 text-slate-500" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-44">
+                          <DropdownMenuRadioGroup
+                            value={typeFilter}
+                            onValueChange={(value) =>
+                              setTypeFilter(value as CipherTypeFilter)
+                            }
+                          >
+                            <DropdownMenuRadioItem value="all">
+                              All types
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="login">
+                              Login
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="card">
+                              Card
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="identify">
+                              Identify
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="note">
+                              Note
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="ssh_key">
+                              SSH key
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <AnimatePresence>
+                      {isInlineSearchOpen && (
+                        <motion.div
+                          className="absolute inset-y-0 right-0 left-2 z-20"
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: 0.18, ease: "easeOut" }}
+                        >
+                          <Input
+                            ref={inlineSearchInputRef}
+                            type="search"
+                            value={cipherSearchQuery}
+                            onChange={(event) =>
+                              setCipherSearchQuery(event.target.value)
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") {
+                                setCipherSearchQuery("");
+                                setIsInlineSearchOpen(false);
+                              }
+                            }}
+                            placeholder={`在 ${selectedMenuName} 中查找`}
+                            className="h-8 bg-white text-xs"
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="size-8 px-0"
+                      aria-label={
+                        isInlineSearchOpen
+                          ? "关闭搜索"
+                          : `在 ${selectedMenuName} 中查找`
+                      }
+                      title={
+                        isInlineSearchOpen
+                          ? "关闭搜索"
+                          : `在 ${selectedMenuName} 中查找`
+                      }
+                      onClick={() => {
+                        if (isInlineSearchOpen) {
+                          setCipherSearchQuery("");
+                          setIsInlineSearchOpen(false);
+                          return;
+                        }
+                        setIsInlineSearchOpen(true);
+                      }}
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        {isInlineSearchOpen ? (
+                          <motion.span
+                            key="close"
+                            initial={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                            exit={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                            transition={{ duration: 0.16, ease: "easeOut" }}
+                            className="inline-flex"
+                          >
+                            <X className="size-4" />
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="search"
+                            initial={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                            exit={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                            transition={{ duration: 0.16, ease: "easeOut" }}
+                            className="inline-flex"
+                          >
+                            <Search className="size-4" />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           type="button"
                           variant="ghost"
-                          className="h-8 justify-start gap-1 rounded-md px-2 text-xs font-medium text-slate-700 hover:bg-slate-200/70 data-[state=open]:bg-slate-200/70"
-                          aria-label="筛选类型"
-                          title="筛选类型"
+                          className="size-8 px-0"
+                          aria-label="排序"
+                          title="排序"
                         >
-                          <span>{toTypeFilterLabel(typeFilter)}</span>
-                          <ChevronDown className="size-3.5 text-slate-500" />
+                          <ArrowUpDown className="size-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-44">
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
                         <DropdownMenuRadioGroup
-                          value={typeFilter}
+                          value={sortBy}
                           onValueChange={(value) =>
-                            setTypeFilter(value as CipherTypeFilter)
+                            setSortBy(value as CipherSortBy)
                           }
                         >
-                          <DropdownMenuRadioItem value="all">
-                            All types
+                          <DropdownMenuRadioItem value="title">
+                            标题
                           </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="login">
-                            Login
+                          <DropdownMenuRadioItem value="created">
+                            创建日期
                           </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="card">
-                            Card
+                          <DropdownMenuRadioItem value="modified">
+                            修改日期
                           </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="identify">
-                            Identify
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="note">
-                            Note
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="ssh_key">
-                            SSH key
-                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>排序方向</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={sortDirection}
+                          onValueChange={(value) =>
+                            setSortDirection(value as CipherSortDirection)
+                          }
+                        >
+                          {sortBy === "title" ? (
+                            <>
+                              <DropdownMenuRadioItem value="asc">
+                                按字母顺序
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="desc">
+                                字母倒序
+                              </DropdownMenuRadioItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuRadioItem value="desc">
+                                最新的在前
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="asc">
+                                最早的在前
+                              </DropdownMenuRadioItem>
+                            </>
+                          )}
                         </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
+                </div>
 
-                  <AnimatePresence>
-                    {isInlineSearchOpen && (
-                      <motion.div
-                        className="absolute inset-y-0 right-0 left-2 z-20"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -10 }}
-                        transition={{ duration: 0.18, ease: "easeOut" }}
-                      >
-                        <Input
-                          ref={inlineSearchInputRef}
-                          type="search"
-                          value={cipherSearchQuery}
-                          onChange={(event) =>
-                            setCipherSearchQuery(event.target.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              setCipherSearchQuery("");
-                              setIsInlineSearchOpen(false);
-                            }
-                          }}
-                          placeholder={`在 ${selectedMenuName} 中查找`}
-                          className="h-8 bg-white text-xs"
-                        />
-                      </motion.div>
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="space-y-1 px-2 pb-2">
+                    {filteredCiphers.map((cipher) => (
+                      <CipherRow
+                        key={cipher.id}
+                        cipher={cipher}
+                        selected={cipher.id === selectedCipherId}
+                        onClick={() => {
+                          void loadCipherDetail(cipher.id);
+                        }}
+                      />
+                    ))}
+                    {filteredCiphers.length === 0 && (
+                      <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                        当前筛选下没有 cipher。
+                      </div>
                     )}
-                  </AnimatePresence>
-                </div>
+                  </div>
+                </ScrollArea>
+              </section>
+            </ResizablePanel>
 
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="size-8 px-0"
-                    aria-label={
-                      isInlineSearchOpen
-                        ? "关闭搜索"
-                        : `在 ${selectedMenuName} 中查找`
-                    }
-                    title={
-                      isInlineSearchOpen
-                        ? "关闭搜索"
-                        : `在 ${selectedMenuName} 中查找`
-                    }
-                    onClick={() => {
-                      if (isInlineSearchOpen) {
-                        setCipherSearchQuery("");
-                        setIsInlineSearchOpen(false);
-                        return;
-                      }
-                      setIsInlineSearchOpen(true);
-                    }}
-                  >
-                    <AnimatePresence mode="wait" initial={false}>
-                      {isInlineSearchOpen ? (
-                        <motion.span
-                          key="close"
-                          initial={{ opacity: 0, rotate: -90, scale: 0.85 }}
-                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                          exit={{ opacity: 0, rotate: 90, scale: 0.85 }}
-                          transition={{ duration: 0.16, ease: "easeOut" }}
-                          className="inline-flex"
-                        >
-                          <X className="size-4" />
-                        </motion.span>
-                      ) : (
-                        <motion.span
-                          key="search"
-                          initial={{ opacity: 0, rotate: 90, scale: 0.85 }}
-                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                          exit={{ opacity: 0, rotate: -90, scale: 0.85 }}
-                          transition={{ duration: 0.16, ease: "easeOut" }}
-                          className="inline-flex"
-                        >
-                          <Search className="size-4" />
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="size-8 px-0"
-                        aria-label="排序"
-                        title="排序"
-                      >
-                        <ArrowUpDown className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuLabel>排序方式</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup
-                        value={sortBy}
-                        onValueChange={(value) =>
-                          setSortBy(value as CipherSortBy)
-                        }
-                      >
-                        <DropdownMenuRadioItem value="title">
-                          标题
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="created">
-                          创建日期
-                        </DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="modified">
-                          修改日期
-                        </DropdownMenuRadioItem>
-                      </DropdownMenuRadioGroup>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel>排序方向</DropdownMenuLabel>
-                      <DropdownMenuRadioGroup
-                        value={sortDirection}
-                        onValueChange={(value) =>
-                          setSortDirection(value as CipherSortDirection)
-                        }
-                      >
-                        {sortBy === "title" ? (
-                          <>
-                            <DropdownMenuRadioItem value="asc">
-                              按字母顺序
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="desc">
-                              字母倒序
-                            </DropdownMenuRadioItem>
-                          </>
-                        ) : (
-                          <>
-                            <DropdownMenuRadioItem value="desc">
-                              最新的在前
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="asc">
-                              最早的在前
-                            </DropdownMenuRadioItem>
-                          </>
-                        )}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+            <ResizableHandle withHandle className="bg-slate-300/60" />
 
-              <ScrollArea className="min-h-0 flex-1">
-                <div className="space-y-1 px-2 pb-2">
-                  {filteredCiphers.map((cipher) => (
-                    <CipherRow
-                      key={cipher.id}
-                      cipher={cipher}
-                      selected={cipher.id === selectedCipherId}
-                      onClick={() => {
-                        void loadCipherDetail(cipher.id);
-                      }}
-                    />
-                  ))}
-                  {filteredCiphers.length === 0 && (
-                    <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
-                      当前筛选下没有 cipher。
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </section>
+            <ResizablePanel defaultSize={39} minSize={24}>
+              <section className="h-full min-h-0 bg-white/80 shadow-sm">
+                <ScrollArea className="h-full">
+                  <div className="p-3">
+                    {!selectedCipherId && <div className="min-h-80" />}
 
-            <section className="h-full min-h-0 bg-white/80 shadow-sm">
-              <ScrollArea className="h-full">
-                <div className="p-3">
-                  {!selectedCipherId && <div className="min-h-80" />}
-
-                  {selectedCipherId && isCipherDetailLoading && (
-                    <div className="flex items-center gap-2 text-sm text-slate-700">
-                      <LoaderCircle className="size-4 animate-spin" />
-                      正在加载 cipher 详情...
-                    </div>
-                  )}
-
-                  {selectedCipherId &&
-                    !isCipherDetailLoading &&
-                    cipherDetailError && (
-                      <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                        {cipherDetailError}
+                    {selectedCipherId && isCipherDetailLoading && (
+                      <div className="flex items-center gap-2 text-sm text-slate-700">
+                        <LoaderCircle className="size-4 animate-spin" />
+                        正在加载 cipher 详情...
                       </div>
                     )}
 
-                  {selectedCipherId &&
-                    !isCipherDetailLoading &&
-                    !cipherDetailError &&
-                    selectedCipherDetail && (
-                      <CipherDetailPanel cipher={selectedCipherDetail} />
-                    )}
-                </div>
-              </ScrollArea>
-            </section>
-          </div>
+                    {selectedCipherId &&
+                      !isCipherDetailLoading &&
+                      cipherDetailError && (
+                        <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {cipherDetailError}
+                        </div>
+                      )}
+
+                    {selectedCipherId &&
+                      !isCipherDetailLoading &&
+                      !cipherDetailError &&
+                      selectedCipherDetail && (
+                        <CipherDetailPanel
+                          key={selectedCipherDetail.id}
+                          cipher={selectedCipherDetail}
+                        />
+                      )}
+                  </div>
+                </ScrollArea>
+              </section>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
       </section>
     </main>
@@ -1197,39 +1360,150 @@ function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
     cipher.login?.username,
     cipher.data?.username,
   );
-  const uri = firstNonEmptyText(
-    cipher.login?.uri,
-    cipher.data?.uri,
-    cipher.login?.uris[0]?.uri,
-    cipher.data?.uris[0]?.uri,
+  const password = firstNonEmptyText(
+    cipher.login?.password,
+    cipher.data?.password,
   );
+  const oneTimePassword = firstNonEmptyText(
+    cipher.login?.totp,
+    cipher.data?.totp,
+  );
+  const oneTimePasswordConfig = useMemo(
+    () => parseTotpConfig(oneTimePassword),
+    [oneTimePassword],
+  );
+  const [oneTimePasswordCode, setOneTimePasswordCode] = useState<string | null>(
+    null,
+  );
+  const [oneTimePasswordRemaining, setOneTimePasswordRemaining] = useState<
+    number | null
+  >(null);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
-  const folderId = cipher.folderId;
   const organizationId = cipher.organizationId;
+
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    setOneTimePasswordCode(null);
+    setOneTimePasswordRemaining(null);
+
+    if (!oneTimePasswordConfig) {
+      return () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+      };
+    }
+
+    const start = async () => {
+      try {
+        const key = await crypto.subtle.importKey(
+          "raw",
+          oneTimePasswordConfig.secret,
+          {
+            name: "HMAC",
+            hash: { name: oneTimePasswordConfig.hashAlgorithm },
+          },
+          false,
+          ["sign"],
+        );
+
+        const tick = async () => {
+          if (cancelled) {
+            return;
+          }
+
+          const now = Date.now();
+          const unixSeconds = Math.floor(now / 1000);
+          const counter = Math.floor(
+            unixSeconds / oneTimePasswordConfig.period,
+          );
+          const remaining =
+            oneTimePasswordConfig.period -
+            (unixSeconds % oneTimePasswordConfig.period);
+          const code = await generateTotpCode(
+            key,
+            counter,
+            oneTimePasswordConfig.digits,
+          );
+
+          if (cancelled) {
+            return;
+          }
+
+          setOneTimePasswordCode(code);
+          setOneTimePasswordRemaining(remaining);
+
+          timeoutId = setTimeout(
+            () => {
+              void tick();
+            },
+            1000 - (now % 1000),
+          );
+        };
+
+        await tick();
+      } catch {
+        if (!cancelled) {
+          setOneTimePasswordCode(null);
+          setOneTimePasswordRemaining(null);
+        }
+      }
+    };
+
+    void start();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [oneTimePasswordConfig]);
+
+  const oneTimePasswordDisplay =
+    oneTimePasswordCode && oneTimePasswordRemaining != null
+      ? `${oneTimePasswordCode} (${oneTimePasswordRemaining}s)`
+      : null;
 
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-base font-semibold text-slate-900">
+        <div className="text-lg font-semibold text-slate-900">
           {cipher.name ?? "Untitled cipher"}
         </div>
-        <div className="text-xs text-slate-500">{cipher.id}</div>
       </div>
 
       <div className="space-y-2">
-        <DetailRow label="Type" value={toCipherTypeLabel(cipher.type)} />
-        <DetailRow label="Folder" value={folderId} />
         <DetailRow label="Org" value={organizationId} />
-        <DetailRow
-          label="Revision"
-          value={formatRevisionDate(cipher.revisionDate)}
-        />
         <DetailRow label="Username" value={username} />
-        <DetailRow label="URI" value={uri} />
-        <DetailRow
-          label="Attachments"
-          value={String(cipher.attachments.length)}
-        />
+        {password && (
+          <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-sm">
+            <div className="text-slate-500">Password</div>
+            <div className="flex min-w-0 items-center gap-1">
+              <div className="break-all text-slate-800">
+                {isPasswordVisible ? password : "••••••••"}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                className="size-7 shrink-0 px-0"
+                onClick={() => setIsPasswordVisible((visible) => !visible)}
+                aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
+                title={isPasswordVisible ? "隐藏密码" : "显示密码"}
+              >
+                {isPasswordVisible ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+        <DetailRow label="One-time password" value={oneTimePasswordDisplay} />
       </div>
 
       {notes && (
