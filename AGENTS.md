@@ -6,6 +6,21 @@
 - Frontend: React/TypeScript in `src/`.
 - Core domains: auth, vault sync, vault unlock/biometric.
 
+## Frontend Component Guidelines
+- Prefer shadcn components for UI implementation.
+- Reuse existing components in `src/components/ui` before adding new ones.
+- When installing a new component, use: `pnpm dlx shadcn@latest add <component-name>`.
+- Do not introduce other UI component libraries unless explicitly required.
+- Keep custom UI wrappers thin; compose from shadcn primitives first.
+
+## AI Response Style
+- Keep AI responses concise and to the point.
+
+## Troubleshooting Guidelines
+- Do not make blind code changes when issues are unclear; investigate and confirm the likely root cause first.
+- If root cause cannot be confirmed, add minimal, temporary diagnostic logs (with sensitive data redacted) to narrow scope.
+- Ask the user to help reproduce and collect the requested logs, then apply targeted fixes based on evidence.
+
 ## DDD Architecture Constraints
 - Enforce dependency direction: `interfaces -> application -> domain`.
 - `infrastructure` only implements application ports; do not place business rules there.
@@ -42,4 +57,3 @@
   - `fix(sync): avoid debounce pollution when sync slot acquisition fails`
   - `refactor(vault): move unlock flow from tauri command to application use case`
   - `docs(agents): add ddd and security constraints for codex`
-
