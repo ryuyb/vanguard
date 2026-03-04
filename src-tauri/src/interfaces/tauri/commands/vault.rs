@@ -91,7 +91,7 @@ pub async fn vault_unlock(
         .execute(
             &*state,
             UnlockVaultCommand {
-                method: to_unlock_method(request.method),
+                method: request.method.into(),
             },
         )
         .await
@@ -171,7 +171,7 @@ pub async fn vault_get_pin_status(
     Ok(VaultPinStatusResponseDto {
         supported: status.supported,
         enabled: status.enabled,
-        lock_type: to_pin_lock_type_dto(status.lock_type),
+        lock_type: status.lock_type.into(),
     })
 }
 
@@ -186,7 +186,7 @@ pub async fn vault_enable_pin_unlock(
             &*state,
             EnablePinUnlockCommand {
                 pin: request.pin,
-                lock_type: to_pin_lock_type(request.lock_type),
+                lock_type: request.lock_type.into(),
             },
         )
         .await
@@ -295,7 +295,7 @@ pub async fn vault_get_cipher_detail(
         .execute(GetCipherDetailQuery {
             account_id: account_id.clone(),
             cipher_id: String::from(cipher_id),
-            user_key: to_vault_user_key_material(&user_key),
+            user_key: (&user_key).into(),
         })
         .await
         .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
@@ -305,35 +305,43 @@ pub async fn vault_get_cipher_detail(
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
 }
 
-fn to_vault_user_key_material(user_key: &VaultUserKey) -> VaultUserKeyMaterial {
-    VaultUserKeyMaterial {
-        enc_key: user_key.enc_key.clone(),
-        mac_key: user_key.mac_key.clone(),
-    }
-}
-
-fn to_unlock_method(method: VaultUnlockMethodDto) -> UnlockMethod {
-    match method {
-        VaultUnlockMethodDto::MasterPassword { password } => {
-            UnlockMethod::MasterPassword { password }
+impl From<&VaultUserKey> for VaultUserKeyMaterial {
+    fn from(user_key: &VaultUserKey) -> Self {
+        Self {
+            enc_key: user_key.enc_key.clone(),
+            mac_key: user_key.mac_key.clone(),
         }
-        VaultUnlockMethodDto::Pin { pin } => UnlockMethod::Pin { pin },
-        VaultUnlockMethodDto::Biometric => UnlockMethod::Biometric,
     }
 }
 
-fn to_pin_lock_type(lock_type: VaultPinLockTypeDto) -> PinLockType {
-    match lock_type {
-        VaultPinLockTypeDto::Disabled => PinLockType::Disabled,
-        VaultPinLockTypeDto::Ephemeral => PinLockType::Ephemeral,
-        VaultPinLockTypeDto::Persistent => PinLockType::Persistent,
+impl From<VaultUnlockMethodDto> for UnlockMethod {
+    fn from(method: VaultUnlockMethodDto) -> Self {
+        match method {
+            VaultUnlockMethodDto::MasterPassword { password } => {
+                UnlockMethod::MasterPassword { password }
+            }
+            VaultUnlockMethodDto::Pin { pin } => UnlockMethod::Pin { pin },
+            VaultUnlockMethodDto::Biometric => UnlockMethod::Biometric,
+        }
     }
 }
 
-fn to_pin_lock_type_dto(lock_type: PinLockType) -> VaultPinLockTypeDto {
-    match lock_type {
-        PinLockType::Disabled => VaultPinLockTypeDto::Disabled,
-        PinLockType::Ephemeral => VaultPinLockTypeDto::Ephemeral,
-        PinLockType::Persistent => VaultPinLockTypeDto::Persistent,
+impl From<VaultPinLockTypeDto> for PinLockType {
+    fn from(lock_type: VaultPinLockTypeDto) -> Self {
+        match lock_type {
+            VaultPinLockTypeDto::Disabled => PinLockType::Disabled,
+            VaultPinLockTypeDto::Ephemeral => PinLockType::Ephemeral,
+            VaultPinLockTypeDto::Persistent => PinLockType::Persistent,
+        }
+    }
+}
+
+impl From<PinLockType> for VaultPinLockTypeDto {
+    fn from(lock_type: PinLockType) -> Self {
+        match lock_type {
+            PinLockType::Disabled => VaultPinLockTypeDto::Disabled,
+            PinLockType::Ephemeral => VaultPinLockTypeDto::Ephemeral,
+            PinLockType::Persistent => VaultPinLockTypeDto::Persistent,
+        }
     }
 }
