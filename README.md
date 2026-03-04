@@ -26,6 +26,26 @@ It is built for people who want a clean, native-feeling Vaultwarden app on deskt
 4. Wait for the initial sync to complete.
 5. Unlock your vault and start browsing your items.
 
+## macOS Troubleshooting
+
+If you see this message when opening a release build:
+
+- `"vanguard.app" is damaged and can't be opened. You should move it to the Trash.`
+
+One common cause is the macOS quarantine attribute on the downloaded app bundle.
+
+You can remove it with:
+
+```bash
+APP_PATH="/absolute/path/to/vanguard.app"
+sudo xattr -d com.apple.quarantine "$APP_PATH"
+```
+
+Notes:
+
+- `APP_PATH` is not fixed; set it to wherever your `vanguard.app` is located.
+- If needed, use `xattr -dr` to remove quarantine recursively for the entire app bundle.
+
 ## Security Notes
 
 - Vanguard is designed to work with Vaultwarden's existing security model.
