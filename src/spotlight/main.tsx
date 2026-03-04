@@ -1,11 +1,16 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { commands, type VaultCipherItemDto } from "@/bindings";
+import {
+  commands,
+  type VaultCipherDetailDto,
+  type VaultCipherItemDto,
+} from "@/bindings";
 import { Card, CardFooter } from "@/components/ui/card";
 import { Command, CommandItem } from "@/components/ui/command";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -25,6 +30,15 @@ type SpotlightItem = {
   searchText: string;
 };
 
+type CopyField = "username" | "password" | "totp";
+
+type DetailAction = {
+  label: string;
+  shortcut: readonly string[];
+  field: CopyField;
+  requiresTotp?: boolean;
+};
+
 function errorToText(error: unknown) {
   if (typeof error === "string") {
     return error;
@@ -39,11 +53,215 @@ function logClientError(context: string, error: unknown) {
   void logError(`[spotlight] ${context}: ${errorToText(error)}`);
 }
 
-const DETAIL_ACTIONS = [
+const DETAIL_ACTIONS: readonly DetailAction[] = [
   { label: "复制 用户名", shortcut: ["⌘", "C"], field: "username" },
   { label: "复制 密码", shortcut: ["⌘", "⇧", "C"], field: "password" },
-] as const;
+  {
+    label: "复制 一次性密码",
+    shortcut: ["⌘", "⌥", "C"],
+    field: "totp",
+    requiresTotp: true,
+  },
+];
 const COPY_FLASH_DURATION_MS = 180;
+const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+type TotpHashAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
+
+type TotpConfig = {
+  secret: Uint8Array;
+  hashAlgorithm: TotpHashAlgorithm;
+  digits: number;
+  period: number;
+};
+
+function firstNonEmptyText(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function toCipherTotpRaw(cipher: VaultCipherDetailDto) {
+  return firstNonEmptyText(cipher.login?.totp, cipher.data?.totp);
+}
+
+function parsePositiveInteger(value: string) {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+function normalizeTotpHashAlgorithm(value: string | null) {
+  if (!value) {
+    return "SHA-1" as TotpHashAlgorithm;
+  }
+  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (normalized === "SHA1") {
+    return "SHA-1" as TotpHashAlgorithm;
+  }
+  if (normalized === "SHA256") {
+    return "SHA-256" as TotpHashAlgorithm;
+  }
+  if (normalized === "SHA512") {
+    return "SHA-512" as TotpHashAlgorithm;
+  }
+  return null;
+}
+
+function decodeBase32Secret(value: string) {
+  const sanitized = value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "")
+    .replace(/=+$/g, "");
+  if (!sanitized) {
+    return null;
+  }
+
+  const output: number[] = [];
+  let buffer = 0;
+  let bitsInBuffer = 0;
+
+  for (const character of sanitized) {
+    const index = BASE32_ALPHABET.indexOf(character);
+    if (index === -1) {
+      return null;
+    }
+
+    buffer = (buffer << 5) | index;
+    bitsInBuffer += 5;
+
+    while (bitsInBuffer >= 8) {
+      output.push((buffer >>> (bitsInBuffer - 8)) & 0xff);
+      bitsInBuffer -= 8;
+    }
+  }
+
+  if (output.length === 0) {
+    return null;
+  }
+
+  return new Uint8Array(output);
+}
+
+function parseTotpConfig(rawTotp: string | null) {
+  const raw = (rawTotp ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  let secretText: string | null = null;
+  let hashAlgorithm: TotpHashAlgorithm = "SHA-1";
+  let digits = 6;
+  let period = 30;
+
+  if (raw.toLowerCase().startsWith("otpauth://")) {
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return null;
+    }
+
+    if (url.protocol !== "otpauth:" || url.hostname.toLowerCase() !== "totp") {
+      return null;
+    }
+
+    secretText = url.searchParams.get("secret");
+    if (!secretText) {
+      return null;
+    }
+
+    const parsedAlgorithm = normalizeTotpHashAlgorithm(
+      url.searchParams.get("algorithm"),
+    );
+    if (!parsedAlgorithm) {
+      return null;
+    }
+    hashAlgorithm = parsedAlgorithm;
+
+    const digitsParam = url.searchParams.get("digits");
+    if (digitsParam) {
+      const parsedDigits = parsePositiveInteger(digitsParam);
+      if (parsedDigits == null || parsedDigits < 6 || parsedDigits > 10) {
+        return null;
+      }
+      digits = parsedDigits;
+    }
+
+    const periodParam = url.searchParams.get("period");
+    if (periodParam) {
+      const parsedPeriod = parsePositiveInteger(periodParam);
+      if (parsedPeriod == null || parsedPeriod <= 0 || parsedPeriod > 300) {
+        return null;
+      }
+      period = parsedPeriod;
+    }
+  } else {
+    secretText = raw;
+  }
+
+  const secret = decodeBase32Secret(secretText);
+  if (!secret) {
+    return null;
+  }
+
+  return {
+    secret,
+    hashAlgorithm,
+    digits,
+    period,
+  } satisfies TotpConfig;
+}
+
+async function createCurrentTotpCode(rawTotp: string | null) {
+  const config = parseTotpConfig(rawTotp);
+  if (!config) {
+    return null;
+  }
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    config.secret,
+    {
+      name: "HMAC",
+      hash: { name: config.hashAlgorithm },
+    },
+    false,
+    ["sign"],
+  );
+
+  const unixSeconds = Math.floor(Date.now() / 1000);
+  const counter = Math.floor(unixSeconds / config.period);
+  const data = new ArrayBuffer(8);
+  const view = new DataView(data);
+  const high = Math.floor(counter / 0x1_0000_0000);
+  const low = counter >>> 0;
+  view.setUint32(0, high);
+  view.setUint32(4, low);
+
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
+  const offset = signature[signature.length - 1] & 0x0f;
+  const binary =
+    ((signature[offset] & 0x7f) << 24) |
+    ((signature[offset + 1] & 0xff) << 16) |
+    ((signature[offset + 2] & 0xff) << 8) |
+    (signature[offset + 3] & 0xff);
+
+  const divisor = 10 ** config.digits;
+  const otp = binary % divisor;
+  return otp.toString().padStart(config.digits, "0");
+}
 
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   const rawName = cipher.name?.trim() ?? "";
@@ -66,9 +284,10 @@ function SpotlightApp() {
   const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [detailActionIndex, setDetailActionIndex] = useState(0);
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
-  const [copiedDetailField, setCopiedDetailField] = useState<
-    "username" | "password" | null
-  >(null);
+  const [copiedDetailField, setCopiedDetailField] = useState<CopyField | null>(
+    null,
+  );
+  const [detailTotpRaw, setDetailTotpRaw] = useState<string | null>(null);
   const [isCopying, setIsCopying] = useState(false);
 
   const hideSpotlight = useCallback(async () => {
@@ -235,6 +454,55 @@ function SpotlightApp() {
     }
   }, [detailItem]);
 
+  useEffect(() => {
+    let disposed = false;
+
+    setDetailTotpRaw(null);
+    if (!detailItem) {
+      return () => {
+        disposed = true;
+      };
+    }
+
+    const loadDetailTotp = async () => {
+      try {
+        const result = await commands.vaultGetCipherDetail({
+          cipherId: detailItem.cipherId,
+        });
+        if (result.status === "error") {
+          logClientError("Failed to load cipher detail for totp", result.error);
+          return;
+        }
+
+        if (!disposed) {
+          setDetailTotpRaw(toCipherTotpRaw(result.data.cipher));
+        }
+      } catch (error) {
+        logClientError("Failed to load cipher detail for totp", error);
+      }
+    };
+
+    void loadDetailTotp();
+
+    return () => {
+      disposed = true;
+    };
+  }, [detailItem]);
+
+  const detailActions = useMemo(() => {
+    if (!detailTotpRaw) {
+      return DETAIL_ACTIONS.filter((action) => !action.requiresTotp);
+    }
+    return DETAIL_ACTIONS;
+  }, [detailTotpRaw]);
+
+  useEffect(() => {
+    setDetailActionIndex((current) => {
+      const maxIndex = Math.max(0, detailActions.length - 1);
+      return Math.min(current, maxIndex);
+    });
+  }, [detailActions.length]);
+
   const resolveSelectedItemId = useCallback(() => {
     const selectedElement = document.querySelector<HTMLElement>(
       "#spotlight-card .spotlight-item[data-selected='true']",
@@ -250,21 +518,48 @@ function SpotlightApp() {
   }, [visibleItems]);
 
   const runCopyAction = useCallback(
-    async (item: SpotlightItem, field: "username" | "password") => {
+    async (item: SpotlightItem, field: CopyField) => {
       if (isCopying) {
         return;
       }
 
       setIsCopying(true);
       try {
-        const result = await commands.vaultCopyCipherField({
-          cipherId: item.cipherId,
-          field,
-          clearAfterMs: null,
-        });
-        if (result.status === "error") {
-          logClientError("Failed to copy cipher field", result.error);
-          return;
+        if (field === "totp") {
+          const cachedRawTotp =
+            detailItem?.cipherId === item.cipherId ? detailTotpRaw : null;
+          const rawTotp =
+            cachedRawTotp ??
+            (await (async () => {
+              const result = await commands.vaultGetCipherDetail({
+                cipherId: item.cipherId,
+              });
+              if (result.status === "error") {
+                logClientError(
+                  "Failed to load cipher detail when copying totp",
+                  result.error,
+                );
+                return null;
+              }
+              return toCipherTotpRaw(result.data.cipher);
+            })());
+
+          const totpCode = await createCurrentTotpCode(rawTotp);
+          if (!totpCode) {
+            return;
+          }
+
+          await writeText(totpCode);
+        } else {
+          const result = await commands.vaultCopyCipherField({
+            cipherId: item.cipherId,
+            field,
+            clearAfterMs: null,
+          });
+          if (result.status === "error") {
+            logClientError("Failed to copy cipher field", result.error);
+            return;
+          }
         }
 
         setCopiedItemId(item.id);
@@ -281,19 +576,32 @@ function SpotlightApp() {
         setIsCopying(false);
       }
     },
-    [hideSpotlight, isCopying],
+    [detailItem?.cipherId, detailTotpRaw, hideSpotlight, isCopying],
   );
 
   const onCommandInputKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       const normalizedKey = event.key.toLowerCase();
       const isCopyShortcut =
-        (event.metaKey || event.ctrlKey) &&
-        !event.altKey &&
-        normalizedKey === "c";
+        (event.metaKey || event.ctrlKey) && normalizedKey === "c";
       if (isCopyShortcut) {
+        let field: CopyField | null = null;
+        if (event.altKey && !event.shiftKey) {
+          field = "totp";
+        } else if (event.shiftKey && !event.altKey) {
+          field = "password";
+        } else if (!event.shiftKey && !event.altKey) {
+          field = "username";
+        }
+        if (!field) {
+          return;
+        }
+
+        if (field === "totp" && detailItem && !detailTotpRaw) {
+          return;
+        }
+
         event.preventDefault();
-        const field = event.shiftKey ? "password" : "username";
         if (detailItem) {
           void runCopyAction(detailItem, field);
           return;
@@ -313,7 +621,7 @@ function SpotlightApp() {
 
       if (event.key === "Enter" && detailItem) {
         event.preventDefault();
-        const field = DETAIL_ACTIONS[detailActionIndex]?.field ?? "username";
+        const field = detailActions[detailActionIndex]?.field ?? "username";
         void runCopyAction(detailItem, field);
         return;
       }
@@ -325,9 +633,9 @@ function SpotlightApp() {
         event.preventDefault();
         setDetailActionIndex((current) => {
           if (event.key === "ArrowDown") {
-            return (current + 1) % DETAIL_ACTIONS.length;
+            return (current + 1) % detailActions.length;
           }
-          return (current - 1 + DETAIL_ACTIONS.length) % DETAIL_ACTIONS.length;
+          return (current - 1 + detailActions.length) % detailActions.length;
         });
         return;
       }
@@ -369,8 +677,10 @@ function SpotlightApp() {
       }
     },
     [
+      detailActions,
       detailActionIndex,
       detailItem,
+      detailTotpRaw,
       hasVisibleResults,
       hideSpotlight,
       query,
@@ -450,7 +760,7 @@ function SpotlightApp() {
                     {detailItem.subtitle}
                   </p>
                   <div className="spotlight-detail-actions" role="listbox">
-                    {DETAIL_ACTIONS.map((action, index) => (
+                    {detailActions.map((action, index) => (
                       <div
                         key={action.label}
                         role="option"
