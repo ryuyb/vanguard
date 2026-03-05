@@ -181,17 +181,17 @@ async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Resul
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<Result<VaultCipherTotpCodeResponseDto, string>> {
+async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Result<VaultCopyCipherFieldResponseDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_totp_code", { request }) };
+    return { status: "ok", data: await TAURI_INVOKE("vault_copy_cipher_field", { request }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Result<VaultCopyCipherFieldResponseDto, string>> {
+async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<Result<VaultCipherTotpCodeResponseDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_copy_cipher_field", { request }) };
+    return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_totp_code", { request }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
