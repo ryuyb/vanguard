@@ -1,512 +1,75 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { error as logError } from "@tauri-apps/plugin-log";
-import { Command as CommandPrimitive } from "cmdk";
-import { SearchIcon } from "lucide-react";
 import { motion } from "motion/react";
-import type { KeyboardEvent } from "react";
-import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
+import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
-import { commands, type VaultCipherItemDto } from "@/bindings";
 import { Card, CardFooter } from "@/components/ui/card";
-import { Command, CommandItem } from "@/components/ui/command";
-import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
-import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Command } from "@/components/ui/command";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { resolveSessionRoute } from "@/lib/route-session";
-import { cn } from "@/lib/utils";
+import {
+  SpotlightFooterHints,
+  SpotlightResultsPanel,
+  SpotlightSearchInput,
+  useSpotlightCopyAction,
+  useSpotlightDetailActions,
+  useSpotlightHideOnOutsideClick,
+  useSpotlightHotkeys,
+  useSpotlightPageClasses,
+  useSpotlightSession,
+  useSpotlightViewModel,
+} from "@/features/spotlight";
 import "@/main.css";
 
-type SpotlightItem = {
-  id: string;
-  cipherId: string;
-  title: string;
-  subtitle: string;
-  searchText: string;
-};
-
-type CopyField = "username" | "password" | "totp";
-
-type DetailAction = {
-  label: string;
-  shortcut: readonly string[];
-  field: CopyField;
-  requiresTotp?: boolean;
-};
-
-function errorToText(error: unknown) {
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unknown error";
-}
-
-function logClientError(context: string, error: unknown) {
-  void logError(`[spotlight] ${context}: ${errorToText(error)}`);
-}
-
-const DETAIL_ACTIONS: readonly DetailAction[] = [
-  { label: "复制 用户名", shortcut: ["⌘", "C"], field: "username" },
-  { label: "复制 密码", shortcut: ["⌘", "⇧", "C"], field: "password" },
-  {
-    label: "复制 一次性密码",
-    shortcut: ["⌘", "⌥", "C"],
-    field: "totp",
-    requiresTotp: true,
-  },
-];
-const COPY_FLASH_DURATION_MS = 180;
-
-function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
-  const rawName = cipher.name?.trim() ?? "";
-  const rawUsername = cipher.username?.trim() ?? "";
-  const title = rawName || "Untitled Cipher";
-  const subtitle = rawUsername || "Vault item";
-  return {
-    id: `cipher-${cipher.id}`,
-    cipherId: cipher.id,
-    title,
-    subtitle,
-    searchText: `${rawName} ${rawUsername}`.toLowerCase(),
-  };
-}
-
 function SpotlightApp() {
-  const [query, setQuery] = useState("");
-  const [vaultItems, setVaultItems] = useState<SpotlightItem[]>([]);
-  const [isLoadingVault, setIsLoadingVault] = useState(false);
-  const [detailItemId, setDetailItemId] = useState<string | null>(null);
-  const [detailActionIndex, setDetailActionIndex] = useState(0);
-  const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
-  const [copiedDetailField, setCopiedDetailField] = useState<CopyField | null>(
-    null,
-  );
-  const [detailHasTotp, setDetailHasTotp] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
+  useSpotlightPageClasses();
 
-  useEffect(() => {
-    const htmlClasses = ["h-full", "w-full", "overflow-hidden"];
-    const bodyClasses = [
-      "m-0",
-      "h-full",
-      "w-full",
-      "overflow-hidden",
-      "overscroll-none",
-      "bg-transparent",
-    ];
+  const { hideSpotlight, isLoadingVault, vaultItems } = useSpotlightSession();
 
-    for (const className of htmlClasses) {
-      document.documentElement.classList.add(className);
-    }
-    for (const className of bodyClasses) {
-      document.body.classList.add(className);
-    }
-
-    return () => {
-      for (const className of htmlClasses) {
-        document.documentElement.classList.remove(className);
-      }
-      for (const className of bodyClasses) {
-        document.body.classList.remove(className);
-      }
-    };
-  }, []);
-
-  const hideSpotlight = useCallback(async () => {
-    try {
-      await getCurrentWindow().hide();
-    } catch (error) {
-      logClientError("Failed to hide spotlight", error);
-    }
-  }, []);
-
-  const openMainWindow = useCallback(async () => {
-    try {
-      const result = await commands.desktopOpenMainWindow();
-      if (result.status === "error") {
-        logClientError(
-          "Failed to open main window via desktop command",
-          result.error,
-        );
-      }
-    } catch (error) {
-      logClientError("Failed to open main window via desktop command", error);
-    } finally {
-      await hideSpotlight();
-    }
-  }, [hideSpotlight]);
-
-  const ensureSpotlightSession = useCallback(async () => {
-    try {
-      const target = await resolveSessionRoute();
-      if (target === "/vault") {
-        return true;
-      }
-
-      await openMainWindow();
-      return false;
-    } catch (error) {
-      logClientError("Failed to resolve spotlight session route", error);
-      await hideSpotlight();
-      return false;
-    }
-  }, [hideSpotlight, openMainWindow]);
-
-  const loadVaultItems = useCallback(async () => {
-    setIsLoadingVault(true);
-
-    try {
-      const viewData = await commands.vaultGetViewData();
-      if (viewData.status === "error") {
-        logClientError("Failed to load vault data", viewData.error);
-        setVaultItems([]);
-        return;
-      }
-
-      const ciphers = viewData.data.ciphers.map(toCipherItem);
-      setVaultItems(ciphers);
-    } catch (error) {
-      logClientError("Failed to load vault data", error);
-      setVaultItems([]);
-    } finally {
-      setIsLoadingVault(false);
-    }
-  }, []);
-
-  const refreshSpotlightState = useCallback(async () => {
-    const canUseSpotlight = await ensureSpotlightSession();
-    if (!canUseSpotlight) {
-      return;
-    }
-    await loadVaultItems();
-  }, [ensureSpotlightSession, loadVaultItems]);
-
-  useEffect(() => {
-    void refreshSpotlightState();
-  }, [refreshSpotlightState]);
-
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-    let disposed = false;
-
-    void getCurrentWindow()
-      .onFocusChanged(({ payload: focused }) => {
-        if (!focused) {
-          return;
-        }
-        void refreshSpotlightState();
-      })
-      .then((unsubscribe) => {
-        if (disposed) {
-          unsubscribe();
-          return;
-        }
-        unlisten = unsubscribe;
-      })
-      .catch((error) => {
-        logClientError("Failed to subscribe spotlight focus events", error);
-      });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [refreshSpotlightState]);
-
-  useEffect(() => {
-    const handleWindowFocus = () => {
-      void refreshSpotlightState();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-      void refreshSpotlightState();
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-    window.addEventListener("pageshow", handleWindowFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("focus", handleWindowFocus);
-      window.removeEventListener("pageshow", handleWindowFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshSpotlightState]);
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const hasQuery = normalizedQuery.length > 0;
-
-  const visibleItems = useMemo(() => {
-    if (!hasQuery) {
-      return [];
-    }
-
-    return vaultItems.filter((item) =>
-      item.searchText.includes(normalizedQuery),
-    );
-  }, [hasQuery, normalizedQuery, vaultItems]);
-  const detailItem = useMemo(() => {
-    if (!detailItemId) {
-      return null;
-    }
-    return visibleItems.find((item) => item.id === detailItemId) ?? null;
-  }, [detailItemId, visibleItems]);
-  const hasVisibleResults = visibleItems.length > 0;
-  const shouldShowResults =
-    (isLoadingVault && hasQuery) || visibleItems.length > 0;
-
-  useEffect(() => {
-    if (!hasVisibleResults) {
-      setDetailItemId(null);
-      return;
-    }
-    if (!detailItemId) {
-      return;
-    }
-    const isVisible = visibleItems.some((item) => item.id === detailItemId);
-    if (!isVisible) {
-      setDetailItemId(null);
-    }
-  }, [detailItemId, hasVisibleResults, visibleItems]);
-
-  useEffect(() => {
-    if (!detailItem) {
-      setDetailActionIndex(0);
-    }
-  }, [detailItem]);
-
-  useEffect(() => {
-    let disposed = false;
-
-    setDetailHasTotp(false);
-    if (!detailItem) {
-      return () => {
-        disposed = true;
-      };
-    }
-
-    const loadDetailTotp = async () => {
-      try {
-        const result = await commands.vaultGetCipherDetail({
-          cipherId: detailItem.cipherId,
-        });
-        if (result.status === "error") {
-          logClientError("Failed to load cipher detail for totp", result.error);
-          return;
-        }
-
-        if (!disposed) {
-          setDetailHasTotp(result.data.cipher.hasTotp);
-        }
-      } catch (error) {
-        logClientError("Failed to load cipher detail for totp", error);
-      }
-    };
-
-    void loadDetailTotp();
-
-    return () => {
-      disposed = true;
-    };
-  }, [detailItem]);
-
-  const detailActions = useMemo(() => {
-    if (!detailHasTotp) {
-      return DETAIL_ACTIONS.filter((action) => !action.requiresTotp);
-    }
-    return DETAIL_ACTIONS;
-  }, [detailHasTotp]);
-
-  useEffect(() => {
-    setDetailActionIndex((current) => {
-      const maxIndex = Math.max(0, detailActions.length - 1);
-      return Math.min(current, maxIndex);
-    });
-  }, [detailActions.length]);
-
-  const resolveSelectedItemId = useCallback(() => {
-    const selectedElement = document.querySelector<HTMLElement>(
-      "#spotlight-card [data-spotlight-item='true'][data-selected='true']",
-    );
-    const selectedValue = selectedElement?.getAttribute("data-value");
-    if (
-      selectedValue &&
-      visibleItems.some((item) => item.id === selectedValue)
-    ) {
-      return selectedValue;
-    }
-    return visibleItems[0]?.id ?? null;
-  }, [visibleItems]);
-
-  const runCopyAction = useCallback(
-    async (item: SpotlightItem, field: CopyField) => {
-      if (isCopying) {
-        return;
-      }
-
-      setIsCopying(true);
-      try {
-        const result = await commands.vaultCopyCipherField({
-          cipherId: item.cipherId,
-          field,
-          clearAfterMs: null,
-        });
-        if (result.status === "error") {
-          logClientError("Failed to copy cipher field", result.error);
-          return;
-        }
-
-        setCopiedItemId(item.id);
-        setCopiedDetailField(field);
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, COPY_FLASH_DURATION_MS),
-        );
-        setCopiedItemId(null);
-        setCopiedDetailField(null);
-        await hideSpotlight();
-      } catch (error) {
-        logClientError("Failed to copy cipher field", error);
-      } finally {
-        setIsCopying(false);
-      }
-    },
-    [hideSpotlight, isCopying],
-  );
-
-  const onCommandInputKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
-      const normalizedKey = event.key.toLowerCase();
-      const isCopyShortcut =
-        (event.metaKey || event.ctrlKey) && normalizedKey === "c";
-      if (isCopyShortcut) {
-        let field: CopyField | null = null;
-        if (event.altKey && !event.shiftKey) {
-          field = "totp";
-        } else if (event.shiftKey && !event.altKey) {
-          field = "password";
-        } else if (!event.shiftKey && !event.altKey) {
-          field = "username";
-        }
-        if (!field) {
-          return;
-        }
-
-        if (field === "totp" && (!detailItem || !detailHasTotp)) {
-          return;
-        }
-
-        event.preventDefault();
-        if (detailItem) {
-          void runCopyAction(detailItem, field);
-          return;
-        }
-        const selectedItemId = resolveSelectedItemId();
-        if (!selectedItemId) {
-          return;
-        }
-        const selectedItem =
-          visibleItems.find((item) => item.id === selectedItemId) ?? null;
-        if (!selectedItem) {
-          return;
-        }
-        void runCopyAction(selectedItem, field);
-        return;
-      }
-
-      if (event.key === "Enter" && detailItem) {
-        event.preventDefault();
-        const field = detailActions[detailActionIndex]?.field ?? "username";
-        void runCopyAction(detailItem, field);
-        return;
-      }
-
-      if (
-        detailItem &&
-        (event.key === "ArrowDown" || event.key === "ArrowUp")
-      ) {
-        event.preventDefault();
-        setDetailActionIndex((current) => {
-          if (event.key === "ArrowDown") {
-            return (current + 1) % detailActions.length;
-          }
-          return (current - 1 + detailActions.length) % detailActions.length;
-        });
-        return;
-      }
-
-      if (event.key === "ArrowRight" && hasVisibleResults && !detailItem) {
-        const inputElement = event.currentTarget;
-        const inputValueLength = inputElement.value.length;
-        const isCaretAtEnd =
-          inputElement.selectionStart === inputValueLength &&
-          inputElement.selectionEnd === inputValueLength;
-        if (!isCaretAtEnd) {
-          return;
-        }
-        event.preventDefault();
-        const selectedItemId = resolveSelectedItemId();
-        if (selectedItemId) {
-          setDetailItemId(selectedItemId);
-        }
-        return;
-      }
-
-      if (event.key === "ArrowLeft" && detailItem) {
-        event.preventDefault();
-        setDetailItemId(null);
-        return;
-      }
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        if (detailItem) {
-          setDetailItemId(null);
-          return;
-        }
-        if (query.trim().length > 0) {
-          setQuery("");
-          return;
-        }
-        void hideSpotlight();
-      }
-    },
-    [
-      detailActions,
-      detailActionIndex,
-      detailHasTotp,
-      detailItem,
-      hasVisibleResults,
+  const { copiedDetailField, copiedItemId, runCopyAction } =
+    useSpotlightCopyAction({
       hideSpotlight,
-      query,
-      resolveSelectedItemId,
-      runCopyAction,
-      visibleItems,
-    ],
-  );
+    });
 
-  useEffect(() => {
-    const onDocumentMouseDown = (event: globalThis.MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-      const cardElement = document.getElementById("spotlight-card");
-      if (cardElement?.contains(target)) {
-        return;
-      }
+  const {
+    detailItem,
+    hasQuery,
+    hasVisibleResults,
+    query,
+    setDetailItemId,
+    setQuery,
+    shouldShowResults,
+    visibleItems,
+  } = useSpotlightViewModel({
+    isLoadingVault,
+    vaultItems,
+  });
+
+  const {
+    detailActionIndex,
+    detailActions,
+    detailHasTotp,
+    setDetailActionIndex,
+  } = useSpotlightDetailActions({ detailItem });
+
+  const { onCommandInputKeyDown } = useSpotlightHotkeys({
+    detailActionIndex,
+    detailActions,
+    detailHasTotp,
+    detailItem,
+    hasVisibleResults,
+    hideSpotlight,
+    query,
+    runCopyAction,
+    setDetailActionIndex,
+    setDetailItemId,
+    setQuery,
+    visibleItems,
+  });
+
+  useSpotlightHideOnOutsideClick({
+    cardId: "spotlight-card",
+    onOutsideClick: () => {
       void hideSpotlight();
-    };
-
-    document.addEventListener("mousedown", onDocumentMouseDown, true);
-    return () => {
-      document.removeEventListener("mousedown", onDocumentMouseDown, true);
-    };
-  }, [hideSpotlight]);
+    },
+  });
 
   return (
     <motion.main
@@ -525,161 +88,32 @@ function SpotlightApp() {
           loop
         >
           <div>
-            <InputGroup className="h-auto rounded-[14px] border border-slate-400/45 bg-white/55 px-3 py-2.5 shadow-none transition-none has-[[data-slot=input-group-control]:focus-visible]:border-slate-400/45 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
-              <CommandPrimitive.Input
-                id="spotlight-search-input"
-                className="w-full bg-transparent text-[18px] leading-[1.3] text-slate-900 outline-none placeholder:text-slate-500 focus-visible:ring-0"
-                value={query}
-                onValueChange={setQuery}
-                autoFocus
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-                placeholder="Search vault ciphers by keyword"
-                aria-label="Search"
-                onKeyDown={onCommandInputKeyDown}
-              />
-              <InputGroupAddon
-                align="inline-end"
-                className="size-6 min-w-6 justify-center rounded-[7px] bg-slate-400/20 p-0 text-slate-700"
-              >
-                <SearchIcon className="size-4 shrink-0" />
-              </InputGroupAddon>
-            </InputGroup>
+            <SpotlightSearchInput
+              query={query}
+              onQueryChange={setQuery}
+              onKeyDown={onCommandInputKeyDown}
+            />
           </div>
-          {shouldShowResults ? (
-            <ScrollArea className="mt-2.5 h-68">
-              {isLoadingVault && hasQuery ? (
-                <div className="grid gap-2 py-0.5" aria-hidden>
-                  {Array.from({ length: 6 }).map((_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="rounded-xl px-3 py-2.5"
-                    >
-                      <Skeleton className="h-4 w-3/5" />
-                      <Skeleton className="mt-2 h-3 w-2/5" />
-                    </div>
-                  ))}
-                </div>
-              ) : detailItem ? (
-                <section
-                  className="px-2.5 pt-3 pb-2.5"
-                  aria-label="Cipher detail"
-                >
-                  <p className="text-base leading-tight font-semibold text-slate-900">
-                    {detailItem.title}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-600">
-                    {detailItem.subtitle}
-                  </p>
-                  <div className="mt-3 grid gap-2" role="listbox">
-                    {detailActions.map((action, index) => (
-                      <div
-                        key={action.label}
-                        role="option"
-                        tabIndex={-1}
-                        aria-selected={detailActionIndex === index}
-                        className={cn(
-                          "flex items-center justify-between gap-3 rounded-xl border border-slate-400/25 bg-white/50 px-3 py-2.5 text-[13px] leading-[1.3] text-slate-900 transition-colors",
-                          detailActionIndex === index &&
-                            "border-blue-800/30 bg-blue-800/12",
-                          copiedDetailField === action.field &&
-                            "animate-in fade-in-0 duration-150 bg-blue-800/25",
-                        )}
-                      >
-                        <span>{action.label}</span>
-                        <KbdGroup className="shrink-0 text-slate-500">
-                          {action.shortcut.map((shortcutKey) => (
-                            <Kbd key={`${action.label}-${shortcutKey}`}>
-                              {shortcutKey}
-                            </Kbd>
-                          ))}
-                        </KbdGroup>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              ) : (
-                <CommandPrimitive.List className="px-0.5">
-                  {visibleItems.map((item) => (
-                    <CommandItem
-                      key={item.id}
-                      value={item.id}
-                      data-spotlight-item="true"
-                      className={cn(
-                        "w-full justify-between gap-3 rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-left data-[selected=true]:bg-blue-800/12",
-                        copiedItemId === item.id &&
-                          "animate-in fade-in-0 duration-150 bg-blue-800/20 data-[selected=true]:bg-blue-800/20",
-                      )}
-                    >
-                      <div>
-                        <p className="text-sm text-slate-900">{item.title}</p>
-                        <p className="mt-0.5 text-xs text-slate-600">
-                          {item.subtitle}
-                        </p>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandPrimitive.List>
-              )}
-            </ScrollArea>
-          ) : null}
+          <SpotlightResultsPanel
+            shouldShowResults={shouldShowResults}
+            isLoadingVault={isLoadingVault}
+            hasQuery={hasQuery}
+            detailItem={detailItem}
+            detailActions={detailActions}
+            detailActionIndex={detailActionIndex}
+            copiedDetailField={copiedDetailField}
+            visibleItems={visibleItems}
+            copiedItemId={copiedItemId}
+          />
         </Command>
 
         <Separator className="mt-2.5 bg-slate-400/30" />
 
         <CardFooter className="mt-0 flex min-h-9 flex-wrap items-center gap-2.5 px-1 pb-0">
-          {hasVisibleResults ? (
-            <>
-              {detailItem ? null : (
-                <>
-                  <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                    <KbdGroup>
-                      <Kbd>⌘</Kbd>
-                      <Kbd>C</Kbd>
-                    </KbdGroup>
-                    复制 用户名
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                    <KbdGroup>
-                      <Kbd>⌘</Kbd>
-                      <Kbd>⇧</Kbd>
-                      <Kbd>C</Kbd>
-                    </KbdGroup>
-                    复制 密码
-                  </span>
-                </>
-              )}
-              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                <Kbd>{detailItem ? "←" : "→"}</Kbd>
-                {detailItem ? "返回结果" : "更多操作"}
-              </span>
-              {detailItem ? (
-                <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                  <KbdGroup>
-                    <Kbd>↑</Kbd>
-                    <Kbd>↓</Kbd>
-                  </KbdGroup>
-                  选择
-                </span>
-              ) : null}
-            </>
-          ) : (
-            <>
-              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                <KbdGroup>
-                  <Kbd>⇧</Kbd>
-                  <Kbd>⌃</Kbd>
-                  <Kbd>Space</Kbd>
-                </KbdGroup>
-                Open quick access
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-                <Kbd>Esc</Kbd>
-                Close
-              </span>
-            </>
-          )}
+          <SpotlightFooterHints
+            hasVisibleResults={hasVisibleResults}
+            detailItem={detailItem}
+          />
         </CardFooter>
       </Card>
     </motion.main>
