@@ -3,10 +3,11 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::application::dto::vault::{
-    CopyCipherFieldCommand, EnablePinUnlockCommand, GetCipherDetailQuery, UnlockVaultCommand,
-    VaultCopyField, VaultUserKeyMaterial,
+    CopyCipherFieldCommand, EnablePinUnlockCommand, GetCipherDetailQuery, GetCipherTotpCodeCommand,
+    UnlockVaultCommand, VaultCopyField, VaultUserKeyMaterial,
 };
 use crate::application::use_cases::copy_cipher_field_use_case::CopyCipherFieldUseCase;
+use crate::application::use_cases::get_cipher_totp_code_use_case::GetCipherTotpCodeUseCase;
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
 use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
 use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
@@ -16,8 +17,9 @@ use crate::bootstrap::app_state::{AppState, VaultUserKey};
 use crate::domain::unlock::{PinLockType, UnlockMethod};
 use crate::interfaces::tauri::dto::vault::{
     VaultBiometricStatusResponseDto, VaultCipherDetailRequestDto, VaultCipherDetailResponseDto,
-    VaultCipherItemDto, VaultCopyCipherFieldRequestDto, VaultCopyCipherFieldResponseDto,
-    VaultCopyFieldDto, VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
+    VaultCipherItemDto, VaultCipherTotpCodeRequestDto, VaultCipherTotpCodeResponseDto,
+    VaultCopyCipherFieldRequestDto, VaultCopyCipherFieldResponseDto, VaultCopyFieldDto,
+    VaultDisableBiometricUnlockRequestDto, VaultDisablePinUnlockRequestDto,
     VaultEnableBiometricUnlockRequestDto, VaultEnablePinUnlockRequestDto, VaultFolderItemDto,
     VaultLockRequestDto, VaultPinLockTypeDto, VaultPinStatusResponseDto, VaultUnlockMethodDto,
     VaultUnlockRequestDto, VaultViewDataResponseDto,
@@ -330,6 +332,30 @@ pub async fn vault_copy_cipher_field(
     Ok(VaultCopyCipherFieldResponseDto {
         copied: result.copied,
         clear_after_ms: result.clear_after_ms,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_get_cipher_totp_code(
+    state: State<'_, AppState>,
+    request: VaultCipherTotpCodeRequestDto,
+) -> Result<VaultCipherTotpCodeResponseDto, String> {
+    let result = GetCipherTotpCodeUseCase::new(state.get_cipher_detail_use_case())
+        .execute(
+            &*state,
+            GetCipherTotpCodeCommand {
+                cipher_id: request.cipher_id,
+            },
+        )
+        .await
+        .map_err(|error| log_command_error("vault_get_cipher_totp_code", error))?;
+
+    Ok(VaultCipherTotpCodeResponseDto {
+        code: result.code,
+        period_seconds: result.period_seconds,
+        remaining_seconds: result.remaining_seconds,
+        expires_at_ms: result.expires_at_ms,
     })
 }
 

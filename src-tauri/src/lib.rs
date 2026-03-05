@@ -38,7 +38,8 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data,
             interfaces::tauri::commands::vault::vault_get_cipher_detail,
-            interfaces::tauri::commands::vault::vault_copy_cipher_field
+            interfaces::tauri::commands::vault::vault_copy_cipher_field,
+            interfaces::tauri::commands::vault::vault_get_cipher_totp_code
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,
@@ -65,11 +66,9 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        app_builder = app_builder.plugin(tauri_plugin_single_instance::init(
-            |app, _args, _cwd| {
-                interfaces::tauri::desktop::open_main_window(app);
-            },
-        ));
+        app_builder = app_builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            interfaces::tauri::desktop::open_main_window(app);
+        }));
     }
 
     app_builder

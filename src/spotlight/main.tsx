@@ -6,11 +6,7 @@ import { motion } from "motion/react";
 import type { KeyboardEvent } from "react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
-import {
-  commands,
-  type VaultCipherDetailDto,
-  type VaultCipherItemDto,
-} from "@/bindings";
+import { commands, type VaultCipherItemDto } from "@/bindings";
 import { Card, CardFooter } from "@/components/ui/card";
 import { Command, CommandItem } from "@/components/ui/command";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -65,21 +61,6 @@ const DETAIL_ACTIONS: readonly DetailAction[] = [
 ];
 const COPY_FLASH_DURATION_MS = 180;
 
-function firstNonEmptyText(
-  ...values: Array<string | null | undefined>
-): string | null {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
-  return null;
-}
-
-function toCipherTotpRaw(cipher: VaultCipherDetailDto) {
-  return firstNonEmptyText(cipher.login?.totp, cipher.data?.totp);
-}
-
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
   const rawName = cipher.name?.trim() ?? "";
   const rawUsername = cipher.username?.trim() ?? "";
@@ -104,7 +85,7 @@ function SpotlightApp() {
   const [copiedDetailField, setCopiedDetailField] = useState<CopyField | null>(
     null,
   );
-  const [detailTotpRaw, setDetailTotpRaw] = useState<string | null>(null);
+  const [detailHasTotp, setDetailHasTotp] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
 
   useEffect(() => {
@@ -302,7 +283,7 @@ function SpotlightApp() {
   useEffect(() => {
     let disposed = false;
 
-    setDetailTotpRaw(null);
+    setDetailHasTotp(false);
     if (!detailItem) {
       return () => {
         disposed = true;
@@ -320,7 +301,7 @@ function SpotlightApp() {
         }
 
         if (!disposed) {
-          setDetailTotpRaw(toCipherTotpRaw(result.data.cipher));
+          setDetailHasTotp(result.data.cipher.hasTotp);
         }
       } catch (error) {
         logClientError("Failed to load cipher detail for totp", error);
@@ -335,11 +316,11 @@ function SpotlightApp() {
   }, [detailItem]);
 
   const detailActions = useMemo(() => {
-    if (!detailTotpRaw) {
+    if (!detailHasTotp) {
       return DETAIL_ACTIONS.filter((action) => !action.requiresTotp);
     }
     return DETAIL_ACTIONS;
-  }, [detailTotpRaw]);
+  }, [detailHasTotp]);
 
   useEffect(() => {
     setDetailActionIndex((current) => {
@@ -415,7 +396,7 @@ function SpotlightApp() {
           return;
         }
 
-        if (field === "totp" && (!detailItem || !detailTotpRaw)) {
+        if (field === "totp" && (!detailItem || !detailHasTotp)) {
           return;
         }
 
@@ -497,8 +478,8 @@ function SpotlightApp() {
     [
       detailActions,
       detailActionIndex,
+      detailHasTotp,
       detailItem,
-      detailTotpRaw,
       hasVisibleResults,
       hideSpotlight,
       query,

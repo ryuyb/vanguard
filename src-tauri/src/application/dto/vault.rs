@@ -32,6 +32,19 @@ pub struct CopyCipherFieldResult {
 }
 
 #[derive(Debug, Clone)]
+pub struct GetCipherTotpCodeCommand {
+    pub cipher_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetCipherTotpCodeResult {
+    pub code: String,
+    pub period_seconds: u64,
+    pub remaining_seconds: u64,
+    pub expires_at_ms: i64,
+}
+
+#[derive(Debug, Clone)]
 pub struct UnlockVaultCommand {
     pub method: UnlockMethod,
 }

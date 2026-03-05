@@ -9,6 +9,12 @@ pub struct VaultCipherDetailRequestDto {
     pub cipher_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultCipherTotpCodeRequestDto {
+    pub cipher_id: String,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum VaultCopyFieldDto {
@@ -131,6 +137,15 @@ pub struct VaultCipherDetailResponseDto {
     pub cipher: VaultCipherDetailDto,
 }
 
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultCipherTotpCodeResponseDto {
+    pub code: String,
+    pub period_seconds: u64,
+    pub remaining_seconds: u64,
+    pub expires_at_ms: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultCipherDetailDto {
@@ -162,6 +177,7 @@ pub struct VaultCipherDetailDto {
     pub identity: Option<VaultCipherIdentityDetailDto>,
     pub ssh_key: Option<VaultCipherSshKeyDetailDto>,
     pub attachments: Vec<VaultAttachmentDetailDto>,
+    pub has_totp: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -211,7 +227,6 @@ pub struct VaultCipherDataDetailDto {
     pub username: Option<String>,
     pub password: Option<String>,
     pub password_revision_date: Option<String>,
-    pub totp: Option<String>,
     pub autofill_on_page_load: Option<bool>,
     pub fido2_credentials: Vec<VaultCipherLoginFido2CredentialDetailDto>,
     pub r#type: Option<i32>,
@@ -251,7 +266,6 @@ pub struct VaultCipherLoginDetailDto {
     pub username: Option<String>,
     pub password: Option<String>,
     pub password_revision_date: Option<String>,
-    pub totp: Option<String>,
     pub autofill_on_page_load: Option<bool>,
     pub fido2_credentials: Vec<VaultCipherLoginFido2CredentialDetailDto>,
 }

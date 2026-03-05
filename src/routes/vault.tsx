@@ -113,176 +113,6 @@ function toAvatarText(email: string | null | undefined) {
   return (compacted.slice(0, 2) || "??").toUpperCase();
 }
 
-type TotpHashAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
-
-type TotpConfig = {
-  secret: Uint8Array;
-  hashAlgorithm: TotpHashAlgorithm;
-  digits: number;
-  period: number;
-};
-
-const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-function parsePositiveInteger(value: string) {
-  if (!/^\d+$/.test(value)) {
-    return null;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isSafeInteger(parsed)) {
-    return null;
-  }
-  return parsed;
-}
-
-function normalizeTotpHashAlgorithm(value: string | null) {
-  if (!value) {
-    return "SHA-1" as TotpHashAlgorithm;
-  }
-  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  if (normalized === "SHA1") {
-    return "SHA-1" as TotpHashAlgorithm;
-  }
-  if (normalized === "SHA256") {
-    return "SHA-256" as TotpHashAlgorithm;
-  }
-  if (normalized === "SHA512") {
-    return "SHA-512" as TotpHashAlgorithm;
-  }
-  return null;
-}
-
-function decodeBase32Secret(value: string) {
-  const sanitized = value
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "")
-    .replace(/=+$/g, "");
-  if (!sanitized) {
-    return null;
-  }
-
-  const output: number[] = [];
-  let buffer = 0;
-  let bitsInBuffer = 0;
-
-  for (const character of sanitized) {
-    const index = BASE32_ALPHABET.indexOf(character);
-    if (index === -1) {
-      return null;
-    }
-
-    buffer = (buffer << 5) | index;
-    bitsInBuffer += 5;
-
-    while (bitsInBuffer >= 8) {
-      output.push((buffer >>> (bitsInBuffer - 8)) & 0xff);
-      bitsInBuffer -= 8;
-    }
-  }
-
-  if (output.length === 0) {
-    return null;
-  }
-
-  return new Uint8Array(output);
-}
-
-function parseTotpConfig(rawTotp: string | null) {
-  const raw = (rawTotp ?? "").trim();
-  if (!raw) {
-    return null;
-  }
-
-  let secretText: string | null = null;
-  let hashAlgorithm: TotpHashAlgorithm = "SHA-1";
-  let digits = 6;
-  let period = 30;
-
-  if (raw.toLowerCase().startsWith("otpauth://")) {
-    let url: URL;
-    try {
-      url = new URL(raw);
-    } catch {
-      return null;
-    }
-
-    if (url.protocol !== "otpauth:" || url.hostname.toLowerCase() !== "totp") {
-      return null;
-    }
-
-    secretText = url.searchParams.get("secret");
-    if (!secretText) {
-      return null;
-    }
-
-    const parsedAlgorithm = normalizeTotpHashAlgorithm(
-      url.searchParams.get("algorithm"),
-    );
-    if (!parsedAlgorithm) {
-      return null;
-    }
-    hashAlgorithm = parsedAlgorithm;
-
-    const digitsParam = url.searchParams.get("digits");
-    if (digitsParam) {
-      const parsedDigits = parsePositiveInteger(digitsParam);
-      if (parsedDigits == null || parsedDigits < 6 || parsedDigits > 10) {
-        return null;
-      }
-      digits = parsedDigits;
-    }
-
-    const periodParam = url.searchParams.get("period");
-    if (periodParam) {
-      const parsedPeriod = parsePositiveInteger(periodParam);
-      if (parsedPeriod == null || parsedPeriod <= 0 || parsedPeriod > 300) {
-        return null;
-      }
-      period = parsedPeriod;
-    }
-  } else {
-    secretText = raw;
-  }
-
-  const secret = decodeBase32Secret(secretText);
-  if (!secret) {
-    return null;
-  }
-
-  return {
-    secret,
-    hashAlgorithm,
-    digits,
-    period,
-  } satisfies TotpConfig;
-}
-
-async function generateTotpCode(
-  key: CryptoKey,
-  counter: number,
-  digits: number,
-): Promise<string> {
-  const data = new ArrayBuffer(8);
-  const view = new DataView(data);
-  const high = Math.floor(counter / 0x1_0000_0000);
-  const low = counter >>> 0;
-  view.setUint32(0, high);
-  view.setUint32(4, low);
-
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
-  const offset = signature[signature.length - 1] & 0x0f;
-  const binary =
-    ((signature[offset] & 0x7f) << 24) |
-    ((signature[offset + 1] & 0xff) << 16) |
-    ((signature[offset + 2] & 0xff) << 8) |
-    (signature[offset + 3] & 0xff);
-
-  const divisor = 10 ** digits;
-  const otp = binary % divisor;
-  return otp.toString().padStart(digits, "0");
-}
-
 function sortFolders(folders: VaultFolderItemDto[]) {
   return [...folders].sort((left, right) =>
     (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
@@ -1364,109 +1194,101 @@ function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
     cipher.login?.password,
     cipher.data?.password,
   );
-  const oneTimePassword = firstNonEmptyText(
-    cipher.login?.totp,
-    cipher.data?.totp,
-  );
-  const oneTimePasswordConfig = useMemo(
-    () => parseTotpConfig(oneTimePassword),
-    [oneTimePassword],
-  );
+  const hasOneTimePassword = cipher.hasTotp;
   const [oneTimePasswordCode, setOneTimePasswordCode] = useState<string | null>(
     null,
   );
   const [oneTimePasswordRemaining, setOneTimePasswordRemaining] = useState<
     number | null
   >(null);
+  const [oneTimePasswordFailed, setOneTimePasswordFailed] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
   const organizationId = cipher.organizationId;
 
   useEffect(() => {
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+    let expiresAtMs: number | null = null;
+    let loading = false;
+
+    setIsPasswordVisible(false);
+
+    const loadTotpSnapshot = async () => {
+      if (loading || disposed) {
+        return;
+      }
+      loading = true;
+      try {
+        const result = await commands.vaultGetCipherTotpCode({
+          cipherId: cipher.id,
+        });
+        if (disposed) {
+          return;
+        }
+        if (result.status === "error") {
+          expiresAtMs = null;
+          setOneTimePasswordCode(null);
+          setOneTimePasswordRemaining(null);
+          setOneTimePasswordFailed(true);
+          return;
+        }
+
+        expiresAtMs = result.data.expiresAtMs;
+        setOneTimePasswordCode(result.data.code);
+        setOneTimePasswordRemaining(result.data.remainingSeconds);
+        setOneTimePasswordFailed(false);
+      } catch {
+        if (disposed) {
+          return;
+        }
+        expiresAtMs = null;
+        setOneTimePasswordCode(null);
+        setOneTimePasswordRemaining(null);
+        setOneTimePasswordFailed(true);
+      } finally {
+        loading = false;
+      }
+    };
+    const intervalId = window.setInterval(() => {
+      if (!expiresAtMs) {
+        return;
+      }
+      const remaining = Math.max(
+        0,
+        Math.ceil((expiresAtMs - Date.now()) / 1000),
+      );
+      setOneTimePasswordRemaining(remaining);
+      if (remaining <= 0) {
+        void loadTotpSnapshot();
+      }
+    }, 1000);
 
     setOneTimePasswordCode(null);
     setOneTimePasswordRemaining(null);
-
-    if (!oneTimePasswordConfig) {
+    setOneTimePasswordFailed(false);
+    if (!hasOneTimePassword) {
       return () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+        disposed = true;
+        window.clearInterval(intervalId);
       };
     }
 
-    const start = async () => {
-      try {
-        const key = await crypto.subtle.importKey(
-          "raw",
-          oneTimePasswordConfig.secret,
-          {
-            name: "HMAC",
-            hash: { name: oneTimePasswordConfig.hashAlgorithm },
-          },
-          false,
-          ["sign"],
-        );
-
-        const tick = async () => {
-          if (cancelled) {
-            return;
-          }
-
-          const now = Date.now();
-          const unixSeconds = Math.floor(now / 1000);
-          const counter = Math.floor(
-            unixSeconds / oneTimePasswordConfig.period,
-          );
-          const remaining =
-            oneTimePasswordConfig.period -
-            (unixSeconds % oneTimePasswordConfig.period);
-          const code = await generateTotpCode(
-            key,
-            counter,
-            oneTimePasswordConfig.digits,
-          );
-
-          if (cancelled) {
-            return;
-          }
-
-          setOneTimePasswordCode(code);
-          setOneTimePasswordRemaining(remaining);
-
-          timeoutId = setTimeout(
-            () => {
-              void tick();
-            },
-            1000 - (now % 1000),
-          );
-        };
-
-        await tick();
-      } catch {
-        if (!cancelled) {
-          setOneTimePasswordCode(null);
-          setOneTimePasswordRemaining(null);
-        }
-      }
-    };
-
-    void start();
+    void loadTotpSnapshot();
 
     return () => {
-      cancelled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      disposed = true;
+      window.clearInterval(intervalId);
     };
-  }, [oneTimePasswordConfig]);
+  }, [cipher.id, hasOneTimePassword]);
 
   const oneTimePasswordDisplay =
     oneTimePasswordCode && oneTimePasswordRemaining != null
       ? `${oneTimePasswordCode} (${oneTimePasswordRemaining}s)`
-      : null;
+      : oneTimePasswordFailed
+        ? "Unavailable"
+        : hasOneTimePassword
+          ? "Loading..."
+          : null;
 
   return (
     <div className="space-y-3">
@@ -1503,7 +1325,9 @@ function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
             </div>
           </div>
         )}
-        <DetailRow label="One-time password" value={oneTimePasswordDisplay} />
+        {hasOneTimePassword && (
+          <DetailRow label="One-time password" value={oneTimePasswordDisplay} />
+        )}
       </div>
 
       {notes && (

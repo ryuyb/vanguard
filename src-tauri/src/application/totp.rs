@@ -1,0 +1,273 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use hmac::{Hmac, Mac};
+use sha1::Sha1;
+use sha2::{Sha256, Sha512};
+use url::Url;
+
+use crate::support::error::AppError;
+use crate::support::result::AppResult;
+
+const BASE32_ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+#[derive(Debug, Clone, Copy)]
+enum TotpHashAlgorithm {
+    Sha1,
+    Sha256,
+    Sha512,
+}
+
+#[derive(Debug, Clone)]
+struct TotpConfig {
+    secret: Vec<u8>,
+    hash_algorithm: TotpHashAlgorithm,
+    digits: u32,
+    period: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TotpCodeSnapshot {
+    pub code: String,
+    pub period_seconds: u64,
+    pub remaining_seconds: u64,
+    pub expires_at_ms: i64,
+}
+
+pub fn current_unix_seconds() -> AppResult<u64> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|_| AppError::internal("failed to read system time for totp generation"))
+}
+
+pub fn generate_current_totp(raw_totp: &str, unix_seconds: u64) -> AppResult<TotpCodeSnapshot> {
+    let config = parse_totp_config(raw_totp)?;
+    let code = generate_totp_code(&config, unix_seconds)?;
+    let remaining_seconds = config.period - (unix_seconds % config.period);
+    let expires_at_seconds = unix_seconds + remaining_seconds;
+    let expires_at_ms = i64::try_from(
+        expires_at_seconds
+            .checked_mul(1000)
+            .ok_or_else(|| AppError::internal("totp expiration timestamp overflow"))?,
+    )
+    .map_err(|_| AppError::internal("totp expiration timestamp overflow"))?;
+
+    Ok(TotpCodeSnapshot {
+        code,
+        period_seconds: config.period,
+        remaining_seconds,
+        expires_at_ms,
+    })
+}
+
+fn parse_totp_config(raw_totp: &str) -> AppResult<TotpConfig> {
+    let raw = raw_totp.trim();
+    if raw.is_empty() {
+        return Err(AppError::validation("invalid totp configuration"));
+    }
+
+    let mut secret_text: Option<String> = None;
+    let mut hash_algorithm = TotpHashAlgorithm::Sha1;
+    let mut digits: u32 = 6;
+    let mut period: u64 = 30;
+
+    if raw.to_ascii_lowercase().starts_with("otpauth://") {
+        let url =
+            Url::parse(raw).map_err(|_| AppError::validation("invalid totp configuration"))?;
+        if url.scheme() != "otpauth"
+            || url.host_str().map(|value| value.to_ascii_lowercase()) != Some(String::from("totp"))
+        {
+            return Err(AppError::validation("invalid totp configuration"));
+        }
+
+        for (key, value) in url.query_pairs() {
+            if key.eq_ignore_ascii_case("secret") {
+                secret_text = Some(value.into_owned());
+            } else if key.eq_ignore_ascii_case("algorithm") {
+                hash_algorithm = parse_totp_algorithm(value.as_ref())?;
+            } else if key.eq_ignore_ascii_case("digits") {
+                digits = parse_totp_digits(value.as_ref())?;
+            } else if key.eq_ignore_ascii_case("period") {
+                period = parse_totp_period(value.as_ref())?;
+            }
+        }
+
+        if secret_text.is_none() {
+            return Err(AppError::validation("invalid totp configuration"));
+        }
+    } else {
+        secret_text = Some(String::from(raw));
+    }
+
+    let secret = decode_base32_secret(
+        secret_text
+            .as_deref()
+            .ok_or_else(|| AppError::validation("invalid totp configuration"))?,
+    )?;
+
+    Ok(TotpConfig {
+        secret,
+        hash_algorithm,
+        digits,
+        period,
+    })
+}
+
+fn parse_totp_algorithm(raw_value: &str) -> AppResult<TotpHashAlgorithm> {
+    let normalized = raw_value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_uppercase();
+    match normalized.as_str() {
+        "SHA1" => Ok(TotpHashAlgorithm::Sha1),
+        "SHA256" => Ok(TotpHashAlgorithm::Sha256),
+        "SHA512" => Ok(TotpHashAlgorithm::Sha512),
+        _ => Err(AppError::validation("invalid totp configuration")),
+    }
+}
+
+fn parse_totp_digits(raw_value: &str) -> AppResult<u32> {
+    let parsed = raw_value
+        .parse::<u32>()
+        .map_err(|_| AppError::validation("invalid totp configuration"))?;
+    if !(6..=10).contains(&parsed) {
+        return Err(AppError::validation("invalid totp configuration"));
+    }
+    Ok(parsed)
+}
+
+fn parse_totp_period(raw_value: &str) -> AppResult<u64> {
+    let parsed = raw_value
+        .parse::<u64>()
+        .map_err(|_| AppError::validation("invalid totp configuration"))?;
+    if parsed == 0 || parsed > 300 {
+        return Err(AppError::validation("invalid totp configuration"));
+    }
+    Ok(parsed)
+}
+
+fn decode_base32_secret(raw_secret: &str) -> AppResult<Vec<u8>> {
+    let sanitized = raw_secret
+        .trim()
+        .to_ascii_uppercase()
+        .chars()
+        .filter(|character| {
+            !character.is_ascii_whitespace() && *character != '-' && *character != '='
+        })
+        .collect::<String>();
+    if sanitized.is_empty() {
+        return Err(AppError::validation("invalid totp configuration"));
+    }
+
+    let mut output = Vec::new();
+    let mut buffer: u32 = 0;
+    let mut bits_in_buffer: u8 = 0;
+
+    for character in sanitized.chars() {
+        let Some(index) = BASE32_ALPHABET.find(character) else {
+            return Err(AppError::validation("invalid totp configuration"));
+        };
+        buffer = (buffer << 5) | u32::try_from(index).expect("base32 index fits in u32");
+        bits_in_buffer += 5;
+
+        while bits_in_buffer >= 8 {
+            output.push(
+                ((buffer >> u32::from(bits_in_buffer - 8)) & 0xff)
+                    .try_into()
+                    .expect("masked byte fits in u8"),
+            );
+            bits_in_buffer -= 8;
+        }
+    }
+
+    if output.is_empty() {
+        return Err(AppError::validation("invalid totp configuration"));
+    }
+
+    Ok(output)
+}
+
+fn generate_totp_code(config: &TotpConfig, unix_seconds: u64) -> AppResult<String> {
+    let counter = unix_seconds / config.period;
+    let counter_bytes = counter.to_be_bytes();
+    let signature = hmac_sign(config.hash_algorithm, &config.secret, &counter_bytes)?;
+    if signature.len() < 20 {
+        return Err(AppError::internal("failed to generate totp code"));
+    }
+
+    let offset = (signature[signature.len() - 1] & 0x0f) as usize;
+    if offset + 3 >= signature.len() {
+        return Err(AppError::internal("failed to generate totp code"));
+    }
+
+    let binary = ((u32::from(signature[offset]) & 0x7f) << 24)
+        | (u32::from(signature[offset + 1]) << 16)
+        | (u32::from(signature[offset + 2]) << 8)
+        | u32::from(signature[offset + 3]);
+    let divisor = 10_u64.pow(config.digits);
+    let otp = u64::from(binary) % divisor;
+    Ok(format!("{otp:0width$}", width = config.digits as usize))
+}
+
+fn hmac_sign(algorithm: TotpHashAlgorithm, secret: &[u8], data: &[u8]) -> AppResult<Vec<u8>> {
+    match algorithm {
+        TotpHashAlgorithm::Sha1 => {
+            type HmacSha1 = Hmac<Sha1>;
+            let mut mac = HmacSha1::new_from_slice(secret)
+                .map_err(|_| AppError::validation("invalid totp configuration"))?;
+            mac.update(data);
+            Ok(mac.finalize().into_bytes().to_vec())
+        }
+        TotpHashAlgorithm::Sha256 => {
+            type HmacSha256 = Hmac<Sha256>;
+            let mut mac = HmacSha256::new_from_slice(secret)
+                .map_err(|_| AppError::validation("invalid totp configuration"))?;
+            mac.update(data);
+            Ok(mac.finalize().into_bytes().to_vec())
+        }
+        TotpHashAlgorithm::Sha512 => {
+            type HmacSha512 = Hmac<Sha512>;
+            let mut mac = HmacSha512::new_from_slice(secret)
+                .map_err(|_| AppError::validation("invalid totp configuration"))?;
+            mac.update(data);
+            Ok(mac.finalize().into_bytes().to_vec())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generate_current_totp;
+
+    #[test]
+    fn generate_totp_from_base32_secret() {
+        let snapshot =
+            generate_current_totp("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", 59).expect("generate");
+        assert_eq!(snapshot.code, "287082");
+        assert_eq!(snapshot.period_seconds, 30);
+        assert_eq!(snapshot.remaining_seconds, 1);
+        assert_eq!(snapshot.expires_at_ms, 60_000);
+    }
+
+    #[test]
+    fn generate_totp_from_otpauth_uri() {
+        let snapshot = generate_current_totp(
+            "otpauth://totp/Vanguard?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8&period=30",
+            59,
+        )
+        .expect("generate");
+        assert_eq!(snapshot.code, "94287082");
+        assert_eq!(snapshot.period_seconds, 30);
+        assert_eq!(snapshot.remaining_seconds, 1);
+    }
+
+    #[test]
+    fn invalid_totp_algorithm_returns_error() {
+        let result = generate_current_totp(
+            "otpauth://totp/Vanguard?secret=GEZDGNBVGY3TQOJQ&algorithm=MD5",
+            59,
+        );
+        assert!(result.is_err());
+    }
+}
