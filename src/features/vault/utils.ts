@@ -1,0 +1,160 @@
+import type { VaultFolderItemDto } from "@/bindings";
+import { toErrorText } from "@/features/auth/shared/utils";
+import type {
+  CipherTypeFilter,
+  FolderTreeNode,
+  FolderTreeNodeDraft,
+} from "@/features/vault/types";
+
+export function toTypeFilterLabel(filter: CipherTypeFilter): string {
+  if (filter === "login") {
+    return "Login";
+  }
+  if (filter === "card") {
+    return "Card";
+  }
+  if (filter === "identify") {
+    return "Identify";
+  }
+  if (filter === "note") {
+    return "Note";
+  }
+  if (filter === "ssh_key") {
+    return "SSH key";
+  }
+  return "All types";
+}
+
+export function toVaultErrorText(error: unknown): string {
+  return toErrorText(error, "加载 vault 数据失败，请稍后重试。");
+}
+
+export function toAvatarText(email: string | null | undefined): string {
+  const normalized = (email ?? "").trim();
+  if (!normalized) {
+    return "??";
+  }
+  const head = normalized.split("@")[0] ?? normalized;
+  const compacted = head.replace(/[^a-zA-Z0-9]/g, "");
+  return (compacted.slice(0, 2) || "??").toUpperCase();
+}
+
+export function sortFolders(
+  folders: VaultFolderItemDto[],
+): VaultFolderItemDto[] {
+  return [...folders].sort((left, right) =>
+    (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
+  );
+}
+
+export function toSortableDate(value: string | null | undefined): number {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return timestamp;
+}
+
+export function firstNonEmptyText(
+  ...values: Array<string | null | undefined>
+): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalizeFolderSegments(folderName: string | null): string[] {
+  const normalized = (folderName ?? "").trim();
+  const rawSegments = normalized.split(/[\\/]+/).map((item) => item.trim());
+  const segments = rawSegments.filter((item) => item.length > 0);
+  if (segments.length > 0) {
+    return segments;
+  }
+  return ["Untitled folder"];
+}
+
+export function buildFolderTree(
+  folders: VaultFolderItemDto[],
+): FolderTreeNode[] {
+  const root = new Map<string, FolderTreeNodeDraft>();
+
+  for (const folder of folders) {
+    const segments = normalizeFolderSegments(folder.name);
+    let current = root;
+    const pathParts: string[] = [];
+
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      pathParts.push(segment);
+      const key = pathParts.join("/");
+
+      let node = current.get(segment);
+      if (!node) {
+        node = {
+          key,
+          label: segment,
+          folderId: null,
+          childrenMap: new Map<string, FolderTreeNodeDraft>(),
+        };
+        current.set(segment, node);
+      }
+
+      if (index === segments.length - 1) {
+        node.folderId = folder.id;
+      }
+
+      current = node.childrenMap;
+    }
+  }
+
+  const toSortedNodes = (
+    map: Map<string, FolderTreeNodeDraft>,
+  ): FolderTreeNode[] => {
+    return [...map.values()]
+      .sort((left, right) =>
+        left.label.localeCompare(right.label, "zh-Hans-CN"),
+      )
+      .map((node) => ({
+        key: node.key,
+        label: node.label,
+        folderId: node.folderId,
+        children: toSortedNodes(node.childrenMap),
+      }));
+  };
+
+  return toSortedNodes(root);
+}
+
+export function collectFolderTreeKeys(nodes: FolderTreeNode[]): string[] {
+  const keys: string[] = [];
+
+  const walk = (items: FolderTreeNode[]) => {
+    for (const item of items) {
+      keys.push(item.key);
+      walk(item.children);
+    }
+  };
+
+  walk(nodes);
+  return keys;
+}
+
+export function countNodeCiphers(
+  node: FolderTreeNode,
+  folderCipherCount: Map<string, number>,
+): number {
+  const selfCount = node.folderId
+    ? (folderCipherCount.get(node.folderId) ?? 0)
+    : 0;
+  let childCount = 0;
+  for (const child of node.children) {
+    childCount += countNodeCiphers(child, folderCipherCount);
+  }
+  return selfCount + childCount;
+}

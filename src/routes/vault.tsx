@@ -3,9 +3,6 @@ import {
   Archive,
   ArrowUpDown,
   ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
   LoaderCircle,
   Lock,
   LogOut,
@@ -20,16 +17,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   commands,
   type VaultCipherDetailDto,
-  type VaultCipherItemDto,
-  type VaultFolderItemDto,
   type VaultViewDataResponseDto,
 } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +37,29 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { CipherDetailPanel } from "@/features/vault/components/cipher-detail-panel";
+import { CipherRow } from "@/features/vault/components/cipher-row";
+import { FolderTreeMenuItem } from "@/features/vault/components/folder-tree-menu-item";
+import {
+  ALL_ITEMS_ID,
+  FAVORITES_ID,
+  TRASH_ID,
+} from "@/features/vault/constants";
+import type {
+  CipherSortBy,
+  CipherSortDirection,
+  CipherTypeFilter,
+  VaultPageState,
+} from "@/features/vault/types";
+import {
+  buildFolderTree,
+  collectFolderTreeKeys,
+  sortFolders,
+  toAvatarText,
+  toSortableDate,
+  toTypeFilterLabel,
+  toVaultErrorText,
+} from "@/features/vault/utils";
 import { resolveSessionRoute } from "@/lib/route-session";
 
 export const Route = createFileRoute("/vault")({
@@ -58,190 +71,6 @@ export const Route = createFileRoute("/vault")({
   },
   component: VaultPage,
 });
-
-const ALL_ITEMS_ID = "__all_items__";
-const FAVORITES_ID = "__favorites__";
-const TRASH_ID = "__trash__";
-
-type VaultPageState = "loading" | "ready" | "error";
-type CipherTypeFilter =
-  | "all"
-  | "login"
-  | "card"
-  | "identify"
-  | "note"
-  | "ssh_key";
-type CipherSortBy = "title" | "created" | "modified";
-type CipherSortDirection = "asc" | "desc";
-
-function toTypeFilterLabel(filter: CipherTypeFilter) {
-  if (filter === "login") {
-    return "Login";
-  }
-  if (filter === "card") {
-    return "Card";
-  }
-  if (filter === "identify") {
-    return "Identify";
-  }
-  if (filter === "note") {
-    return "Note";
-  }
-  if (filter === "ssh_key") {
-    return "SSH key";
-  }
-  return "All types";
-}
-
-function errorToText(error: unknown) {
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "加载 vault 数据失败，请稍后重试。";
-}
-
-function toAvatarText(email: string | null | undefined) {
-  const normalized = (email ?? "").trim();
-  if (!normalized) {
-    return "??";
-  }
-  const head = normalized.split("@")[0] ?? normalized;
-  const compacted = head.replace(/[^a-zA-Z0-9]/g, "");
-  return (compacted.slice(0, 2) || "??").toUpperCase();
-}
-
-function sortFolders(folders: VaultFolderItemDto[]) {
-  return [...folders].sort((left, right) =>
-    (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
-  );
-}
-
-function toSortableDate(value: string | null | undefined) {
-  if (!value) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) {
-    return Number.NEGATIVE_INFINITY;
-  }
-  return timestamp;
-}
-
-function firstNonEmptyText(
-  ...values: Array<string | null | undefined>
-): string | null {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
-  return null;
-}
-
-type FolderTreeNode = {
-  key: string;
-  label: string;
-  folderId: string | null;
-  children: FolderTreeNode[];
-};
-
-type FolderTreeNodeDraft = {
-  key: string;
-  label: string;
-  folderId: string | null;
-  childrenMap: Map<string, FolderTreeNodeDraft>;
-};
-
-function normalizeFolderSegments(folderName: string | null) {
-  const normalized = (folderName ?? "").trim();
-  const rawSegments = normalized.split(/[\\/]+/).map((item) => item.trim());
-  const segments = rawSegments.filter((item) => item.length > 0);
-  if (segments.length > 0) {
-    return segments;
-  }
-  return ["Untitled folder"];
-}
-
-function buildFolderTree(folders: VaultFolderItemDto[]) {
-  const root = new Map<string, FolderTreeNodeDraft>();
-
-  for (const folder of folders) {
-    const segments = normalizeFolderSegments(folder.name);
-    let current = root;
-    const pathParts: string[] = [];
-
-    for (let index = 0; index < segments.length; index += 1) {
-      const segment = segments[index];
-      pathParts.push(segment);
-      const key = pathParts.join("/");
-
-      let node = current.get(segment);
-      if (!node) {
-        node = {
-          key,
-          label: segment,
-          folderId: null,
-          childrenMap: new Map<string, FolderTreeNodeDraft>(),
-        };
-        current.set(segment, node);
-      }
-
-      if (index === segments.length - 1) {
-        node.folderId = folder.id;
-      }
-
-      current = node.childrenMap;
-    }
-  }
-
-  const toSortedNodes = (
-    map: Map<string, FolderTreeNodeDraft>,
-  ): FolderTreeNode[] => {
-    return [...map.values()]
-      .sort((left, right) =>
-        left.label.localeCompare(right.label, "zh-Hans-CN"),
-      )
-      .map((node) => ({
-        key: node.key,
-        label: node.label,
-        folderId: node.folderId,
-        children: toSortedNodes(node.childrenMap),
-      }));
-  };
-
-  return toSortedNodes(root);
-}
-
-function collectFolderTreeKeys(nodes: FolderTreeNode[]) {
-  const keys: string[] = [];
-
-  const walk = (items: FolderTreeNode[]) => {
-    for (const item of items) {
-      keys.push(item.key);
-      walk(item.children);
-    }
-  };
-
-  walk(nodes);
-  return keys;
-}
-
-function countNodeCiphers(
-  node: FolderTreeNode,
-  folderCipherCount: Map<string, number>,
-): number {
-  const selfCount = node.folderId
-    ? (folderCipherCount.get(node.folderId) ?? 0)
-    : 0;
-  let childCount = 0;
-  for (const child of node.children) {
-    childCount += countNodeCiphers(child, folderCipherCount);
-  }
-  return selfCount + childCount;
-}
 
 function VaultPage() {
   const navigate = useNavigate({ from: "/vault" });
@@ -290,7 +119,7 @@ function VaultPage() {
       const restore = await commands.authRestoreState({});
       if (restore.status === "error") {
         setPageState("error");
-        setErrorText(errorToText(restore.error));
+        setErrorText(toVaultErrorText(restore.error));
         setUserEmail("未登录");
         setUserBaseUrl("未知服务");
         return;
@@ -302,7 +131,7 @@ function VaultPage() {
       const result = await commands.vaultGetViewData();
 
       if (result.status === "error") {
-        const text = errorToText(result.error);
+        const text = toVaultErrorText(result.error);
         if (text.toLowerCase().includes("vault is locked")) {
           await navigate({ to: "/unlock" });
         } else {
@@ -317,7 +146,7 @@ function VaultPage() {
       setPageState("ready");
     } catch (error) {
       setPageState("error");
-      setErrorText(errorToText(error));
+      setErrorText(toVaultErrorText(error));
       setViewData(null);
     } finally {
       setIsRefreshing(false);
@@ -524,7 +353,7 @@ function VaultPage() {
       }
 
       if (detail.status === "error") {
-        setCipherDetailError(errorToText(detail.error));
+        setCipherDetailError(toVaultErrorText(detail.error));
         return;
       }
 
@@ -533,7 +362,7 @@ function VaultPage() {
       if (requestSeq !== detailRequestSeqRef.current) {
         return;
       }
-      setCipherDetailError(errorToText(error));
+      setCipherDetailError(toVaultErrorText(error));
     } finally {
       if (requestSeq === detailRequestSeqRef.current) {
         setIsCipherDetailLoading(false);
@@ -1040,304 +869,5 @@ function VaultPage() {
         )}
       </section>
     </main>
-  );
-}
-
-function FolderTreeMenuItem({
-  node,
-  depth,
-  selectedMenuId,
-  expandedNodeKeys,
-  folderCipherCount,
-  onFolderSelect,
-  onOpenChange,
-}: {
-  node: FolderTreeNode;
-  depth: number;
-  selectedMenuId: string;
-  expandedNodeKeys: Set<string>;
-  folderCipherCount: Map<string, number>;
-  onFolderSelect: (folderId: string) => void;
-  onOpenChange: (nodeKey: string, open: boolean) => void;
-}) {
-  const hasChildren = node.children.length > 0;
-  const isExpanded = expandedNodeKeys.has(node.key);
-  const isSelected = node.folderId != null && selectedMenuId === node.folderId;
-  const count = countNodeCiphers(node, folderCipherCount);
-
-  return (
-    <Collapsible
-      open={hasChildren ? isExpanded : false}
-      onOpenChange={(open) => onOpenChange(node.key, open)}
-    >
-      <div className="space-y-1" style={{ paddingLeft: `${depth * 10}px` }}>
-        <div className="flex items-center gap-1">
-          {hasChildren ? (
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex size-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
-                aria-label={isExpanded ? "collapse folder" : "expand folder"}
-              >
-                <ChevronRight
-                  className={[
-                    "size-4 transition-transform",
-                    isExpanded ? "rotate-90" : "",
-                  ].join(" ")}
-                />
-              </button>
-            </CollapsibleTrigger>
-          ) : (
-            <span className="inline-block size-6" aria-hidden="true" />
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              if (node.folderId) {
-                onFolderSelect(node.folderId);
-                return;
-              }
-              if (hasChildren) {
-                onOpenChange(node.key, !isExpanded);
-              }
-            }}
-            className={[
-              "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
-              isSelected
-                ? "bg-sky-100/90 font-medium text-sky-800"
-                : "text-slate-700 hover:bg-slate-100",
-            ].join(" ")}
-          >
-            <span className="truncate">{node.label}</span>
-            <span className="text-xs text-slate-500">{count}</span>
-          </button>
-        </div>
-
-        {hasChildren && (
-          <CollapsibleContent>
-            <div className="space-y-1">
-              {node.children.map((child) => (
-                <FolderTreeMenuItem
-                  key={child.key}
-                  node={child}
-                  depth={depth + 1}
-                  selectedMenuId={selectedMenuId}
-                  expandedNodeKeys={expandedNodeKeys}
-                  folderCipherCount={folderCipherCount}
-                  onFolderSelect={onFolderSelect}
-                  onOpenChange={onOpenChange}
-                />
-              ))}
-            </div>
-          </CollapsibleContent>
-        )}
-      </div>
-    </Collapsible>
-  );
-}
-
-function CipherRow({
-  cipher,
-  selected,
-  onClick,
-}: {
-  cipher: VaultCipherItemDto;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "w-full rounded-lg px-3 py-2 text-left transition-colors",
-        selected
-          ? "bg-sky-100/85 text-sky-900"
-          : "bg-slate-50/80 text-slate-800 hover:bg-slate-100",
-      ].join(" ")}
-    >
-      <div className="truncate text-sm font-medium">
-        {cipher.name ?? "Untitled cipher"}
-      </div>
-      <div className="mt-1 truncate text-xs text-slate-600">
-        {cipher.username ?? ""}
-      </div>
-    </button>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
-  if (!value) {
-    return null;
-  }
-  return (
-    <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-sm">
-      <div className="text-slate-500">{label}</div>
-      <div className="break-all text-slate-800">{value}</div>
-    </div>
-  );
-}
-
-function CipherDetailPanel({ cipher }: { cipher: VaultCipherDetailDto }) {
-  const username = firstNonEmptyText(
-    cipher.login?.username,
-    cipher.data?.username,
-  );
-  const password = firstNonEmptyText(
-    cipher.login?.password,
-    cipher.data?.password,
-  );
-  const hasOneTimePassword = cipher.hasTotp;
-  const [oneTimePasswordCode, setOneTimePasswordCode] = useState<string | null>(
-    null,
-  );
-  const [oneTimePasswordRemaining, setOneTimePasswordRemaining] = useState<
-    number | null
-  >(null);
-  const [oneTimePasswordFailed, setOneTimePasswordFailed] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
-  const organizationId = cipher.organizationId;
-
-  useEffect(() => {
-    let disposed = false;
-    let expiresAtMs: number | null = null;
-    let loading = false;
-
-    setIsPasswordVisible(false);
-
-    const loadTotpSnapshot = async () => {
-      if (loading || disposed) {
-        return;
-      }
-      loading = true;
-      try {
-        const result = await commands.vaultGetCipherTotpCode({
-          cipherId: cipher.id,
-        });
-        if (disposed) {
-          return;
-        }
-        if (result.status === "error") {
-          expiresAtMs = null;
-          setOneTimePasswordCode(null);
-          setOneTimePasswordRemaining(null);
-          setOneTimePasswordFailed(true);
-          return;
-        }
-
-        expiresAtMs = result.data.expiresAtMs;
-        setOneTimePasswordCode(result.data.code);
-        setOneTimePasswordRemaining(result.data.remainingSeconds);
-        setOneTimePasswordFailed(false);
-      } catch {
-        if (disposed) {
-          return;
-        }
-        expiresAtMs = null;
-        setOneTimePasswordCode(null);
-        setOneTimePasswordRemaining(null);
-        setOneTimePasswordFailed(true);
-      } finally {
-        loading = false;
-      }
-    };
-    const intervalId = window.setInterval(() => {
-      if (!expiresAtMs) {
-        return;
-      }
-      const remaining = Math.max(
-        0,
-        Math.ceil((expiresAtMs - Date.now()) / 1000),
-      );
-      setOneTimePasswordRemaining(remaining);
-      if (remaining <= 0) {
-        void loadTotpSnapshot();
-      }
-    }, 1000);
-
-    setOneTimePasswordCode(null);
-    setOneTimePasswordRemaining(null);
-    setOneTimePasswordFailed(false);
-    if (!hasOneTimePassword) {
-      return () => {
-        disposed = true;
-        window.clearInterval(intervalId);
-      };
-    }
-
-    void loadTotpSnapshot();
-
-    return () => {
-      disposed = true;
-      window.clearInterval(intervalId);
-    };
-  }, [cipher.id, hasOneTimePassword]);
-
-  const oneTimePasswordDisplay =
-    oneTimePasswordCode && oneTimePasswordRemaining != null
-      ? `${oneTimePasswordCode} (${oneTimePasswordRemaining}s)`
-      : oneTimePasswordFailed
-        ? "Unavailable"
-        : hasOneTimePassword
-          ? "Loading..."
-          : null;
-
-  return (
-    <div className="space-y-3">
-      <div className="space-y-1">
-        <div className="text-lg font-semibold text-slate-900">
-          {cipher.name ?? "Untitled cipher"}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <DetailRow label="Org" value={organizationId} />
-        <DetailRow label="Username" value={username} />
-        {password && (
-          <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-sm">
-            <div className="text-slate-500">Password</div>
-            <div className="flex min-w-0 items-center gap-1">
-              <div className="break-all text-slate-800">
-                {isPasswordVisible ? password : "••••••••"}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                className="size-7 shrink-0 px-0"
-                onClick={() => setIsPasswordVisible((visible) => !visible)}
-                aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
-                title={isPasswordVisible ? "隐藏密码" : "显示密码"}
-              >
-                {isPasswordVisible ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
-        {hasOneTimePassword && (
-          <DetailRow label="One-time password" value={oneTimePasswordDisplay} />
-        )}
-      </div>
-
-      {notes && (
-        <div className="rounded-lg bg-slate-50/90 p-2">
-          <div className="mb-1 text-xs text-slate-500">Notes</div>
-          <pre className="whitespace-pre-wrap text-sm text-slate-800">
-            {notes}
-          </pre>
-        </div>
-      )}
-    </div>
   );
 }
