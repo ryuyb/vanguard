@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
+import { motion } from "motion/react";
 import type { KeyboardEvent } from "react";
 import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -18,8 +19,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveSessionRoute } from "@/lib/route-session";
+import { cn } from "@/lib/utils";
 import "@/main.css";
-import "./spotlight.css";
 
 type SpotlightItem = {
   id: string;
@@ -105,6 +106,34 @@ function SpotlightApp() {
   );
   const [detailTotpRaw, setDetailTotpRaw] = useState<string | null>(null);
   const [isCopying, setIsCopying] = useState(false);
+
+  useEffect(() => {
+    const htmlClasses = ["h-full", "w-full", "overflow-hidden"];
+    const bodyClasses = [
+      "m-0",
+      "h-full",
+      "w-full",
+      "overflow-hidden",
+      "overscroll-none",
+      "bg-transparent",
+    ];
+
+    for (const className of htmlClasses) {
+      document.documentElement.classList.add(className);
+    }
+    for (const className of bodyClasses) {
+      document.body.classList.add(className);
+    }
+
+    return () => {
+      for (const className of htmlClasses) {
+        document.documentElement.classList.remove(className);
+      }
+      for (const className of bodyClasses) {
+        document.body.classList.remove(className);
+      }
+    };
+  }, []);
 
   const hideSpotlight = useCallback(async () => {
     try {
@@ -321,7 +350,7 @@ function SpotlightApp() {
 
   const resolveSelectedItemId = useCallback(() => {
     const selectedElement = document.querySelector<HTMLElement>(
-      "#spotlight-card .spotlight-item[data-selected='true']",
+      "#spotlight-card [data-spotlight-item='true'][data-selected='true']",
     );
     const selectedValue = selectedElement?.getAttribute("data-value");
     if (
@@ -499,14 +528,26 @@ function SpotlightApp() {
   }, [hideSpotlight]);
 
   return (
-    <main className="spotlight-shell">
-      <Card id="spotlight-card" className="spotlight-card">
-        <Command className="spotlight-command" shouldFilter={false} loop>
-          <div className="spotlight-search">
-            <InputGroup className="spotlight-search-group">
+    <motion.main
+      initial={{ opacity: 0, y: 8, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="grid h-full w-full place-items-center overflow-hidden bg-white/[0.004] px-4 py-6 sm:px-8 sm:py-10 md:px-16 md:py-12"
+    >
+      <Card
+        id="spotlight-card"
+        className="block w-full max-w-180 gap-0 rounded-4xl border border-white/40 bg-linear-to-b from-[rgba(250,251,255,0.82)] to-[rgba(243,246,252,0.74)] p-3.5 pb-0 text-slate-900 ring-0 shadow-[0_36px_70px_rgba(15,23,42,0.36),inset_0_1px_0_rgba(255,255,255,0.42)] backdrop-blur-[20px] backdrop-saturate-[1.8]"
+      >
+        <Command
+          className="rounded-none! bg-transparent p-0! text-inherit"
+          shouldFilter={false}
+          loop
+        >
+          <div>
+            <InputGroup className="h-auto rounded-[14px] border border-slate-400/45 bg-white/55 px-3 py-2.5 shadow-none transition-none has-[[data-slot=input-group-control]:focus-visible]:border-slate-400/45 has-[[data-slot=input-group-control]:focus-visible]:ring-0">
               <CommandPrimitive.Input
                 id="spotlight-search-input"
-                className="spotlight-input"
+                className="w-full bg-transparent text-[18px] leading-[1.3] text-slate-900 outline-none placeholder:text-slate-500 focus-visible:ring-0"
                 value={query}
                 onValueChange={setQuery}
                 autoFocus
@@ -519,46 +560,54 @@ function SpotlightApp() {
               />
               <InputGroupAddon
                 align="inline-end"
-                className="spotlight-search-addon"
+                className="size-6 min-w-6 justify-center rounded-[7px] bg-slate-400/20 p-0 text-slate-700"
               >
                 <SearchIcon className="size-4 shrink-0" />
               </InputGroupAddon>
             </InputGroup>
           </div>
           {shouldShowResults ? (
-            <ScrollArea className="spotlight-results">
+            <ScrollArea className="mt-2.5 h-68">
               {isLoadingVault && hasQuery ? (
-                <div className="spotlight-skeleton-list" aria-hidden>
+                <div className="grid gap-2 py-0.5" aria-hidden>
                   {Array.from({ length: 6 }).map((_, index) => (
                     <div
                       key={`skeleton-${index}`}
-                      className="spotlight-skeleton-item"
+                      className="rounded-xl px-3 py-2.5"
                     >
                       <Skeleton className="h-4 w-3/5" />
-                      <Skeleton className="h-3 w-2/5" />
+                      <Skeleton className="mt-2 h-3 w-2/5" />
                     </div>
                   ))}
                 </div>
               ) : detailItem ? (
                 <section
-                  className="spotlight-detail"
+                  className="px-2.5 pt-3 pb-2.5"
                   aria-label="Cipher detail"
                 >
-                  <p className="spotlight-detail-title">{detailItem.title}</p>
-                  <p className="spotlight-detail-subtitle">
+                  <p className="text-base leading-tight font-semibold text-slate-900">
+                    {detailItem.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600">
                     {detailItem.subtitle}
                   </p>
-                  <div className="spotlight-detail-actions" role="listbox">
+                  <div className="mt-3 grid gap-2" role="listbox">
                     {detailActions.map((action, index) => (
                       <div
                         key={action.label}
                         role="option"
                         tabIndex={-1}
                         aria-selected={detailActionIndex === index}
-                        className={`spotlight-detail-action${detailActionIndex === index ? " is-selected" : ""}${copiedDetailField === action.field ? " is-copied" : ""}`}
+                        className={cn(
+                          "flex items-center justify-between gap-3 rounded-xl border border-slate-400/25 bg-white/50 px-3 py-2.5 text-[13px] leading-[1.3] text-slate-900 transition-colors",
+                          detailActionIndex === index &&
+                            "border-blue-800/30 bg-blue-800/12",
+                          copiedDetailField === action.field &&
+                            "animate-in fade-in-0 duration-150 bg-blue-800/25",
+                        )}
                       >
                         <span>{action.label}</span>
-                        <KbdGroup className="spotlight-detail-action-shortcut">
+                        <KbdGroup className="shrink-0 text-slate-500">
                           {action.shortcut.map((shortcutKey) => (
                             <Kbd key={`${action.label}-${shortcutKey}`}>
                               {shortcutKey}
@@ -570,16 +619,21 @@ function SpotlightApp() {
                   </div>
                 </section>
               ) : (
-                <CommandPrimitive.List className="spotlight-command-list">
+                <CommandPrimitive.List className="px-0.5">
                   {visibleItems.map((item) => (
                     <CommandItem
                       key={item.id}
                       value={item.id}
-                      className={`spotlight-item${copiedItemId === item.id ? " is-copied" : ""}`}
+                      data-spotlight-item="true"
+                      className={cn(
+                        "w-full justify-between gap-3 rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-left data-[selected=true]:bg-blue-800/12",
+                        copiedItemId === item.id &&
+                          "animate-in fade-in-0 duration-150 bg-blue-800/20 data-[selected=true]:bg-blue-800/20",
+                      )}
                     >
                       <div>
-                        <p className="spotlight-item-title">{item.title}</p>
-                        <p className="spotlight-item-subtitle">
+                        <p className="text-sm text-slate-900">{item.title}</p>
+                        <p className="mt-0.5 text-xs text-slate-600">
                           {item.subtitle}
                         </p>
                       </div>
@@ -591,21 +645,21 @@ function SpotlightApp() {
           ) : null}
         </Command>
 
-        <Separator className="spotlight-meta-separator" />
+        <Separator className="mt-2.5 bg-slate-400/30" />
 
-        <CardFooter className="spotlight-meta">
+        <CardFooter className="mt-0 flex min-h-9 flex-wrap items-center gap-2.5 px-1 pb-0">
           {hasVisibleResults ? (
             <>
               {detailItem ? null : (
                 <>
-                  <span className="spotlight-meta-item">
+                  <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                     <KbdGroup>
                       <Kbd>⌘</Kbd>
                       <Kbd>C</Kbd>
                     </KbdGroup>
                     复制 用户名
                   </span>
-                  <span className="spotlight-meta-item">
+                  <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                     <KbdGroup>
                       <Kbd>⌘</Kbd>
                       <Kbd>⇧</Kbd>
@@ -615,12 +669,12 @@ function SpotlightApp() {
                   </span>
                 </>
               )}
-              <span className="spotlight-meta-item">
+              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                 <Kbd>{detailItem ? "←" : "→"}</Kbd>
                 {detailItem ? "返回结果" : "更多操作"}
               </span>
               {detailItem ? (
-                <span className="spotlight-meta-item">
+                <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                   <KbdGroup>
                     <Kbd>↑</Kbd>
                     <Kbd>↓</Kbd>
@@ -631,7 +685,7 @@ function SpotlightApp() {
             </>
           ) : (
             <>
-              <span className="spotlight-meta-item">
+              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                 <KbdGroup>
                   <Kbd>⇧</Kbd>
                   <Kbd>⌃</Kbd>
@@ -639,7 +693,7 @@ function SpotlightApp() {
                 </KbdGroup>
                 Open quick access
               </span>
-              <span className="spotlight-meta-item">
+              <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
                 <Kbd>Esc</Kbd>
                 Close
               </span>
@@ -647,13 +701,14 @@ function SpotlightApp() {
           )}
         </CardFooter>
       </Card>
-    </main>
+    </motion.main>
   );
 }
 
-ReactDOM.createRoot(
-  document.getElementById("spotlight-root") as HTMLElement,
-).render(
+const spotlightRoot = document.getElementById("spotlight-root") as HTMLElement;
+spotlightRoot.classList.add("h-full", "w-full", "overflow-hidden");
+
+ReactDOM.createRoot(spotlightRoot).render(
   <StrictMode>
     <SpotlightApp />
   </StrictMode>,
