@@ -536,9 +536,9 @@ function VaultPage() {
             <ResizableHandle withHandle className="bg-slate-300/60" />
 
             <ResizablePanel defaultSize={39} minSize={24}>
-              <section className="h-full min-h-0 bg-white/80 shadow-sm">
-                <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]>div]:h-full">
-                  <div className="flex h-full flex-col p-3">
+              <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white/80 shadow-sm">
+                <ScrollArea className="h-full min-w-0 [&>[data-slot=scroll-area-viewport]]:min-w-0 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:h-full [&>[data-slot=scroll-area-viewport]>div]:min-w-0 [&>[data-slot=scroll-area-viewport]>div]:w-full">
+                  <div className="flex h-full min-w-0 w-full flex-col p-3">
                     {!selectedCipherId && <div className="min-h-80" />}
 
                     {selectedCipherId && isCipherDetailLoading && (
@@ -560,7 +560,7 @@ function VaultPage() {
                       !isCipherDetailLoading &&
                       !cipherDetailError &&
                       selectedCipherDetail && (
-                        <div className="min-h-0 flex-1">
+                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden">
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}

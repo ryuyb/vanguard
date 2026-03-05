@@ -44,20 +44,27 @@ function DetailField({
   label,
   value,
   children,
+  contentClassName,
 }: {
   label: string;
   value?: string | null | undefined;
   children?: ReactNode;
+  contentClassName?: string;
 }) {
   if (!value && !children) {
     return null;
   }
   return (
-    <div className="w-full rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-xs">
+    <div className="min-w-0 w-full rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-xs">
       <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
         {label}
       </div>
-      <div className="mt-1 min-w-0 break-all text-sm font-medium text-slate-900">
+      <div
+        className={[
+          "mt-1 min-w-0 text-sm font-medium text-slate-900",
+          contentClassName ?? "break-all",
+        ].join(" ")}
+      >
         {children ?? value}
       </div>
     </div>
@@ -286,7 +293,7 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
           : null;
 
   return (
-    <Card className="h-full min-h-0 gap-0 overflow-y-auto border-slate-200/80 bg-white/90 py-0 shadow-sm">
+    <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-slate-200/80 bg-white/90 py-0 shadow-sm">
       <CardHeader className="gap-2 border-b border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-sky-50/50 px-6 py-3">
         <div className="flex h-9 items-center">
           <h2 className="m-0 leading-none text-lg font-semibold text-slate-900">
@@ -295,7 +302,7 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 pt-4">
+      <CardContent className="min-w-0 space-y-3 pt-4">
         <div className="flex flex-col gap-2">
           <DetailField label="Username" value={username} />
           <DetailField label="Org" value={organizationId} />
@@ -336,10 +343,14 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
         )}
 
         {uniqueUris.length > 0 && (
-          <DetailField label="URIs">
-            <div className="space-y-1">
+          <DetailField label="URIs" contentClassName="overflow-hidden">
+            <div className="min-w-0 w-full space-y-1 overflow-hidden">
               {uniqueUris.map((uri) => (
-                <div key={uri} className="break-all text-slate-900">
+                <div
+                  key={uri}
+                  title={uri}
+                  className="block min-w-0 w-full truncate text-slate-900"
+                >
                   {uri}
                 </div>
               ))}
@@ -349,7 +360,7 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
       </CardContent>
 
       {(notes || customFields.length > 0) && (
-        <CardContent className="pt-4">
+        <CardContent className="min-w-0 pt-4">
           <div className="space-y-3">
             {notes && (
               <div className="space-y-2">
@@ -441,7 +452,7 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
         </CardContent>
       )}
 
-      <CardContent className="pt-3">
+      <CardContent className="min-w-0 pt-3">
         <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
           <CollapsibleTrigger asChild>
             <button
