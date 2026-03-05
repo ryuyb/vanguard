@@ -13,12 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  commands,
-  type VaultCipherDetailDto,
-  type VaultViewDataResponseDto,
-} from "@/bindings";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,29 +32,19 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CipherDetailPanel } from "@/features/vault/components/cipher-detail-panel";
-import { CipherRow } from "@/features/vault/components/cipher-row";
-import { FolderTreeMenuItem } from "@/features/vault/components/folder-tree-menu-item";
 import {
   ALL_ITEMS_ID,
+  CipherDetailPanel,
+  CipherRow,
+  type CipherSortBy,
+  type CipherSortDirection,
+  type CipherTypeFilter,
   FAVORITES_ID,
+  FolderTreeMenuItem,
   TRASH_ID,
-} from "@/features/vault/constants";
-import type {
-  CipherSortBy,
-  CipherSortDirection,
-  CipherTypeFilter,
-  VaultPageState,
-} from "@/features/vault/types";
-import {
-  buildFolderTree,
-  collectFolderTreeKeys,
-  sortFolders,
-  toAvatarText,
-  toSortableDate,
   toTypeFilterLabel,
-  toVaultErrorText,
-} from "@/features/vault/utils";
+  useVaultPageModel,
+} from "@/features/vault";
 import { resolveSessionRoute } from "@/lib/route-session";
 
 export const Route = createFileRoute("/vault")({
@@ -74,348 +59,55 @@ export const Route = createFileRoute("/vault")({
 
 function VaultPage() {
   const navigate = useNavigate({ from: "/vault" });
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const inlineSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const [headerSearchQuery, setHeaderSearchQuery] = useState("");
-  const [cipherSearchQuery, setCipherSearchQuery] = useState("");
-  const [isInlineSearchOpen, setIsInlineSearchOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<CipherTypeFilter>("all");
-  const [sortBy, setSortBy] = useState<CipherSortBy>("modified");
-  const [sortDirection, setSortDirection] =
-    useState<CipherSortDirection>("desc");
-  const [userEmail, setUserEmail] = useState("未登录");
-  const [userBaseUrl, setUserBaseUrl] = useState("未知服务");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLocking, setIsLocking] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [pageState, setPageState] = useState<VaultPageState>("loading");
-  const [errorText, setErrorText] = useState("");
-  const [viewData, setViewData] = useState<VaultViewDataResponseDto | null>(
-    null,
-  );
-  const [selectedMenuId, setSelectedMenuId] = useState(ALL_ITEMS_ID);
-  const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
-  const [selectedCipherDetail, setSelectedCipherDetail] =
-    useState<VaultCipherDetailDto | null>(null);
-  const [isCipherDetailLoading, setIsCipherDetailLoading] = useState(false);
-  const [cipherDetailError, setCipherDetailError] = useState("");
-  const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
-    new Set<string>(),
-  );
-  const detailRequestSeqRef = useRef(0);
-
-  const loadVaultData = useCallback(async () => {
-    setIsRefreshing(true);
-    setErrorText("");
-    setPageState("loading");
-
-    try {
-      const target = await resolveSessionRoute();
-      if (target !== "/vault") {
-        await navigate({ to: target });
-        return;
-      }
-
-      const restore = await commands.authRestoreState({});
-      if (restore.status === "error") {
-        setPageState("error");
-        setErrorText(toVaultErrorText(restore.error));
-        setUserEmail("未登录");
-        setUserBaseUrl("未知服务");
-        return;
-      }
-
-      setUserEmail(restore.data.email ?? "未登录");
-      setUserBaseUrl(restore.data.baseUrl ?? "未知服务");
-
-      const result = await commands.vaultGetViewData();
-
-      if (result.status === "error") {
-        const text = toVaultErrorText(result.error);
-        if (text.toLowerCase().includes("vault is locked")) {
-          await navigate({ to: "/unlock" });
-        } else {
-          setPageState("error");
-          setErrorText(text);
-        }
-        setViewData(null);
-        return;
-      }
-
-      setViewData(result.data);
-      setPageState("ready");
-    } catch (error) {
-      setPageState("error");
-      setErrorText(toVaultErrorText(error));
-      setViewData(null);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [navigate]);
-
-  useEffect(() => {
-    void loadVaultData();
-  }, [loadVaultData]);
-
-  const onLock = async () => {
-    setIsLocking(true);
-    try {
-      const result = await commands.vaultLock({});
-      if (result.status === "ok") {
-        await navigate({ to: "/unlock" });
-      }
-    } finally {
-      setIsLocking(false);
-    }
-  };
-
-  const onLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      const result = await commands.authLogout({});
-      if (result.status === "ok") {
-        await navigate({ to: "/" });
-      }
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  const sortedFolders = useMemo(
-    () => sortFolders(viewData?.folders ?? []),
-    [viewData?.folders],
-  );
-  const folderTree = useMemo(
-    () => buildFolderTree(sortedFolders),
-    [sortedFolders],
-  );
-  const folderTreeKeys = useMemo(
-    () => collectFolderTreeKeys(folderTree),
-    [folderTree],
-  );
-  const folderIdSet = useMemo(
-    () => new Set(sortedFolders.map((folder) => folder.id)),
-    [sortedFolders],
+  const navigateTo = useCallback(
+    async (to: "/" | "/unlock" | "/vault") => {
+      await navigate({ to });
+    },
+    [navigate],
   );
 
-  useEffect(() => {
-    setExpandedNodeKeys((previous) => {
-      const validKeys = new Set(folderTreeKeys);
-      const next = new Set<string>();
-      for (const key of previous) {
-        if (validKeys.has(key)) {
-          next.add(key);
-        }
-      }
-      if (next.size === 0) {
-        for (const node of folderTree) {
-          next.add(node.key);
-        }
-      }
-      return next;
-    });
-  }, [folderTree, folderTreeKeys]);
-
-  useEffect(() => {
-    if (
-      selectedMenuId === ALL_ITEMS_ID ||
-      selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
-    ) {
-      return;
-    }
-    const exists = folderIdSet.has(selectedMenuId);
-    if (!exists) {
-      setSelectedMenuId(ALL_ITEMS_ID);
-    }
-  }, [folderIdSet, selectedMenuId]);
-
-  useEffect(() => {
-    if (!isInlineSearchOpen) {
-      return;
-    }
-    const frameId = requestAnimationFrame(() => {
-      inlineSearchInputRef.current?.focus();
-    });
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, [isInlineSearchOpen]);
-
-  const normalizedCipherSearchQuery = cipherSearchQuery.trim().toLowerCase();
-
-  const filteredCiphers = useMemo(() => {
-    const allCiphers = viewData?.ciphers ?? [];
-    const folderFiltered =
-      selectedMenuId === ALL_ITEMS_ID ||
-      selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
-        ? allCiphers
-        : allCiphers.filter((cipher) => cipher.folderId === selectedMenuId);
-
-    const typeFiltered = folderFiltered.filter((cipher) => {
-      if (typeFilter === "all") {
-        return true;
-      }
-      if (typeFilter === "login") {
-        return cipher.type === 1;
-      }
-      if (typeFilter === "note") {
-        return cipher.type === 2;
-      }
-      if (typeFilter === "card") {
-        return cipher.type === 3;
-      }
-      if (typeFilter === "identify") {
-        return cipher.type === 4;
-      }
-      if (typeFilter === "ssh_key") {
-        return cipher.type === 5;
-      }
-      return true;
-    });
-
-    const searchFiltered = !normalizedCipherSearchQuery
-      ? typeFiltered
-      : typeFiltered.filter((cipher) => {
-          const searchText = [cipher.name, cipher.id, cipher.organizationId]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          return searchText.includes(normalizedCipherSearchQuery);
-        });
-
-    return [...searchFiltered].sort((left, right) => {
-      if (sortBy === "title") {
-        const titleCompare = (left.name ?? "").localeCompare(
-          right.name ?? "",
-          "zh-Hans-CN",
-        );
-        return sortDirection === "asc" ? titleCompare : -titleCompare;
-      }
-      if (sortBy === "created") {
-        const createdCompare =
-          toSortableDate(left.creationDate) -
-          toSortableDate(right.creationDate);
-        return sortDirection === "asc" ? createdCompare : -createdCompare;
-      }
-      const modifiedCompare =
-        toSortableDate(left.revisionDate) - toSortableDate(right.revisionDate);
-      return sortDirection === "asc" ? modifiedCompare : -modifiedCompare;
-    });
-  }, [
-    normalizedCipherSearchQuery,
+  const {
+    avatarText,
+    cipherDetailError,
+    cipherSearchQuery,
+    errorText,
+    expandedNodeKeys,
+    filteredCiphers,
+    folderCipherCount,
+    folderTree,
+    headerSearchQuery,
+    inlineSearchInputRef,
+    isCipherDetailLoading,
+    isHeaderActionBusy,
+    isInlineSearchOpen,
+    isLocking,
+    isLoggingOut,
+    loadCipherDetail,
+    lockLabel,
+    logoutLabel,
+    onFolderTreeOpenChange,
+    onLock,
+    onLogout,
+    pageState,
+    searchInputRef,
+    selectedCipherDetail,
+    selectedCipherId,
     selectedMenuId,
+    selectedMenuName,
+    setCipherSearchQuery,
+    setHeaderSearchQuery,
+    setIsInlineSearchOpen,
+    setSelectedMenuId,
+    setSortBy,
+    setSortDirection,
+    setTypeFilter,
     sortBy,
     sortDirection,
     typeFilter,
-    viewData?.ciphers,
-  ]);
-
-  useEffect(() => {
-    if (!selectedCipherId) {
-      return;
-    }
-    const existsInList = filteredCiphers.some(
-      (cipher) => cipher.id === selectedCipherId,
-    );
-    if (existsInList) {
-      return;
-    }
-    detailRequestSeqRef.current += 1;
-    setSelectedCipherId(null);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(false);
-  }, [filteredCiphers, selectedCipherId]);
-
-  const loadCipherDetail = useCallback(async (cipherId: string) => {
-    const normalizedCipherId = cipherId.trim();
-    if (!normalizedCipherId) {
-      return;
-    }
-
-    setSelectedCipherId(normalizedCipherId);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(true);
-
-    const requestSeq = detailRequestSeqRef.current + 1;
-    detailRequestSeqRef.current = requestSeq;
-
-    try {
-      const detail = await commands.vaultGetCipherDetail({
-        cipherId: normalizedCipherId,
-      });
-
-      if (requestSeq !== detailRequestSeqRef.current) {
-        return;
-      }
-
-      if (detail.status === "error") {
-        setCipherDetailError(toVaultErrorText(detail.error));
-        return;
-      }
-
-      setSelectedCipherDetail(detail.data.cipher);
-    } catch (error) {
-      if (requestSeq !== detailRequestSeqRef.current) {
-        return;
-      }
-      setCipherDetailError(toVaultErrorText(error));
-    } finally {
-      if (requestSeq === detailRequestSeqRef.current) {
-        setIsCipherDetailLoading(false);
-      }
-    }
-  }, []);
-
-  const folderCipherCount = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const cipher of viewData?.ciphers ?? []) {
-      if (!cipher.folderId) {
-        continue;
-      }
-      map.set(cipher.folderId, (map.get(cipher.folderId) ?? 0) + 1);
-    }
-    return map;
-  }, [viewData?.ciphers]);
-
-  const selectedMenuName = useMemo(() => {
-    if (selectedMenuId === ALL_ITEMS_ID) {
-      return "All items";
-    }
-    if (selectedMenuId === FAVORITES_ID) {
-      return "Favorites";
-    }
-    if (selectedMenuId === TRASH_ID) {
-      return "Trash";
-    }
-    return (
-      sortedFolders.find((folder) => folder.id === selectedMenuId)?.name ??
-      "Unknown folder"
-    );
-  }, [selectedMenuId, sortedFolders]);
-
-  const onFolderTreeOpenChange = useCallback(
-    (nodeKey: string, open: boolean) => {
-      setExpandedNodeKeys((previous) => {
-        const next = new Set(previous);
-        if (open) {
-          next.add(nodeKey);
-        } else {
-          next.delete(nodeKey);
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const avatarText = useMemo(() => toAvatarText(userEmail), [userEmail]);
-  const isHeaderActionBusy = isLocking || isLoggingOut || isRefreshing;
-  const lockLabel = isLocking ? "锁定中..." : "锁定";
-  const logoutLabel = isLoggingOut ? "登出中..." : "登出";
+    userBaseUrl,
+    userEmail,
+    viewData,
+  } = useVaultPageModel({ navigateTo });
 
   return (
     <main className="flex h-dvh flex-col bg-[radial-gradient(circle_at_12%_8%,hsl(212_95%_96%),transparent_36%),radial-gradient(circle_at_92%_92%,hsl(215_95%_97%),transparent_40%),linear-gradient(145deg,hsl(216_55%_98%),hsl(0_0%_100%))]">
