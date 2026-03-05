@@ -15,6 +15,7 @@ pub struct GetCipherDetailQuery {
 pub enum VaultCopyField {
     Username,
     Password,
+    Totp,
 }
 
 #[derive(Debug, Clone)]

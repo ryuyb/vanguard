@@ -369,6 +369,7 @@ impl From<VaultCopyFieldDto> for VaultCopyField {
         match field {
             VaultCopyFieldDto::Username => VaultCopyField::Username,
             VaultCopyFieldDto::Password => VaultCopyField::Password,
+            VaultCopyFieldDto::Totp => VaultCopyField::Totp,
         }
     }
 }

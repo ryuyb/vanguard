@@ -5522,6 +5522,7 @@ dependencies = [
  "security-framework-sys",
  "serde",
  "serde_json",
+ "sha1",
  "sha2",
  "specta",
  "specta-typescript",
@@ -5538,6 +5539,7 @@ dependencies = [
  "tauri-specta",
  "tokio",
  "tokio-tungstenite",
+ "url",
  "uuid",
  "zeroize",
 ]

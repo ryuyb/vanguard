@@ -1,5 +1,4 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { error as logError } from "@tauri-apps/plugin-log";
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
@@ -64,16 +63,6 @@ const DETAIL_ACTIONS: readonly DetailAction[] = [
   },
 ];
 const COPY_FLASH_DURATION_MS = 180;
-const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-type TotpHashAlgorithm = "SHA-1" | "SHA-256" | "SHA-512";
-
-type TotpConfig = {
-  secret: Uint8Array;
-  hashAlgorithm: TotpHashAlgorithm;
-  digits: number;
-  period: number;
-};
 
 function firstNonEmptyText(
   ...values: Array<string | null | undefined>
@@ -88,179 +77,6 @@ function firstNonEmptyText(
 
 function toCipherTotpRaw(cipher: VaultCipherDetailDto) {
   return firstNonEmptyText(cipher.login?.totp, cipher.data?.totp);
-}
-
-function parsePositiveInteger(value: string) {
-  if (!/^\d+$/.test(value)) {
-    return null;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isSafeInteger(parsed)) {
-    return null;
-  }
-  return parsed;
-}
-
-function normalizeTotpHashAlgorithm(value: string | null) {
-  if (!value) {
-    return "SHA-1" as TotpHashAlgorithm;
-  }
-  const normalized = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-  if (normalized === "SHA1") {
-    return "SHA-1" as TotpHashAlgorithm;
-  }
-  if (normalized === "SHA256") {
-    return "SHA-256" as TotpHashAlgorithm;
-  }
-  if (normalized === "SHA512") {
-    return "SHA-512" as TotpHashAlgorithm;
-  }
-  return null;
-}
-
-function decodeBase32Secret(value: string) {
-  const sanitized = value
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "")
-    .replace(/=+$/g, "");
-  if (!sanitized) {
-    return null;
-  }
-
-  const output: number[] = [];
-  let buffer = 0;
-  let bitsInBuffer = 0;
-
-  for (const character of sanitized) {
-    const index = BASE32_ALPHABET.indexOf(character);
-    if (index === -1) {
-      return null;
-    }
-
-    buffer = (buffer << 5) | index;
-    bitsInBuffer += 5;
-
-    while (bitsInBuffer >= 8) {
-      output.push((buffer >>> (bitsInBuffer - 8)) & 0xff);
-      bitsInBuffer -= 8;
-    }
-  }
-
-  if (output.length === 0) {
-    return null;
-  }
-
-  return new Uint8Array(output);
-}
-
-function parseTotpConfig(rawTotp: string | null) {
-  const raw = (rawTotp ?? "").trim();
-  if (!raw) {
-    return null;
-  }
-
-  let secretText: string | null = null;
-  let hashAlgorithm: TotpHashAlgorithm = "SHA-1";
-  let digits = 6;
-  let period = 30;
-
-  if (raw.toLowerCase().startsWith("otpauth://")) {
-    let url: URL;
-    try {
-      url = new URL(raw);
-    } catch {
-      return null;
-    }
-
-    if (url.protocol !== "otpauth:" || url.hostname.toLowerCase() !== "totp") {
-      return null;
-    }
-
-    secretText = url.searchParams.get("secret");
-    if (!secretText) {
-      return null;
-    }
-
-    const parsedAlgorithm = normalizeTotpHashAlgorithm(
-      url.searchParams.get("algorithm"),
-    );
-    if (!parsedAlgorithm) {
-      return null;
-    }
-    hashAlgorithm = parsedAlgorithm;
-
-    const digitsParam = url.searchParams.get("digits");
-    if (digitsParam) {
-      const parsedDigits = parsePositiveInteger(digitsParam);
-      if (parsedDigits == null || parsedDigits < 6 || parsedDigits > 10) {
-        return null;
-      }
-      digits = parsedDigits;
-    }
-
-    const periodParam = url.searchParams.get("period");
-    if (periodParam) {
-      const parsedPeriod = parsePositiveInteger(periodParam);
-      if (parsedPeriod == null || parsedPeriod <= 0 || parsedPeriod > 300) {
-        return null;
-      }
-      period = parsedPeriod;
-    }
-  } else {
-    secretText = raw;
-  }
-
-  const secret = decodeBase32Secret(secretText);
-  if (!secret) {
-    return null;
-  }
-
-  return {
-    secret,
-    hashAlgorithm,
-    digits,
-    period,
-  } satisfies TotpConfig;
-}
-
-async function createCurrentTotpCode(rawTotp: string | null) {
-  const config = parseTotpConfig(rawTotp);
-  if (!config) {
-    return null;
-  }
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    config.secret,
-    {
-      name: "HMAC",
-      hash: { name: config.hashAlgorithm },
-    },
-    false,
-    ["sign"],
-  );
-
-  const unixSeconds = Math.floor(Date.now() / 1000);
-  const counter = Math.floor(unixSeconds / config.period);
-  const data = new ArrayBuffer(8);
-  const view = new DataView(data);
-  const high = Math.floor(counter / 0x1_0000_0000);
-  const low = counter >>> 0;
-  view.setUint32(0, high);
-  view.setUint32(4, low);
-
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
-  const offset = signature[signature.length - 1] & 0x0f;
-  const binary =
-    ((signature[offset] & 0x7f) << 24) |
-    ((signature[offset + 1] & 0xff) << 16) |
-    ((signature[offset + 2] & 0xff) << 8) |
-    (signature[offset + 3] & 0xff);
-
-  const divisor = 10 ** config.digits;
-  const otp = binary % divisor;
-  return otp.toString().padStart(config.digits, "0");
 }
 
 function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
@@ -525,41 +341,14 @@ function SpotlightApp() {
 
       setIsCopying(true);
       try {
-        if (field === "totp") {
-          const cachedRawTotp =
-            detailItem?.cipherId === item.cipherId ? detailTotpRaw : null;
-          const rawTotp =
-            cachedRawTotp ??
-            (await (async () => {
-              const result = await commands.vaultGetCipherDetail({
-                cipherId: item.cipherId,
-              });
-              if (result.status === "error") {
-                logClientError(
-                  "Failed to load cipher detail when copying totp",
-                  result.error,
-                );
-                return null;
-              }
-              return toCipherTotpRaw(result.data.cipher);
-            })());
-
-          const totpCode = await createCurrentTotpCode(rawTotp);
-          if (!totpCode) {
-            return;
-          }
-
-          await writeText(totpCode);
-        } else {
-          const result = await commands.vaultCopyCipherField({
-            cipherId: item.cipherId,
-            field,
-            clearAfterMs: null,
-          });
-          if (result.status === "error") {
-            logClientError("Failed to copy cipher field", result.error);
-            return;
-          }
+        const result = await commands.vaultCopyCipherField({
+          cipherId: item.cipherId,
+          field,
+          clearAfterMs: null,
+        });
+        if (result.status === "error") {
+          logClientError("Failed to copy cipher field", result.error);
+          return;
         }
 
         setCopiedItemId(item.id);
@@ -576,7 +365,7 @@ function SpotlightApp() {
         setIsCopying(false);
       }
     },
-    [detailItem?.cipherId, detailTotpRaw, hideSpotlight, isCopying],
+    [hideSpotlight, isCopying],
   );
 
   const onCommandInputKeyDown = useCallback(
@@ -597,7 +386,7 @@ function SpotlightApp() {
           return;
         }
 
-        if (field === "totp" && detailItem && !detailTotpRaw) {
+        if (field === "totp" && (!detailItem || !detailTotpRaw)) {
           return;
         }
 

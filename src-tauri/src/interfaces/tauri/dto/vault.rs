@@ -14,6 +14,7 @@ pub struct VaultCipherDetailRequestDto {
 pub enum VaultCopyFieldDto {
     Username,
     Password,
+    Totp,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
