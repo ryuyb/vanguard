@@ -6,7 +6,7 @@ use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
-use rand::RngCore;
+use rand::RngExt;
 
 use crate::application::dto::vault::{
     EnablePinUnlockCommand, UnlockVaultResult, VaultPinStatus, VaultUserKeyMaterial,
@@ -216,11 +216,11 @@ fn encrypt_user_key_with_pin(
     let plaintext_user_key = serialize_user_key(user_key)?;
 
     let mut salt = [0u8; PIN_SALT_LEN];
-    rand::thread_rng().fill_bytes(&mut salt);
+    rand::rng().fill(&mut salt);
     let derived_key = derive_pin_key(trimmed_pin, &salt)?;
 
     let mut nonce = [0u8; PIN_NONCE_LEN];
-    rand::thread_rng().fill_bytes(&mut nonce);
+    rand::rng().fill(&mut nonce);
 
     let cipher = XChaCha20Poly1305::new_from_slice(&derived_key)
         .map_err(|_| AppError::internal("failed to initialize pin envelope cipher"))?;

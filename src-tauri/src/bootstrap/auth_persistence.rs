@@ -5,7 +5,7 @@ use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, Payload};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
-use rand::RngCore;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -105,7 +105,7 @@ pub fn encrypt_refresh_token(
     }
 
     let mut salt = [0u8; WRAP_SALT_LEN];
-    rand::rngs::OsRng.fill_bytes(&mut salt);
+    rand::rng().fill(&mut salt);
     let key = derive_wrap_key(
         master_password,
         &salt,
@@ -216,7 +216,7 @@ pub fn encrypt_refresh_token_with_runtime(
     }
 
     let mut nonce = [0u8; WRAP_NONCE_LEN];
-    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    rand::rng().fill(&mut nonce);
     let aad = build_aad(account_id, base_url, email);
     let cipher = XChaCha20Poly1305::new((&runtime.key).into());
     let ciphertext = cipher

@@ -99,7 +99,7 @@ impl NotificationPort for VaultwardenNotificationPort {
 
         let handshake_message = format!("{INITIAL_HANDSHAKE_PAYLOAD}{RECORD_SEPARATOR}");
         stream
-            .send(Message::Text(handshake_message))
+            .send(Message::Text(handshake_message.into()))
             .await
             .map_err(|error| {
                 AppError::remote(format!("failed to send websocket handshake: {error}"))
