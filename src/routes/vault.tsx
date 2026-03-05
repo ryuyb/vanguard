@@ -7,13 +7,14 @@ import {
   Lock,
   LogOut,
   Search,
+  Settings,
   Star,
   Trash2,
   UserRound,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,6 +43,7 @@ import {
   FAVORITES_ID,
   FolderTreeMenuItem,
   TRASH_ID,
+  VaultSettingsDialog,
   toTypeFilterLabel,
   useVaultPageModel,
 } from "@/features/vault";
@@ -59,6 +61,8 @@ export const Route = createFileRoute("/vault")({
 
 function VaultPage() {
   const navigate = useNavigate({ from: "/vault" });
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+
   const navigateTo = useCallback(
     async (to: "/" | "/unlock" | "/vault") => {
       await navigate({ to });
@@ -171,6 +175,14 @@ function VaultPage() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setIsSettingsDialogOpen(true);
+                    }}
+                  >
+                    <Settings />
+                    设置
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={isHeaderActionBusy}
                     onSelect={() => {
@@ -560,6 +572,11 @@ function VaultPage() {
           </ResizablePanelGroup>
         )}
       </section>
+
+      <VaultSettingsDialog
+        open={isSettingsDialogOpen}
+        onOpenChange={setIsSettingsDialogOpen}
+      />
     </main>
   );
 }
