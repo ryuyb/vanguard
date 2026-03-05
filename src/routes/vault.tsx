@@ -43,9 +43,9 @@ import {
   FAVORITES_ID,
   FolderTreeMenuItem,
   TRASH_ID,
-  VaultSettingsDialog,
   toTypeFilterLabel,
   useVaultPageModel,
+  VaultSettingsDialog,
 } from "@/features/vault";
 import { resolveSessionRoute } from "@/lib/route-session";
 
@@ -537,8 +537,8 @@ function VaultPage() {
 
             <ResizablePanel defaultSize={39} minSize={24}>
               <section className="h-full min-h-0 bg-white/80 shadow-sm">
-                <ScrollArea className="h-full">
-                  <div className="p-3">
+                <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]>div]:h-full">
+                  <div className="flex h-full flex-col p-3">
                     {!selectedCipherId && <div className="min-h-80" />}
 
                     {selectedCipherId && isCipherDetailLoading && (
@@ -560,10 +560,12 @@ function VaultPage() {
                       !isCipherDetailLoading &&
                       !cipherDetailError &&
                       selectedCipherDetail && (
-                        <CipherDetailPanel
-                          key={selectedCipherDetail.id}
-                          cipher={selectedCipherDetail}
-                        />
+                        <div className="min-h-0 flex-1">
+                          <CipherDetailPanel
+                            key={selectedCipherDetail.id}
+                            cipher={selectedCipherDetail}
+                          />
+                        </div>
                       )}
                   </div>
                 </ScrollArea>

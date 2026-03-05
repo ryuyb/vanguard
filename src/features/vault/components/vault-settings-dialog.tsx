@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Shield, SlidersHorizontal, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +27,7 @@ type VaultSettingsDialogProps = {
 
 type SettingsSection = "security" | "general";
 type LanguageOption = "zh" | "en";
-type RequireMasterPasswordOption =
-  | "1d"
-  | "7d"
-  | "14d"
-  | "30d"
-  | "never";
+type RequireMasterPasswordOption = "1d" | "7d" | "14d" | "30d" | "never";
 type AutoLockIdleOption =
   | "1m"
   | "2m"
@@ -53,7 +48,10 @@ type ClipboardClearOption =
   | "5m"
   | "never";
 
-const AUTO_LOCK_IDLE_OPTIONS: Array<{ value: AutoLockIdleOption; label: string }> = [
+const AUTO_LOCK_IDLE_OPTIONS: Array<{
+  value: AutoLockIdleOption;
+  label: string;
+}> = [
   { value: "1m", label: "1 分钟" },
   { value: "2m", label: "2 分钟" },
   { value: "5m", label: "5 分钟" },
@@ -138,7 +136,8 @@ function formatShortcutFromKeyboardEvent(event: {
     ArrowRight: "Right",
   };
   const keyLabel =
-    keyMap[event.key] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key);
+    keyMap[event.key] ??
+    (event.key.length === 1 ? event.key.toUpperCase() : event.key);
 
   return `${modifiers.join("")}${keyLabel}`;
 }
@@ -147,11 +146,13 @@ export function VaultSettingsDialog({
   open,
   onOpenChange,
 }: VaultSettingsDialogProps) {
-  const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [activeSection, setActiveSection] =
+    useState<SettingsSection>("general");
   const [language, setLanguage] = useState<LanguageOption>("zh");
   const [showWebsiteIcon, setShowWebsiteIcon] = useState(true);
-  const [quickAccessShortcut, setQuickAccessShortcut] =
-    useState(QUICK_ACCESS_SHORTCUT);
+  const [quickAccessShortcut, setQuickAccessShortcut] = useState(
+    QUICK_ACCESS_SHORTCUT,
+  );
   const [lockShortcut, setLockShortcut] = useState(LOCK_SHORTCUT);
   const [isQuickAccessCapturing, setIsQuickAccessCapturing] = useState(false);
   const [isLockCapturing, setIsLockCapturing] = useState(false);
@@ -189,7 +190,9 @@ export function VaultSettingsDialog({
         setIsBiometricSupported(biometricResult.data.supported);
         setIsBiometricEnabled(biometricResult.data.enabled);
       } else {
-        setErrorText(toErrorText(biometricResult.error, "读取触控ID状态失败。"));
+        setErrorText(
+          toErrorText(biometricResult.error, "读取触控ID状态失败。"),
+        );
       }
 
       if (pinResult.status === "ok") {
@@ -284,7 +287,9 @@ export function VaultSettingsDialog({
         }
         setIsPinEnabled(false);
       } catch (error) {
-        setErrorText(toErrorText(error, checked ? "启用 PIN 失败。" : "禁用 PIN 失败。"));
+        setErrorText(
+          toErrorText(error, checked ? "启用 PIN 失败。" : "禁用 PIN 失败。"),
+        );
       } finally {
         setIsPinBusy(false);
       }
@@ -420,7 +425,9 @@ export function VaultSettingsDialog({
             {activeSection === "security" && (
               <>
                 <h3 className="text-sm font-medium text-slate-900">解锁</h3>
-                <p className="mt-1 text-xs text-slate-600">配置快速解锁方式。</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  配置快速解锁方式。
+                </p>
 
                 <div className="mt-3 space-y-2">
                   <label
@@ -428,7 +435,9 @@ export function VaultSettingsDialog({
                     className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
                   >
                     <div className="space-y-0.5">
-                      <div className="text-sm text-slate-900">通过 触控ID 解锁</div>
+                      <div className="text-sm text-slate-900">
+                        通过 触控ID 解锁
+                      </div>
                       <div className="text-xs text-slate-600">
                         {isBiometricSupported
                           ? "使用系统生物识别快速解锁。"
@@ -441,7 +450,9 @@ export function VaultSettingsDialog({
                       className="mt-0.5 size-4 accent-sky-600"
                       checked={isBiometricEnabled}
                       disabled={
-                        isStatusLoading || isBiometricBusy || !isBiometricSupported
+                        isStatusLoading ||
+                        isBiometricBusy ||
+                        !isBiometricSupported
                       }
                       onChange={(event) => {
                         void onBiometricCheckedChange(event.target.checked);
@@ -454,7 +465,9 @@ export function VaultSettingsDialog({
                     className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
                   >
                     <div className="space-y-0.5">
-                      <div className="text-sm text-slate-900">通过 PIN 解锁</div>
+                      <div className="text-sm text-slate-900">
+                        通过 PIN 解锁
+                      </div>
                       <div className="text-xs text-slate-600">
                         {isPinSupported
                           ? "启用后可通过 PIN 快速解锁。"
@@ -474,7 +487,9 @@ export function VaultSettingsDialog({
                   </label>
 
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="mb-2 text-sm text-slate-900">需要主密码</div>
+                    <div className="mb-2 text-sm text-slate-900">
+                      需要主密码
+                    </div>
                     <Select
                       value={requireMasterPasswordAfter}
                       onValueChange={(value) =>
@@ -645,7 +660,9 @@ export function VaultSettingsDialog({
                     <div className="mb-2 text-sm text-slate-900">语言</div>
                     <Select
                       value={language}
-                      onValueChange={(value) => setLanguage(value as LanguageOption)}
+                      onValueChange={(value) =>
+                        setLanguage(value as LanguageOption)
+                      }
                     >
                       <SelectTrigger
                         id="vault-setting-language"
@@ -679,7 +696,9 @@ export function VaultSettingsDialog({
                         onFocus={onQuickAccessFocusCapture}
                         onBlur={onQuickAccessBlurCapture}
                         onKeyDown={onQuickAccessKeyDownCapture}
-                        placeholder={isQuickAccessCapturing ? "输入键盘快捷键" : "未配置"}
+                        placeholder={
+                          isQuickAccessCapturing ? "输入键盘快捷键" : "未配置"
+                        }
                         className={quickAccessShortcut ? "pr-8" : undefined}
                       />
                       {quickAccessShortcut && (
@@ -704,11 +723,15 @@ export function VaultSettingsDialog({
                     <div className="relative">
                       <Input
                         value={lockShortcut}
-                        onChange={(event) => setLockShortcut(event.target.value)}
+                        onChange={(event) =>
+                          setLockShortcut(event.target.value)
+                        }
                         onFocus={onLockFocusCapture}
                         onBlur={onLockBlurCapture}
                         onKeyDown={onLockKeyDownCapture}
-                        placeholder={isLockCapturing ? "输入键盘快捷键" : "未配置"}
+                        placeholder={
+                          isLockCapturing ? "输入键盘快捷键" : "未配置"
+                        }
                         className={lockShortcut ? "pr-8" : undefined}
                       />
                       {lockShortcut && (
