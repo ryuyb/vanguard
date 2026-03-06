@@ -28,14 +28,9 @@ export function UnlockUnlockedState({
           当前仅恢复了本地解锁状态，后端登录会话尚未恢复。
         </div>
       )}
-      {biometricSupported && (
+      {biometricSupported && biometricEnabled && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          Touch ID：{biometricEnabled ? "已启用" : "未启用"}
-        </div>
-      )}
-      {biometricSupported && !biometricEnabled && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          如需启用或关闭 Touch ID，请进入 Vault 页面进行设置。
+          Touch ID：已启用
         </div>
       )}
       <Button asChild className="w-full">

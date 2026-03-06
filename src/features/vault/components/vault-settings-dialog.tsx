@@ -171,6 +171,9 @@ export function VaultSettingsDialog({
   const [isPinEnabled, setIsPinEnabled] = useState(false);
   const [isBiometricBusy, setIsBiometricBusy] = useState(false);
   const [isPinBusy, setIsPinBusy] = useState(false);
+  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinDialogError, setPinDialogError] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const quickAccessOriginalShortcutRef = useRef(quickAccessShortcut);
   const lockOriginalShortcutRef = useRef(lockShortcut);
@@ -210,11 +213,29 @@ export function VaultSettingsDialog({
 
   useEffect(() => {
     if (!open) {
+      setIsPinDialogOpen(false);
+      setPinInput("");
+      setPinDialogError(null);
       return;
     }
     setActiveSection("general");
     void loadSecuritySettings();
   }, [loadSecuritySettings, open]);
+
+  const onPinDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && isPinBusy) {
+        return;
+      }
+
+      setIsPinDialogOpen(nextOpen);
+      if (!nextOpen) {
+        setPinInput("");
+        setPinDialogError(null);
+      }
+    },
+    [isPinBusy],
+  );
 
   const onBiometricCheckedChange = useCallback(
     async (checked: boolean) => {
@@ -256,30 +277,15 @@ export function VaultSettingsDialog({
       }
 
       setErrorText(null);
+      if (checked) {
+        setPinDialogError(null);
+        setPinInput("");
+        setIsPinDialogOpen(true);
+        return;
+      }
+
       setIsPinBusy(true);
       try {
-        if (checked) {
-          const enteredPin = window.prompt("请输入用于解锁 Vault 的 PIN");
-          if (enteredPin === null) {
-            return;
-          }
-          const normalizedPin = enteredPin.trim();
-          if (!normalizedPin) {
-            setErrorText("PIN 不能为空。");
-            return;
-          }
-          const enableResult = await commands.vaultEnablePinUnlock({
-            pin: normalizedPin,
-            lockType: "persistent",
-          });
-          if (enableResult.status === "error") {
-            setErrorText(toErrorText(enableResult.error, "启用 PIN 失败。"));
-            return;
-          }
-          setIsPinEnabled(true);
-          return;
-        }
-
         const disableResult = await commands.vaultDisablePinUnlock({});
         if (disableResult.status === "error") {
           setErrorText(toErrorText(disableResult.error, "禁用 PIN 失败。"));
@@ -296,6 +302,36 @@ export function VaultSettingsDialog({
     },
     [isPinEnabled, isPinSupported],
   );
+
+  const onPinEnableSubmit = useCallback(async () => {
+    const normalizedPin = pinInput.trim();
+    if (!normalizedPin) {
+      setPinDialogError("PIN 不能为空。");
+      return;
+    }
+
+    setErrorText(null);
+    setPinDialogError(null);
+    setIsPinBusy(true);
+    try {
+      const result = await commands.vaultEnablePinUnlock({
+        pin: normalizedPin,
+        lockType: "persistent",
+      });
+      if (result.status === "error") {
+        setPinDialogError(toErrorText(result.error, "启用 PIN 失败。"));
+        return;
+      }
+
+      setIsPinEnabled(true);
+      setIsPinDialogOpen(false);
+      setPinInput("");
+    } catch (error) {
+      setPinDialogError(toErrorText(error, "启用 PIN 失败。"));
+    } finally {
+      setIsPinBusy(false);
+    }
+  }, [pinInput]);
 
   const onQuickAccessFocusCapture = useCallback(() => {
     quickAccessOriginalShortcutRef.current = quickAccessShortcut;
@@ -760,6 +796,63 @@ export function VaultSettingsDialog({
 
         <DialogFooter showCloseButton />
       </DialogContent>
+
+      <Dialog open={isPinDialogOpen} onOpenChange={onPinDialogOpenChange}>
+        <DialogContent className="sm:max-w-sm" showCloseButton={!isPinBusy}>
+          <DialogHeader>
+            <DialogTitle>启用 PIN 解锁</DialogTitle>
+            <DialogDescription>
+              输入用于解锁 Vault 的 PIN，确认后将立即启用。
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onPinEnableSubmit();
+            }}
+          >
+            <div className="space-y-2">
+              <Input
+                autoFocus
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="请输入 PIN"
+                value={pinInput}
+                disabled={isPinBusy}
+                onChange={(event) => {
+                  setPinInput(event.target.value);
+                  if (pinDialogError) {
+                    setPinDialogError(null);
+                  }
+                }}
+              />
+
+              {pinDialogError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {pinDialogError}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPinBusy}
+                onClick={() => onPinDialogOpenChange(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={isPinBusy}>
+                {isPinBusy ? "启用中..." : "确定"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

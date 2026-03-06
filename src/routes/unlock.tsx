@@ -8,13 +8,7 @@ import { LoaderCircle } from "lucide-react";
 import { useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   UnlockHero,
   UnlockLockedForm,
@@ -46,10 +40,12 @@ function UnlockPage() {
     biometricEnabled,
     biometricSupported,
     canBiometricUnlock,
+    canPinUnlock,
     canUnlock,
     feedback,
     isBiometricUnlocking,
     isLoggingOut,
+    isPinUnlocking,
     isRestoring,
     isUnlocking,
     isVaultUnlocked,
@@ -57,10 +53,17 @@ function UnlockPage() {
     onBiometricUnlock,
     onLogout,
     onMasterPasswordChange,
+    onPinChange,
+    onPinUnlock,
+    onShowMasterPasswordUnlock,
+    onShowPinUnlock,
     onToggleShowPassword,
     onUnlock,
+    pin,
+    pinEnabled,
     restoreState,
     showPassword,
+    unlockMethod,
   } = useUnlockFlow({
     navigateToHome,
     navigateToVault,
@@ -83,9 +86,6 @@ function UnlockPage() {
               Session Unlock
             </Badge>
             <CardTitle className="text-2xl font-semibold">解锁 Vault</CardTitle>
-            <CardDescription>
-              支持密码解锁与 Touch ID 解锁（需先显式启用）
-            </CardDescription>
           </CardHeader>
           <CardContent>
             {isRestoring && (
@@ -126,18 +126,27 @@ function UnlockPage() {
                   biometricSupported={biometricSupported}
                   biometricEnabled={biometricEnabled}
                   canBiometricUnlock={canBiometricUnlock}
-                  masterPassword={masterPassword}
-                  showPassword={showPassword}
-                  isUnlocking={isUnlocking}
-                  isBiometricUnlocking={isBiometricUnlocking}
-                  isLoggingOut={isLoggingOut}
+                  canPinUnlock={canPinUnlock}
                   canUnlock={canUnlock}
                   feedback={feedback}
-                  onMasterPasswordChange={onMasterPasswordChange}
-                  onToggleShowPassword={onToggleShowPassword}
-                  onSubmit={onUnlock}
+                  isBiometricUnlocking={isBiometricUnlocking}
+                  isLoggingOut={isLoggingOut}
+                  isPinUnlocking={isPinUnlocking}
+                  isUnlocking={isUnlocking}
+                  masterPassword={masterPassword}
                   onBiometricUnlock={onBiometricUnlock}
                   onLogout={onLogout}
+                  onMasterPasswordChange={onMasterPasswordChange}
+                  onPinChange={onPinChange}
+                  onPinUnlock={onPinUnlock}
+                  onShowMasterPasswordUnlock={onShowMasterPasswordUnlock}
+                  onShowPinUnlock={onShowPinUnlock}
+                  onSubmit={onUnlock}
+                  onToggleShowPassword={onToggleShowPassword}
+                  pin={pin}
+                  pinEnabled={pinEnabled}
+                  showPassword={showPassword}
+                  unlockMethod={unlockMethod}
                 />
               )}
           </CardContent>

@@ -9,14 +9,18 @@ type UseUnlockFlowParams = {
   navigateToVault: () => Promise<void>;
 };
 
+type UnlockMethod = "pin" | "masterPassword";
+
 type UseUnlockFlowResult = {
   biometricEnabled: boolean;
   biometricSupported: boolean;
   canBiometricUnlock: boolean;
+  canPinUnlock: boolean;
   canUnlock: boolean;
   feedback: UnlockFeedback;
   isBiometricUnlocking: boolean;
   isLoggingOut: boolean;
+  isPinUnlocking: boolean;
   isRestoring: boolean;
   isUnlocking: boolean;
   isVaultUnlocked: boolean;
@@ -24,10 +28,18 @@ type UseUnlockFlowResult = {
   onBiometricUnlock: () => Promise<void>;
   onLogout: () => Promise<void>;
   onMasterPasswordChange: (value: string) => void;
+  onPinChange: (value: string) => void;
+  onPinUnlock: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onShowMasterPasswordUnlock: () => void;
+  onShowPinUnlock: () => void;
   onToggleShowPassword: () => void;
   onUnlock: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  pin: string;
+  pinEnabled: boolean;
+  pinSupported: boolean;
   restoreState: RestoreAuthStateResponseDto | null;
   showPassword: boolean;
+  unlockMethod: UnlockMethod;
 };
 
 function toUnlockErrorText(error: unknown): string {
@@ -42,13 +54,19 @@ export function useUnlockFlow({
     useState<RestoreAuthStateResponseDto | null>(null);
   const [isRestoring, setIsRestoring] = useState(true);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isPinUnlocking, setIsPinUnlocking] = useState(false);
   const [isBiometricUnlocking, setIsBiometricUnlocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [pinSupported, setPinSupported] = useState(false);
+  const [pinEnabled, setPinEnabled] = useState(false);
   const [canBiometricUnlock, setCanBiometricUnlock] = useState(false);
   const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
+  const [unlockMethod, setUnlockMethod] =
+    useState<UnlockMethod>("masterPassword");
   const [masterPassword, setMasterPassword] = useState("");
+  const [pin, setPin] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [feedback, setFeedback] = useState<UnlockFeedback>({ kind: "idle" });
 
@@ -60,11 +78,16 @@ export function useUnlockFlow({
         setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
         setBiometricSupported(false);
         setBiometricEnabled(false);
+        setPinSupported(false);
+        setPinEnabled(false);
         setCanBiometricUnlock(false);
         setIsVaultUnlocked(false);
+        setUnlockMethod("masterPassword");
         return;
       }
+
       setRestoreState(result.data);
+
       let vaultUnlocked = false;
       if (result.data.status !== "needsLogin") {
         const unlockedResult = await commands.vaultIsUnlocked();
@@ -72,15 +95,27 @@ export function useUnlockFlow({
       }
       setIsVaultUnlocked(vaultUnlocked);
 
-      const biometricStatus = await commands.vaultGetBiometricStatus();
-      const supported =
-        biometricStatus.status === "ok" && biometricStatus.data.supported;
-      const enabled =
-        biometricStatus.status === "ok" && biometricStatus.data.enabled;
-      setBiometricSupported(supported);
-      setBiometricEnabled(enabled);
+      const [biometricStatus, pinStatus] = await Promise.all([
+        commands.vaultGetBiometricStatus(),
+        commands.vaultGetPinStatus(),
+      ]);
 
-      if (!vaultUnlocked && supported && enabled) {
+      const nextBiometricSupported =
+        biometricStatus.status === "ok" && biometricStatus.data.supported;
+      const nextBiometricEnabled =
+        biometricStatus.status === "ok" && biometricStatus.data.enabled;
+      const nextPinSupported =
+        pinStatus.status === "ok" && pinStatus.data.supported;
+      const nextPinEnabled =
+        pinStatus.status === "ok" && pinStatus.data.enabled;
+
+      setBiometricSupported(nextBiometricSupported);
+      setBiometricEnabled(nextBiometricEnabled);
+      setPinSupported(nextPinSupported);
+      setPinEnabled(nextPinEnabled);
+      setUnlockMethod(nextPinEnabled ? "pin" : "masterPassword");
+
+      if (!vaultUnlocked && nextBiometricSupported && nextBiometricEnabled) {
         const canUnlockWithBiometric =
           await commands.vaultCanUnlockWithBiometric();
         setCanBiometricUnlock(
@@ -93,8 +128,11 @@ export function useUnlockFlow({
       setFeedback({ kind: "error", text: toUnlockErrorText(error) });
       setBiometricSupported(false);
       setBiometricEnabled(false);
+      setPinSupported(false);
+      setPinEnabled(false);
       setCanBiometricUnlock(false);
       setIsVaultUnlocked(false);
+      setUnlockMethod("masterPassword");
     } finally {
       setIsRestoring(false);
     }
@@ -108,6 +146,7 @@ export function useUnlockFlow({
     () =>
       !isRestoring &&
       !isUnlocking &&
+      !isPinUnlocking &&
       !isBiometricUnlocking &&
       !isLoggingOut &&
       restoreState?.status !== "needsLogin" &&
@@ -116,10 +155,35 @@ export function useUnlockFlow({
     [
       isBiometricUnlocking,
       isLoggingOut,
+      isPinUnlocking,
       isRestoring,
       isUnlocking,
       isVaultUnlocked,
       masterPassword,
+      restoreState?.status,
+    ],
+  );
+
+  const canPinUnlock = useMemo(
+    () =>
+      !isRestoring &&
+      !isUnlocking &&
+      !isPinUnlocking &&
+      !isBiometricUnlocking &&
+      !isLoggingOut &&
+      restoreState?.status !== "needsLogin" &&
+      !isVaultUnlocked &&
+      pinEnabled &&
+      pin.trim().length > 0,
+    [
+      isBiometricUnlocking,
+      isLoggingOut,
+      isPinUnlocking,
+      isRestoring,
+      isUnlocking,
+      isVaultUnlocked,
+      pin,
+      pinEnabled,
       restoreState?.status,
     ],
   );
@@ -158,11 +222,63 @@ export function useUnlockFlow({
       }
 
       setMasterPassword("");
+      setPin("");
       await navigateToVault();
     } catch (error) {
       setFeedback({ kind: "error", text: toUnlockErrorText(error) });
     } finally {
       setIsUnlocking(false);
+    }
+  };
+
+  const onPinUnlock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (restoreState?.status === "needsLogin" || isVaultUnlocked) {
+      setFeedback({
+        kind: "error",
+        text: "当前会话不是锁定状态，无法执行解锁。",
+      });
+      return;
+    }
+
+    if (!pinEnabled) {
+      setFeedback({
+        kind: "error",
+        text: "当前账号未启用 PIN 解锁，请使用 master password 解锁。",
+      });
+      return;
+    }
+
+    const trimmedPin = pin.trim();
+    if (!trimmedPin) {
+      setFeedback({ kind: "error", text: "请输入 PIN。" });
+      return;
+    }
+
+    setIsPinUnlocking(true);
+    setFeedback({ kind: "idle" });
+
+    try {
+      const result = await commands.vaultUnlock({
+        method: {
+          type: "pin",
+          pin: trimmedPin,
+        },
+      });
+
+      if (result.status === "error") {
+        setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
+        return;
+      }
+
+      setPin("");
+      setMasterPassword("");
+      await navigateToVault();
+    } catch (error) {
+      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+    } finally {
+      setIsPinUnlocking(false);
     }
   };
 
@@ -188,6 +304,7 @@ export function useUnlockFlow({
         setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
         return;
       }
+      setPin("");
       setMasterPassword("");
       await navigateToVault();
     } catch (error) {
@@ -206,6 +323,7 @@ export function useUnlockFlow({
         setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
         return;
       }
+      setPin("");
       setMasterPassword("");
       await navigateToHome();
     } catch (error) {
@@ -219,6 +337,23 @@ export function useUnlockFlow({
     setMasterPassword(value);
   };
 
+  const onPinChange = (value: string) => {
+    setPin(value);
+  };
+
+  const onShowMasterPasswordUnlock = () => {
+    setUnlockMethod("masterPassword");
+    setFeedback({ kind: "idle" });
+  };
+
+  const onShowPinUnlock = () => {
+    if (!pinSupported) {
+      return;
+    }
+    setUnlockMethod("pin");
+    setFeedback({ kind: "idle" });
+  };
+
   const onToggleShowPassword = () => {
     setShowPassword((previous) => !previous);
   };
@@ -227,10 +362,12 @@ export function useUnlockFlow({
     biometricEnabled,
     biometricSupported,
     canBiometricUnlock,
+    canPinUnlock,
     canUnlock,
     feedback,
     isBiometricUnlocking,
     isLoggingOut,
+    isPinUnlocking,
     isRestoring,
     isUnlocking,
     isVaultUnlocked,
@@ -238,9 +375,17 @@ export function useUnlockFlow({
     onBiometricUnlock,
     onLogout,
     onMasterPasswordChange,
+    onPinChange,
+    onPinUnlock,
+    onShowMasterPasswordUnlock,
+    onShowPinUnlock,
     onToggleShowPassword,
     onUnlock,
+    pin,
+    pinEnabled,
+    pinSupported,
     restoreState,
     showPassword,
+    unlockMethod,
   };
 }
