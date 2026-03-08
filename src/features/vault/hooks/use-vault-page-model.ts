@@ -10,6 +10,11 @@ import {
   FAVORITES_ID,
   TRASH_ID,
 } from "@/features/vault/constants";
+import { useCipherDetailSelection } from "@/features/vault/hooks/use-cipher-detail-selection";
+import { useExpandedFolderKeys } from "@/features/vault/hooks/use-expanded-folder-keys";
+import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers";
+import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
+import { useInlineSearchFocus } from "@/features/vault/hooks/use-inline-search-focus";
 import type {
   CipherSortBy,
   CipherSortDirection,
@@ -21,10 +26,11 @@ import {
   collectFolderTreeKeys,
   sortFolders,
   toAvatarText,
-  toSortableDate,
   toVaultErrorText,
 } from "@/features/vault/utils";
 import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
+
+export type VaultPageNavigationTarget = SessionRoute;
 
 type UseVaultPageModelParams = {
   navigateTo: (to: SessionRoute) => Promise<void>;
@@ -51,15 +57,17 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     null,
   );
   const [selectedMenuId, setSelectedMenuId] = useState(ALL_ITEMS_ID);
-  const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
-  const [selectedCipherDetail, setSelectedCipherDetail] =
-    useState<VaultCipherDetailDto | null>(null);
-  const [isCipherDetailLoading, setIsCipherDetailLoading] = useState(false);
-  const [cipherDetailError, setCipherDetailError] = useState("");
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );
-  const detailRequestSeqRef = useRef(0);
+  const {
+    cipherDetailError,
+    isCipherDetailLoading,
+    loadCipherDetail,
+    selectedCipherDetail,
+    selectedCipherId,
+    useClearSelectionWhenMissing,
+  } = useCipherDetailSelection();
 
   const loadVaultData = useCallback(async () => {
     setIsRefreshing(true);
@@ -155,177 +163,33 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     [sortedFolders],
   );
 
-  useEffect(() => {
-    setExpandedNodeKeys((previous) => {
-      const validKeys = new Set(folderTreeKeys);
-      const next = new Set<string>();
-      for (const key of previous) {
-        if (validKeys.has(key)) {
-          next.add(key);
-        }
-      }
-      if (next.size === 0) {
-        for (const node of folderTree) {
-          next.add(node.key);
-        }
-      }
-      return next;
-    });
-  }, [folderTree, folderTreeKeys]);
+  useExpandedFolderKeys({
+    folderTree,
+    folderTreeKeys,
+    setExpandedNodeKeys,
+  });
 
-  useEffect(() => {
-    if (
-      selectedMenuId === ALL_ITEMS_ID ||
-      selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
-    ) {
-      return;
-    }
-    const exists = folderIdSet.has(selectedMenuId);
-    if (!exists) {
-      setSelectedMenuId(ALL_ITEMS_ID);
-    }
-  }, [folderIdSet, selectedMenuId]);
+  useFolderSelectionGuard({
+    folderIdSet,
+    selectedMenuId,
+    setSelectedMenuId,
+  });
 
-  useEffect(() => {
-    if (!isInlineSearchOpen) {
-      return;
-    }
-    const frameId = requestAnimationFrame(() => {
-      inlineSearchInputRef.current?.focus();
-    });
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, [isInlineSearchOpen]);
+  useInlineSearchFocus({
+    inlineSearchInputRef,
+    isInlineSearchOpen,
+  });
 
-  const normalizedCipherSearchQuery = cipherSearchQuery.trim().toLowerCase();
-
-  const filteredCiphers = useMemo(() => {
-    const allCiphers = viewData?.ciphers ?? [];
-    const folderFiltered =
-      selectedMenuId === ALL_ITEMS_ID ||
-      selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
-        ? allCiphers
-        : allCiphers.filter((cipher) => cipher.folderId === selectedMenuId);
-
-    const typeFiltered = folderFiltered.filter((cipher) => {
-      if (typeFilter === "all") {
-        return true;
-      }
-      if (typeFilter === "login") {
-        return cipher.type === 1;
-      }
-      if (typeFilter === "note") {
-        return cipher.type === 2;
-      }
-      if (typeFilter === "card") {
-        return cipher.type === 3;
-      }
-      if (typeFilter === "identify") {
-        return cipher.type === 4;
-      }
-      if (typeFilter === "ssh_key") {
-        return cipher.type === 5;
-      }
-      return true;
-    });
-
-    const searchFiltered = !normalizedCipherSearchQuery
-      ? typeFiltered
-      : typeFiltered.filter((cipher) => {
-          const searchText = [cipher.name, cipher.id, cipher.organizationId]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          return searchText.includes(normalizedCipherSearchQuery);
-        });
-
-    return [...searchFiltered].sort((left, right) => {
-      if (sortBy === "title") {
-        const titleCompare = (left.name ?? "").localeCompare(
-          right.name ?? "",
-          "zh-Hans-CN",
-        );
-        return sortDirection === "asc" ? titleCompare : -titleCompare;
-      }
-      if (sortBy === "created") {
-        const createdCompare =
-          toSortableDate(left.creationDate) -
-          toSortableDate(right.creationDate);
-        return sortDirection === "asc" ? createdCompare : -createdCompare;
-      }
-      const modifiedCompare =
-        toSortableDate(left.revisionDate) - toSortableDate(right.revisionDate);
-      return sortDirection === "asc" ? modifiedCompare : -modifiedCompare;
-    });
-  }, [
-    normalizedCipherSearchQuery,
+  const filteredCiphers = useFilteredCiphers({
+    cipherSearchQuery,
     selectedMenuId,
     sortBy,
     sortDirection,
     typeFilter,
-    viewData?.ciphers,
-  ]);
+    viewData,
+  });
 
-  useEffect(() => {
-    if (!selectedCipherId) {
-      return;
-    }
-    const existsInList = filteredCiphers.some(
-      (cipher) => cipher.id === selectedCipherId,
-    );
-    if (existsInList) {
-      return;
-    }
-    detailRequestSeqRef.current += 1;
-    setSelectedCipherId(null);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(false);
-  }, [filteredCiphers, selectedCipherId]);
-
-  const loadCipherDetail = useCallback(async (cipherId: string) => {
-    const normalizedCipherId = cipherId.trim();
-    if (!normalizedCipherId) {
-      return;
-    }
-
-    setSelectedCipherId(normalizedCipherId);
-    setSelectedCipherDetail(null);
-    setCipherDetailError("");
-    setIsCipherDetailLoading(true);
-
-    const requestSeq = detailRequestSeqRef.current + 1;
-    detailRequestSeqRef.current = requestSeq;
-
-    try {
-      const detail = await commands.vaultGetCipherDetail({
-        cipherId: normalizedCipherId,
-      });
-
-      if (requestSeq !== detailRequestSeqRef.current) {
-        return;
-      }
-
-      if (detail.status === "error") {
-        setCipherDetailError(toVaultErrorText(detail.error));
-        return;
-      }
-
-      setSelectedCipherDetail(detail.data.cipher);
-    } catch (error) {
-      if (requestSeq !== detailRequestSeqRef.current) {
-        return;
-      }
-      setCipherDetailError(toVaultErrorText(error));
-    } finally {
-      if (requestSeq === detailRequestSeqRef.current) {
-        setIsCipherDetailLoading(false);
-      }
-    }
-  }, []);
+  useClearSelectionWhenMissing(filteredCiphers.map((cipher) => cipher.id));
 
   const folderCipherCount = useMemo(() => {
     const map = new Map<string, number>();

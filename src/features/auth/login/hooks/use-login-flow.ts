@@ -1,19 +1,24 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { commands } from "@/bindings";
 import { CUSTOM_SERVER_URL_OPTION } from "@/features/auth/login/constants";
+import {
+  canVaultUnlockAfterLogin,
+  isValidServerUrl,
+  loginWithPassword,
+  normalizeBaseUrl,
+  restoreLoginHints,
+  sendEmailLoginCode,
+  syncVaultAfterLogin,
+  toLoginErrorText,
+  toProviderId,
+  toProviderLabel,
+  toServerUrlOption,
+  unlockVaultAfterLogin,
+} from "@/features/auth/login/login-flow-helpers";
 import type {
   LoginFeedback,
   TwoFactorState,
 } from "@/features/auth/login/types";
-import {
-  isValidServerUrl,
-  normalizeBaseUrl,
-  toProviderId,
-  toProviderLabel,
-  toServerUrlOption,
-} from "@/features/auth/login/utils";
-import { toErrorText } from "@/features/auth/shared/utils";
 
 type UseLoginFlowParams = {
   navigateToVault: () => Promise<void>;
@@ -42,10 +47,6 @@ type UseLoginFlowResult = {
   twoFactorState: TwoFactorState | null;
 };
 
-function toLoginErrorText(error: unknown): string {
-  return toErrorText(error, "登录失败，请稍后重试。");
-}
-
 export function useLoginFlow({
   navigateToVault,
 }: UseLoginFlowParams): UseLoginFlowResult {
@@ -70,7 +71,7 @@ export function useLoginFlow({
     const restoreSession = async () => {
       setIsRestoringSession(true);
       try {
-        const result = await commands.authRestoreState({});
+        const result = await restoreLoginHints();
         if (cancelled) {
           return;
         }
@@ -191,14 +192,12 @@ export function useLoginFlow({
         return;
       }
 
-      const result = await commands.authLoginWithPassword({
+      const result = await loginWithPassword({
         baseUrl: normalizedBaseUrl,
         email: trimmedEmail,
         masterPassword,
         twoFactorProvider,
         twoFactorToken,
-        twoFactorRemember: false,
-        authrequest: null,
       });
 
       if (result.status === "error") {
@@ -210,7 +209,7 @@ export function useLoginFlow({
         setSubmitProgressText("正在准备你的密码库...");
         setTwoFactorState(null);
 
-        const canUnlockResult = await commands.vaultCanUnlock();
+        const canUnlockResult = await canVaultUnlockAfterLogin();
         if (canUnlockResult.status === "error") {
           setFeedback({
             kind: "error",
@@ -222,12 +221,7 @@ export function useLoginFlow({
 
         if (canUnlock) {
           setSubmitProgressText("正在解锁本地密码库...");
-          const unlockResult = await commands.vaultUnlock({
-            method: {
-              type: "masterPassword",
-              password: masterPassword,
-            },
-          });
+          const unlockResult = await unlockVaultAfterLogin(masterPassword);
           if (unlockResult.status === "error") {
             setFeedback({
               kind: "error",
@@ -237,9 +231,7 @@ export function useLoginFlow({
           }
 
           setSubmitProgressText("正在同步最新数据...");
-          const syncResult = await commands.vaultSyncNow({
-            excludeDomains: false,
-          });
+          const syncResult = await syncVaultAfterLogin();
           if (syncResult.status === "error") {
             setMasterPassword("");
             await navigateToVault();
@@ -252,9 +244,7 @@ export function useLoginFlow({
         }
 
         setSubmitProgressText("正在首次同步密码库...");
-        const syncResult = await commands.vaultSyncNow({
-          excludeDomains: false,
-        });
+        const syncResult = await syncVaultAfterLogin();
         if (syncResult.status === "error") {
           setFeedback({
             kind: "error",
@@ -264,12 +254,7 @@ export function useLoginFlow({
         }
 
         setSubmitProgressText("正在完成解锁...");
-        const unlockResult = await commands.vaultUnlock({
-          method: {
-            type: "masterPassword",
-            password: masterPassword,
-          },
-        });
+        const unlockResult = await unlockVaultAfterLogin(masterPassword);
         if (unlockResult.status === "error") {
           setFeedback({
             kind: "error",
@@ -338,12 +323,10 @@ export function useLoginFlow({
     setFeedback({ kind: "idle" });
 
     try {
-      const result = await commands.authSendEmailLogin({
+      const result = await sendEmailLoginCode({
         baseUrl: normalizedBaseUrl,
         email: trimmedEmail,
         masterPassword,
-        authRequestId: null,
-        authRequestAccessCode: null,
       });
 
       if (result.status === "error") {

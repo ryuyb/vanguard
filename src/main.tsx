@@ -9,11 +9,15 @@ import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree });
 
+function shouldNavigateToResolvedRoute(currentPath: string, target: string) {
+  return currentPath !== target;
+}
+
 async function syncRouteWithSession() {
   try {
     const target = await resolveSessionRoute();
     const currentPath = router.state.location.pathname;
-    if (currentPath === target) {
+    if (!shouldNavigateToResolvedRoute(currentPath, target)) {
       return;
     }
     await router.navigate({ to: target });
