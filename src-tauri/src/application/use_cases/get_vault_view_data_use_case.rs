@@ -77,6 +77,28 @@ impl GetVaultViewDataUseCase {
                     &user_key,
                     "cipher.data.username",
                 )?;
+                let login_uri = vault_crypto::decrypt_optional_field(
+                    cipher.login.as_ref().and_then(|login| login.uri.clone()),
+                    &user_key,
+                    "cipher.login.uri",
+                )?;
+                let login_uris = cipher
+                    .login
+                    .as_ref()
+                    .map(|login| decrypt_login_uris(&login.uris, &user_key, "cipher.login.uris"))
+                    .transpose()?
+                    .unwrap_or_default();
+                let data_uri = vault_crypto::decrypt_optional_field(
+                    cipher.data.as_ref().and_then(|data| data.uri.clone()),
+                    &user_key,
+                    "cipher.data.uri",
+                )?;
+                let data_uris = cipher
+                    .data
+                    .as_ref()
+                    .map(|data| decrypt_login_uris(&data.uris, &user_key, "cipher.data.uris"))
+                    .transpose()?
+                    .unwrap_or_default();
 
                 Ok(VaultCipherItem {
                     id: cipher.id,
@@ -89,6 +111,7 @@ impl GetVaultViewDataUseCase {
                         "cipher.name",
                     )?,
                     username: first_non_empty(login_username, data_username),
+                    uris: collect_cipher_uris(login_uri, login_uris, data_uri, data_uris),
                     favorite: cipher.favorite,
                     creation_date: cipher.creation_date,
                     revision_date: cipher.revision_date,
@@ -109,6 +132,25 @@ impl GetVaultViewDataUseCase {
     }
 }
 
+fn decrypt_login_uris(
+    entries: &[crate::application::dto::sync::SyncCipherLoginUri],
+    user_key: &crate::application::dto::vault::VaultUserKeyMaterial,
+    path: &str,
+) -> Result<Vec<String>, AppError> {
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            vault_crypto::decrypt_optional_field(
+                entry.uri.clone(),
+                user_key,
+                &format!("{path}[{index}].uri"),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|values| values.into_iter().flatten().collect())
+}
+
 fn first_non_empty(left: Option<String>, right: Option<String>) -> Option<String> {
     if let Some(value) = left {
         if !value.trim().is_empty() {
@@ -121,4 +163,39 @@ fn first_non_empty(left: Option<String>, right: Option<String>) -> Option<String
         }
     }
     None
+}
+
+fn collect_cipher_uris(
+    login_uri: Option<String>,
+    login_uris: Vec<String>,
+    data_uri: Option<String>,
+    data_uris: Vec<String>,
+) -> Vec<String> {
+    let mut uris: Vec<String> = Vec::new();
+
+    if let Some(candidate) = login_uri {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    for candidate in login_uris {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    if let Some(candidate) = data_uri {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    for candidate in data_uris {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+
+    uris
+}
+
+fn push_unique_non_empty_uri(uris: &mut Vec<String>, candidate: String) {
+    let normalized = candidate.trim();
+    if normalized.is_empty() {
+        return;
+    }
+    if uris.iter().any(|existing| existing == normalized) {
+        return;
+    }
+    uris.push(normalized.to_string());
 }

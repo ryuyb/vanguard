@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,10 +47,53 @@ import {
 } from "@/features/vault";
 import { useVaultPageModel } from "@/features/vault/hooks";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
+import { getCipherIconUrl } from "@/features/vault/utils";
 
 type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
 };
+
+function CipherRowObserver({
+  children,
+  cipherId,
+  onVisibilityChange,
+}: {
+  children: React.ReactNode;
+  cipherId: string;
+  onVisibilityChange: (cipherId: string, visible: boolean) => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) {
+      return;
+    }
+
+    let rafId = 0;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        window.cancelAnimationFrame(rafId);
+        rafId = window.requestAnimationFrame(() => {
+          onVisibilityChange(cipherId, entry?.isIntersecting === true);
+        });
+      },
+      {
+        rootMargin: "120px 0px",
+        threshold: 0.01,
+      },
+    );
+
+    observer.observe(node);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [cipherId, onVisibilityChange]);
+
+  return <div ref={ref}>{children}</div>;
+}
 
 export function VaultPage({ navigateTo }: VaultPageProps) {
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -75,6 +118,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     loadCipherDetail,
     lockLabel,
     logoutLabel,
+    markCipherIconFallback,
+    markCipherIconLoaded,
     onFolderTreeOpenChange,
     onLock,
     onLogout,
@@ -84,6 +129,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     selectedCipherId,
     selectedMenuId,
     selectedMenuName,
+    setCipherRowVisible,
     setCipherSearchQuery,
     setHeaderSearchQuery,
     setIsInlineSearchOpen,
@@ -508,16 +554,31 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
 
                 <ScrollArea className="min-h-0 flex-1">
                   <div className="space-y-1 px-2 pb-2">
-                    {filteredCiphers.map((cipher) => (
-                      <CipherRow
-                        key={cipher.id}
-                        cipher={cipher}
-                        selected={cipher.id === selectedCipherId}
-                        onClick={() => {
-                          void loadCipherDetail(cipher.id);
-                        }}
-                      />
-                    ))}
+                    {filteredCiphers.map(
+                      (cipher: (typeof filteredCiphers)[number]) => (
+                        <CipherRowObserver
+                          key={cipher.id}
+                          cipherId={cipher.id}
+                          onVisibilityChange={setCipherRowVisible}
+                        >
+                          <CipherRow
+                            cipher={cipher}
+                            iconLoadState={cipher.iconLoadState}
+                            onClick={() => {
+                              void loadCipherDetail(cipher.id);
+                            }}
+                            onIconError={() => {
+                              markCipherIconFallback(cipher.id);
+                            }}
+                            onIconLoad={() => {
+                              markCipherIconLoaded(cipher.id);
+                            }}
+                            selected={cipher.id === selectedCipherId}
+                            shouldLoadIcon={cipher.shouldLoadIcon}
+                          />
+                        </CipherRowObserver>
+                      ),
+                    )}
                     {filteredCiphers.length === 0 && (
                       <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
                         当前筛选下没有 cipher。
@@ -559,6 +620,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
+                            iconUrl={getCipherIconUrl(selectedCipherDetail)}
                           />
                         </div>
                       )}

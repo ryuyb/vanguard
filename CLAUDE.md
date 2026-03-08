@@ -22,6 +22,7 @@ tests/
 : Follow standard conventions
 
 ## Recent Changes
+- 001-vault-icons: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 
 - 001-frontend-refactor: Added
 

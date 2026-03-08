@@ -8,7 +8,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { firstNonEmptyText } from "@/features/vault/utils";
+import {
+  CipherIcon,
+  toCipherTypeIcon,
+} from "@/features/vault/components/cipher-icon";
+import {
+  firstNonEmptyText,
+  getCipherIconUrl,
+  toCipherIconAlt,
+} from "@/features/vault/utils";
 
 const CUSTOM_FIELD_TYPE_TEXT = 0;
 const CUSTOM_FIELD_TYPE_HIDDEN = 1;
@@ -73,9 +81,14 @@ function DetailField({
 
 type CipherDetailPanelProps = {
   cipher: VaultCipherDetailDto;
+  iconUrl?: string | null;
 };
 
-export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
+export function CipherDetailPanel({
+  cipher,
+  iconUrl: iconUrlProp,
+}: CipherDetailPanelProps) {
+  const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher);
   const username = firstNonEmptyText(
     cipher.login?.username,
     cipher.data?.username,
@@ -295,10 +308,21 @@ export function CipherDetailPanel({ cipher }: CipherDetailPanelProps) {
   return (
     <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-slate-200/80 bg-white/90 py-0 shadow-sm">
       <CardHeader className="gap-2 border-b border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-sky-50/50 px-6 py-3">
-        <div className="flex h-9 items-center">
-          <h2 className="m-0 leading-none text-lg font-semibold text-slate-900">
-            {cipher.name ?? "Untitled cipher"}
-          </h2>
+        <div className="flex min-h-9 items-center gap-3">
+          <CipherIcon
+            alt={toCipherIconAlt(cipher.name)}
+            className="size-10 bg-white/90 text-slate-500"
+            iconUrl={iconUrl}
+            isVisible={Boolean(iconUrl)}
+            loadState={iconUrl ? "loading" : "fallback"}
+          >
+            {toCipherTypeIcon(cipher.type)}
+          </CipherIcon>
+          <div className="min-w-0 flex-1">
+            <h2 className="m-0 truncate leading-none text-lg font-semibold text-slate-900">
+              {cipher.name ?? "Untitled cipher"}
+            </h2>
+          </div>
         </div>
       </CardHeader>
 

@@ -1,4 +1,8 @@
-import type { VaultFolderItemDto } from "@/bindings";
+import type {
+  VaultCipherDetailDto,
+  VaultCipherItemDto,
+  VaultFolderItemDto,
+} from "@/bindings";
 import { toErrorText } from "@/features/auth/shared/utils";
 import type {
   CipherTypeFilter,
@@ -157,4 +161,102 @@ export function countNodeCiphers(
     childCount += countNodeCiphers(child, folderCipherCount);
   }
   return selfCount + childCount;
+}
+
+export function getCipherPrimaryUri(
+  cipher: Pick<VaultCipherItemDto, "name"> & {
+    uri?: string | null;
+    uris?: Array<{ uri: string | null } | string | null> | null;
+    login?: {
+      uri?: string | null;
+      uris?: Array<{ uri: string | null }> | null;
+    } | null;
+    data?: {
+      uri?: string | null;
+      uris?: Array<{ uri: string | null }> | null;
+    } | null;
+  },
+): string | null {
+  const itemUris = (cipher.uris ?? []).map((entry) => {
+    if (typeof entry === "string") {
+      return entry;
+    }
+    return entry?.uri;
+  });
+
+  const candidates = [
+    cipher.uri,
+    ...itemUris,
+    cipher.login?.uri,
+    ...(cipher.login?.uris ?? []).map((item) => item.uri),
+    cipher.data?.uri,
+    ...(cipher.data?.uris ?? []).map((item) => item.uri),
+  ];
+
+  return firstNonEmptyText(...candidates);
+}
+
+export function toCipherIconHost(
+  uri: string | null | undefined,
+): string | null {
+  const normalizedUri = (uri ?? "").trim();
+  if (!normalizedUri) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(normalizedUri);
+    return normalizeIconHost(parsed.hostname);
+  } catch {
+    try {
+      const parsed = new URL(`https://${normalizedUri}`);
+      return normalizeIconHost(parsed.hostname);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizeIconHost(hostname: string): string | null {
+  const normalized = hostname.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === "localhost") {
+    return null;
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(normalized)) {
+    return null;
+  }
+  if (!/^[a-z0-9.-]+$/.test(normalized)) {
+    return null;
+  }
+  if (normalized.startsWith(".") || normalized.includes("..")) {
+    return null;
+  }
+  return normalized;
+}
+
+export function toCipherIconUrl(uri: string | null | undefined): string | null {
+  const host = toCipherIconHost(uri);
+  if (!host) {
+    return null;
+  }
+  return `https://icons.bitwarden.net/${host}/icon.png`;
+}
+
+export function toCipherIconAlt(name: string | null | undefined): string {
+  const normalized = (name ?? "").trim();
+  return normalized ? `${normalized} icon` : "Vault item icon";
+}
+
+export function getCipherIconUrl(
+  cipher:
+    | (VaultCipherDetailDto & { uri?: string | null })
+    | (VaultCipherItemDto & {
+        uri?: string | null;
+        uris?: Array<{ uri: string | null } | string | null> | null;
+      }),
+): string | null {
+  return toCipherIconUrl(getCipherPrimaryUri(cipher));
 }

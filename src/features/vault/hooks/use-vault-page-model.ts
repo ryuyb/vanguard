@@ -16,6 +16,7 @@ import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers"
 import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
 import { useInlineSearchFocus } from "@/features/vault/hooks/use-inline-search-focus";
 import type {
+  CipherIconLoadState,
   CipherSortBy,
   CipherSortDirection,
   CipherTypeFilter,
@@ -24,6 +25,7 @@ import type {
 import {
   buildFolderTree,
   collectFolderTreeKeys,
+  getCipherIconUrl,
   sortFolders,
   toAvatarText,
   toVaultErrorText,
@@ -60,6 +62,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );
+  const [_visibleCipherIds, setVisibleCipherIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [_cipherIconLoadState, setCipherIconLoadState] = useState<
+    Record<string, CipherIconLoadState>
+  >({});
   const {
     cipherDetailError,
     isCipherDetailLoading,
@@ -189,6 +197,122 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     viewData,
   });
 
+  const ciphersWithIcons = useMemo(
+    () =>
+      filteredCiphers.map((cipher) => {
+        const iconUrl = getCipherIconUrl(cipher);
+        const iconLoadState = _cipherIconLoadState[cipher.id] ?? "idle";
+        const shouldLoadIcon =
+          iconUrl != null &&
+          (iconLoadState === "loading" ||
+            iconLoadState === "loaded" ||
+            iconLoadState === "fallback");
+
+        return {
+          ...cipher,
+          iconUrl,
+          iconLoadState,
+          shouldLoadIcon,
+        };
+      }),
+    [_cipherIconLoadState, filteredCiphers],
+  );
+
+  const filteredCipherIds = useMemo(
+    () => filteredCiphers.map((cipher) => cipher.id),
+    [filteredCiphers],
+  );
+
+  useEffect(() => {
+    setVisibleCipherIds((previous) => {
+      const activeCipherIdSet = new Set(filteredCipherIds);
+      const next = new Set<string>();
+      for (const cipherId of previous) {
+        if (activeCipherIdSet.has(cipherId)) {
+          next.add(cipherId);
+        }
+      }
+
+      if (next.size !== previous.size) {
+        return next;
+      }
+      for (const cipherId of previous) {
+        if (!next.has(cipherId)) {
+          return next;
+        }
+      }
+      return previous;
+    });
+
+    setCipherIconLoadState((previous) => {
+      const next: Record<string, CipherIconLoadState> = {};
+      for (const cipherId of filteredCipherIds) {
+        next[cipherId] = previous[cipherId] ?? "idle";
+      }
+
+      const previousKeys = Object.keys(previous);
+      const nextKeys = Object.keys(next);
+      if (previousKeys.length !== nextKeys.length) {
+        return next;
+      }
+      for (const key of nextKeys) {
+        if (previous[key] !== next[key]) {
+          return next;
+        }
+      }
+      return previous;
+    });
+  }, [filteredCipherIds]);
+
+  const setCipherRowVisible = useCallback(
+    (cipherId: string, visible: boolean) => {
+      setVisibleCipherIds((previous) => {
+        if (visible && previous.has(cipherId)) {
+          return previous;
+        }
+        if (!visible && !previous.has(cipherId)) {
+          return previous;
+        }
+        const next = new Set(previous);
+        if (visible) {
+          next.add(cipherId);
+        } else {
+          next.delete(cipherId);
+        }
+        return next;
+      });
+
+      if (!visible) {
+        return;
+      }
+
+      setCipherIconLoadState((previous) => {
+        if (previous[cipherId] && previous[cipherId] !== "idle") {
+          return previous;
+        }
+        return {
+          ...previous,
+          [cipherId]: "loading",
+        };
+      });
+    },
+    [],
+  );
+
+  const markCipherIconLoaded = useCallback((cipherId: string) => {
+    setCipherIconLoadState((previous) => ({
+      ...previous,
+      [cipherId]: "loaded",
+    }));
+  }, []);
+
+  const markCipherIconFallback = useCallback((cipherId: string) => {
+    setCipherIconLoadState((previous) => ({
+      ...previous,
+      [cipherId]: "fallback",
+    }));
+  }, []);
+
   useClearSelectionWhenMissing(filteredCiphers.map((cipher) => cipher.id));
 
   const folderCipherCount = useMemo(() => {
@@ -260,7 +384,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     errorText,
     expandedNodeKeys,
     favoriteCipherCount,
-    filteredCiphers,
+    filteredCiphers: ciphersWithIcons,
     folderCipherCount,
     folderTree,
     headerSearchQuery,
@@ -274,6 +398,8 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     loadCipherDetail,
     lockLabel,
     logoutLabel,
+    markCipherIconFallback,
+    markCipherIconLoaded,
     onFolderTreeOpenChange,
     onLock,
     onLogout,
@@ -283,6 +409,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     selectedCipherId,
     selectedMenuId,
     selectedMenuName,
+    setCipherRowVisible,
     setCipherSearchQuery,
     setHeaderSearchQuery,
     setIsInlineSearchOpen,
@@ -304,7 +431,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     errorText: string;
     expandedNodeKeys: Set<string>;
     favoriteCipherCount: number;
-    filteredCiphers: NonNullable<VaultViewDataResponseDto["ciphers"]>;
+    filteredCiphers: typeof ciphersWithIcons;
     folderCipherCount: Map<string, number>;
     folderTree: ReturnType<typeof buildFolderTree>;
     headerSearchQuery: string;
@@ -318,6 +445,8 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     loadCipherDetail: (cipherId: string) => Promise<void>;
     lockLabel: string;
     logoutLabel: string;
+    markCipherIconFallback: (cipherId: string) => void;
+    markCipherIconLoaded: (cipherId: string) => void;
     onFolderTreeOpenChange: (nodeKey: string, open: boolean) => void;
     onLock: () => Promise<void>;
     onLogout: () => Promise<void>;
@@ -327,6 +456,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     selectedCipherId: string | null;
     selectedMenuId: string;
     selectedMenuName: string;
+    setCipherRowVisible: (cipherId: string, visible: boolean) => void;
     setCipherSearchQuery: Dispatch<SetStateAction<string>>;
     setHeaderSearchQuery: Dispatch<SetStateAction<string>>;
     setIsInlineSearchOpen: Dispatch<SetStateAction<boolean>>;

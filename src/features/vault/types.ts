@@ -1,5 +1,7 @@
 export type VaultPageState = "loading" | "ready" | "error";
 
+export type CipherIconLoadState = "idle" | "loading" | "loaded" | "fallback";
+
 export type CipherTypeFilter =
   | "all"
   | "login"
