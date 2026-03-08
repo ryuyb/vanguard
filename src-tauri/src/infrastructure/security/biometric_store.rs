@@ -25,7 +25,7 @@ impl BiometricUnlockBundle {
 }
 
 pub fn is_supported() -> bool {
-    cfg!(target_os = "macos")
+    imp::is_supported()
 }
 
 pub fn save_unlock_bundle(account_id: &str, bundle: &BiometricUnlockBundle) -> AppResult<()> {
@@ -48,6 +48,8 @@ pub fn delete_unlock_bundle(account_id: &str) -> AppResult<()> {
 mod imp {
     use core_foundation::base::TCFType;
     use core_foundation::string::CFString;
+    use objc2::{extern_class, extern_methods, rc::Retained, runtime::NSObject};
+    use objc2_foundation::{NSError, NSInteger};
     use security_framework::base::Error;
     use security_framework::passwords::{
         delete_generic_password_options, generic_password, set_generic_password_options,
@@ -67,6 +69,58 @@ mod imp {
     const ERR_SEC_USER_CANCELED: i32 = -128;
     const ERR_SEC_INTERACTION_NOT_ALLOWED: i32 = -25_308;
     const ERR_SEC_MISSING_ENTITLEMENT: i32 = -34_018;
+
+    const LA_POLICY_DEVICE_OWNER_AUTHENTICATION_WITH_BIOMETRICS: NSInteger = 1;
+    #[link(name = "LocalAuthentication", kind = "framework")]
+    unsafe extern "C" {}
+
+    extern_class!(
+        #[unsafe(super(NSObject))]
+        #[derive(PartialEq, Eq, Hash)]
+        struct LAContext;
+    );
+
+    impl LAContext {
+        extern_methods!(
+            #[unsafe(method(new))]
+            fn new() -> Retained<Self>;
+
+            #[unsafe(method(canEvaluatePolicy:error:))]
+            fn can_evaluate_policy(
+                &self,
+                policy: NSInteger,
+                error: Option<&mut Option<Retained<NSError>>>,
+            ) -> bool;
+        );
+    }
+
+    pub fn is_supported() -> bool {
+        let context = LAContext::new();
+        let mut error = None;
+
+        let supported = context.can_evaluate_policy(
+            LA_POLICY_DEVICE_OWNER_AUTHENTICATION_WITH_BIOMETRICS,
+            Some(&mut error),
+        );
+
+        if !supported {
+            if let Some(error) = error {
+                log::debug!(
+                    target: "vanguard::infrastructure::security::biometric_store",
+                    "biometric support unavailable code={} description={}",
+                    error.code(),
+                    error.localizedDescription()
+                );
+            } else {
+                log::debug!(
+                    target: "vanguard::infrastructure::security::biometric_store",
+                    "biometric support unavailable without LocalAuthentication error"
+                );
+            }
+        }
+
+        supported
+    }
 
     pub fn save_unlock_bundle(account_id: &str, bundle: &BiometricUnlockBundle) -> AppResult<()> {
         let account_key = normalize_account_id(account_id)?;
@@ -198,6 +252,10 @@ mod imp {
     use crate::infrastructure::security::biometric_store::BiometricUnlockBundle;
     use crate::support::error::AppError;
     use crate::support::result::AppResult;
+
+    pub fn is_supported() -> bool {
+        false
+    }
 
     pub fn save_unlock_bundle(_account_id: &str, _bundle: &BiometricUnlockBundle) -> AppResult<()> {
         Err(AppError::validation(

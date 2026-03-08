@@ -165,7 +165,9 @@ export function VaultSettingsDialog({
   const [clipboardClearAfter, setClipboardClearAfter] =
     useState<ClipboardClearOption>("never");
   const [isStatusLoading, setIsStatusLoading] = useState(false);
-  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [isBiometricSupported, setIsBiometricSupported] = useState<
+    boolean | null
+  >(null);
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [isPinSupported, setIsPinSupported] = useState(false);
   const [isPinEnabled, setIsPinEnabled] = useState(false);
@@ -183,6 +185,7 @@ export function VaultSettingsDialog({
   const loadSecuritySettings = useCallback(async () => {
     setIsStatusLoading(true);
     setErrorText(null);
+    setIsBiometricSupported(null);
     try {
       const [biometricResult, pinResult] = await Promise.all([
         commands.vaultGetBiometricStatus(),
@@ -194,7 +197,7 @@ export function VaultSettingsDialog({
         setIsBiometricEnabled(biometricResult.data.enabled);
       } else {
         setErrorText(
-          toErrorText(biometricResult.error, "读取触控ID状态失败。"),
+          toErrorText(biometricResult.error, "读取生物识别状态失败。"),
         );
       }
 
@@ -253,7 +256,7 @@ export function VaultSettingsDialog({
           setErrorText(
             toErrorText(
               result.error,
-              checked ? "启用触控ID失败。" : "禁用触控ID失败。",
+              checked ? "启用生物识别失败。" : "禁用生物识别失败。",
             ),
           );
           return;
@@ -261,7 +264,10 @@ export function VaultSettingsDialog({
         setIsBiometricEnabled(checked);
       } catch (error) {
         setErrorText(
-          toErrorText(error, checked ? "启用触控ID失败。" : "禁用触控ID失败。"),
+          toErrorText(
+            error,
+            checked ? "启用生物识别失败。" : "禁用生物识别失败。",
+          ),
         );
       } finally {
         setIsBiometricBusy(false);
@@ -466,35 +472,37 @@ export function VaultSettingsDialog({
                 </p>
 
                 <div className="mt-3 space-y-2">
-                  <label
-                    htmlFor="vault-setting-biometric"
-                    className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="text-sm text-slate-900">
-                        通过 触控ID 解锁
+                  {isBiometricSupported !== false && (
+                    <label
+                      htmlFor="vault-setting-biometric"
+                      className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="text-sm text-slate-900">
+                          通过生物识别解锁
+                        </div>
+                        <div className="text-xs text-slate-600">
+                          {isBiometricSupported
+                            ? "使用系统生物识别快速解锁。"
+                            : "正在检测生物识别可用性。"}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-600">
-                        {isBiometricSupported
-                          ? "使用系统生物识别快速解锁。"
-                          : "当前设备暂不支持触控ID。"}
-                      </div>
-                    </div>
-                    <input
-                      id="vault-setting-biometric"
-                      type="checkbox"
-                      className="mt-0.5 size-4 accent-sky-600"
-                      checked={isBiometricEnabled}
-                      disabled={
-                        isStatusLoading ||
-                        isBiometricBusy ||
-                        !isBiometricSupported
-                      }
-                      onChange={(event) => {
-                        void onBiometricCheckedChange(event.target.checked);
-                      }}
-                    />
-                  </label>
+                      <input
+                        id="vault-setting-biometric"
+                        type="checkbox"
+                        className="mt-0.5 size-4 accent-sky-600"
+                        checked={isBiometricEnabled}
+                        disabled={
+                          isStatusLoading ||
+                          isBiometricBusy ||
+                          !isBiometricSupported
+                        }
+                        onChange={(event) => {
+                          void onBiometricCheckedChange(event.target.checked);
+                        }}
+                      />
+                    </label>
+                  )}
 
                   <label
                     htmlFor="vault-setting-pin"

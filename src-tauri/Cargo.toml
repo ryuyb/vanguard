@@ -59,3 +59,5 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.
 security-framework = "3"
 security-framework-sys = "2"
 core-foundation = "0.10"
+objc2 = "0.6.4"
+objc2-foundation = { version = "0.3.2", features = ["NSError", "NSObject", "NSString"] }

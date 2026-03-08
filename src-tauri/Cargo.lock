@@ -5656,6 +5656,8 @@ dependencies = [
  "futures-util",
  "hmac",
  "log",
+ "objc2",
+ "objc2-foundation",
  "pbkdf2",
  "rand 0.10.0",
  "reqwest",
