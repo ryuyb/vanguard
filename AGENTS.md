@@ -6,6 +6,10 @@
 - Frontend: React/TypeScript in `src/`.
 - Core domains: auth, vault sync, vault unlock/biometric.
 
+## Frontend Package Manager
+- Use `pnpm` for frontend/package-manager commands in this repository.
+- Prefer `pnpm <command>` over `npm <command>` when installing dependencies, running scripts, or invoking frontend tooling.
+
 ## Frontend Component Guidelines
 - Prefer shadcn components for UI implementation.
 - Reuse existing components in `src/components/ui` before adding new ones.
