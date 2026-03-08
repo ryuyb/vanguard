@@ -5,14 +5,13 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { LoaderCircle } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   UnlockHero,
   UnlockLockedForm,
-  UnlockUnlockedState,
   useUnlockFlow,
 } from "@/features/auth/unlock";
 import { resolveSessionRoute } from "@/lib/route-session";
@@ -69,6 +68,16 @@ function UnlockPage() {
     navigateToVault,
   });
 
+  useEffect(() => {
+    if (
+      !isRestoring &&
+      restoreState?.status !== "needsLogin" &&
+      isVaultUnlocked
+    ) {
+      void navigateToVault();
+    }
+  }, [isRestoring, isVaultUnlocked, navigateToVault, restoreState?.status]);
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_90%_15%,hsl(210_85%_95%),transparent_40%),radial-gradient(circle_at_12%_85%,hsl(216_90%_97%),transparent_45%),linear-gradient(160deg,hsl(210_50%_98%),hsl(0_0%_100%))] p-6 md:p-10">
       <div
@@ -109,13 +118,10 @@ function UnlockPage() {
             {!isRestoring &&
               restoreState?.status !== "needsLogin" &&
               isVaultUnlocked && (
-                <UnlockUnlockedState
-                  restoreState={restoreState}
-                  biometricSupported={biometricSupported}
-                  biometricEnabled={biometricEnabled}
-                  isLoggingOut={isLoggingOut}
-                  onLogout={onLogout}
-                />
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <LoaderCircle className="animate-spin" />
+                  当前 Vault 已解锁，正在跳转...
+                </div>
               )}
 
             {!isRestoring &&

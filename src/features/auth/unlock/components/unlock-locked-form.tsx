@@ -192,13 +192,15 @@ export function UnlockLockedForm({
           ) : (
             <Fingerprint />
           )}
-          {isBiometricUnlocking ? "正在等待 Touch ID..." : "使用 Touch ID 解锁"}
+          {isBiometricUnlocking
+            ? "正在等待生物识别验证..."
+            : "使用生物识别解锁"}
         </Button>
       )}
 
       {biometricSupported && biometricEnabled && !canBiometricUnlock && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Touch ID
+          生物识别
           已启用，但当前设备还没有可用于解锁的本地同步数据，请先完成一次同步并用密码解锁。
         </div>
       )}

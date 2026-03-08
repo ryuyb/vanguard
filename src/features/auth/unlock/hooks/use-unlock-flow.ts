@@ -286,7 +286,7 @@ export function useUnlockFlow({
     if (restoreState?.status === "needsLogin" || isVaultUnlocked) {
       setFeedback({
         kind: "error",
-        text: "当前会话不是锁定状态，无法执行 Touch ID 解锁。",
+        text: "当前会话不是锁定状态，无法执行生物识别解锁。",
       });
       return;
     }
