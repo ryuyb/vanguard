@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { VaultViewDataResponseDto } from "@/bindings";
+import type { VaultCipherItemDto, VaultViewDataResponseDto } from "@/bindings";
 import {
   ALL_ITEMS_ID,
   FAVORITES_ID,
@@ -11,6 +11,10 @@ import type {
   CipherTypeFilter,
 } from "@/features/vault/types";
 import { toSortableDate } from "@/features/vault/utils";
+
+function isDeleted(cipher: VaultCipherItemDto) {
+  return cipher.deletedDate != null;
+}
 
 export function useFilteredCiphers({
   cipherSearchQuery,
@@ -31,14 +35,20 @@ export function useFilteredCiphers({
 
   return useMemo(() => {
     const allCiphers = viewData?.ciphers ?? [];
-    const folderFiltered =
-      selectedMenuId === ALL_ITEMS_ID ||
-      selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
-        ? allCiphers
-        : allCiphers.filter((cipher) => cipher.folderId === selectedMenuId);
+    const menuFiltered = allCiphers.filter((cipher) => {
+      if (selectedMenuId === ALL_ITEMS_ID) {
+        return !isDeleted(cipher);
+      }
+      if (selectedMenuId === FAVORITES_ID) {
+        return cipher.favorite === true && !isDeleted(cipher);
+      }
+      if (selectedMenuId === TRASH_ID) {
+        return isDeleted(cipher);
+      }
+      return cipher.folderId === selectedMenuId && !isDeleted(cipher);
+    });
 
-    const typeFiltered = folderFiltered.filter((cipher) => {
+    const typeFiltered = menuFiltered.filter((cipher) => {
       if (typeFilter === "all") {
         return true;
       }

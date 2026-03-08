@@ -43,10 +43,10 @@ import {
   FolderTreeMenuItem,
   TRASH_ID,
   toTypeFilterLabel,
+  VaultSettingsDialog,
 } from "@/features/vault";
 import { useVaultPageModel } from "@/features/vault/hooks";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
-import { VaultSettingsDialog } from "./vault-settings-dialog";
 
 type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
@@ -61,6 +61,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     cipherSearchQuery,
     errorText,
     expandedNodeKeys,
+    favoriteCipherCount,
     filteredCiphers,
     folderCipherCount,
     folderTree,
@@ -92,6 +93,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     setTypeFilter,
     sortBy,
     sortDirection,
+    trashCipherCount,
     typeFilter,
     userBaseUrl,
     userEmail,
@@ -240,7 +242,11 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           All items
                         </span>
                         <span className="text-xs text-slate-500">
-                          {viewData.ciphers.length}
+                          {
+                            (viewData.ciphers ?? []).filter(
+                              (cipher) => cipher.deletedDate == null,
+                            ).length
+                          }
                         </span>
                       </div>
                     </button>
@@ -260,7 +266,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <Star className="size-4 text-slate-500" />
                           Favorites
                         </span>
-                        <span className="text-xs text-slate-500">-</span>
+                        <span className="text-xs text-slate-500">
+                          {favoriteCipherCount}
+                        </span>
                       </div>
                     </button>
 
@@ -279,7 +287,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <Trash2 className="size-4 text-slate-500" />
                           Trash
                         </span>
-                        <span className="text-xs text-slate-500">-</span>
+                        <span className="text-xs text-slate-500">
+                          {trashCipherCount}
+                        </span>
                       </div>
                     </button>
 

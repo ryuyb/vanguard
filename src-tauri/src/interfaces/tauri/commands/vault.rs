@@ -258,6 +258,7 @@ pub async fn vault_get_view_data(
                 r#type: cipher.r#type,
                 name: cipher.name,
                 username: cipher.username,
+                favorite: cipher.favorite,
                 creation_date: cipher.creation_date,
                 revision_date: cipher.revision_date,
                 deleted_date: cipher.deleted_date,

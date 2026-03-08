@@ -89,6 +89,7 @@ impl GetVaultViewDataUseCase {
                         "cipher.name",
                     )?,
                     username: first_non_empty(login_username, data_username),
+                    favorite: cipher.favorite,
                     creation_date: cipher.creation_date,
                     revision_date: cipher.revision_date,
                     deleted_date: cipher.deleted_date,

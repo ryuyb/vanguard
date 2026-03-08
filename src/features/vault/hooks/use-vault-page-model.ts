@@ -194,13 +194,28 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const folderCipherCount = useMemo(() => {
     const map = new Map<string, number>();
     for (const cipher of viewData?.ciphers ?? []) {
-      if (!cipher.folderId) {
+      if (cipher.deletedDate != null || !cipher.folderId) {
         continue;
       }
       map.set(cipher.folderId, (map.get(cipher.folderId) ?? 0) + 1);
     }
     return map;
   }, [viewData?.ciphers]);
+
+  const favoriteCipherCount = useMemo(
+    () =>
+      (viewData?.ciphers ?? []).filter(
+        (cipher) => cipher.favorite === true && cipher.deletedDate == null,
+      ).length,
+    [viewData?.ciphers],
+  );
+
+  const trashCipherCount = useMemo(
+    () =>
+      (viewData?.ciphers ?? []).filter((cipher) => cipher.deletedDate != null)
+        .length,
+    [viewData?.ciphers],
+  );
 
   const selectedMenuName = useMemo(() => {
     if (selectedMenuId === ALL_ITEMS_ID) {
@@ -244,6 +259,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     cipherSearchQuery,
     errorText,
     expandedNodeKeys,
+    favoriteCipherCount,
     filteredCiphers,
     folderCipherCount,
     folderTree,
@@ -276,6 +292,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     setTypeFilter,
     sortBy,
     sortDirection,
+    trashCipherCount,
     typeFilter,
     userBaseUrl,
     userEmail,
@@ -286,6 +303,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     cipherSearchQuery: string;
     errorText: string;
     expandedNodeKeys: Set<string>;
+    favoriteCipherCount: number;
     filteredCiphers: NonNullable<VaultViewDataResponseDto["ciphers"]>;
     folderCipherCount: Map<string, number>;
     folderTree: ReturnType<typeof buildFolderTree>;
@@ -318,6 +336,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     setTypeFilter: Dispatch<SetStateAction<CipherTypeFilter>>;
     sortBy: CipherSortBy;
     sortDirection: CipherSortDirection;
+    trashCipherCount: number;
     typeFilter: CipherTypeFilter;
     userBaseUrl: string;
     userEmail: string;

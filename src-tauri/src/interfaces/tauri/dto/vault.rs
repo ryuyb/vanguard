@@ -114,6 +114,7 @@ pub struct VaultCipherItemDto {
     pub r#type: Option<i32>,
     pub name: Option<String>,
     pub username: Option<String>,
+    pub favorite: Option<bool>,
     pub creation_date: Option<String>,
     pub revision_date: Option<String>,
     pub deleted_date: Option<String>,
