@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useIconCache } from "@/features/vault/hooks/use-icon-cache";
 import type { CipherIconLoadState } from "@/features/vault/types";
 
 export type IconStateMap = Record<string, CipherIconLoadState>;
@@ -8,6 +9,7 @@ export function useIconState() {
   const [visibleCipherIds, setVisibleCipherIds] = useState<Set<string>>(
     new Set(),
   );
+  const { getCachedStatus, setCachedStatus } = useIconCache();
 
   const updateIconLoadState = useCallback(
     (cipherId: string, state: CipherIconLoadState) => {
@@ -32,17 +34,23 @@ export function useIconState() {
   );
 
   const setIconLoaded = useCallback(
-    (cipherId: string) => {
+    (cipherId: string, iconUrl?: string) => {
       updateIconLoadState(cipherId, "loaded");
+      if (iconUrl) {
+        setCachedStatus(iconUrl, "loaded");
+      }
     },
-    [updateIconLoadState],
+    [setCachedStatus, updateIconLoadState],
   );
 
   const setIconFallback = useCallback(
-    (cipherId: string) => {
+    (cipherId: string, iconUrl?: string) => {
       updateIconLoadState(cipherId, "fallback");
+      if (iconUrl) {
+        setCachedStatus(iconUrl, "failed");
+      }
     },
-    [updateIconLoadState],
+    [setCachedStatus, updateIconLoadState],
   );
 
   const setCipherVisible = useCallback((cipherId: string, visible: boolean) => {
@@ -101,10 +109,21 @@ export function useIconState() {
   }, []);
 
   const getIconLoadState = useCallback(
-    (cipherId: string): CipherIconLoadState => {
+    (cipherId: string, iconUrl?: string): CipherIconLoadState => {
+      // Check cache first
+      if (iconUrl) {
+        const cachedStatus = getCachedStatus(iconUrl);
+        if (cachedStatus === "loaded") {
+          return "loaded";
+        }
+        if (cachedStatus === "failed") {
+          return "fallback";
+        }
+      }
+
       return iconLoadStates[cipherId] ?? "idle";
     },
-    [iconLoadStates],
+    [getCachedStatus, iconLoadStates],
   );
 
   const isVisible = useCallback(
@@ -125,5 +144,6 @@ export function useIconState() {
     cleanupStaleStates,
     getIconLoadState,
     isVisible,
+    getCachedStatus,
   };
 }

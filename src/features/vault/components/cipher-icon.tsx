@@ -66,8 +66,13 @@ export function CipherIcon({
 }: CipherIconProps) {
   const [didFail, setDidFail] = useState(false);
 
+  // Once loaded successfully, keep showing the image even if not visible
+  // This prevents flickering when scrolling
   const shouldShowImage =
-    Boolean(iconUrl) && isVisible && loadState !== "fallback" && !didFail;
+    Boolean(iconUrl) &&
+    loadState !== "fallback" &&
+    !didFail &&
+    (loadState === "loaded" || isVisible);
 
   return (
     <div
