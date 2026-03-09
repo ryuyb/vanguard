@@ -7,10 +7,10 @@ use crate::interfaces::tauri::dto::sync::{
     SyncNowRequestDto, SyncStatusRequestDto, SyncStatusResponseDto,
 };
 use crate::interfaces::tauri::{mapping, session};
-use crate::support::error::AppError;
+use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
 
-fn log_command_error(command: &str, error: AppError) -> String {
+fn log_command_error(command: &str, error: AppError) -> ErrorPayload {
     let payload = error.to_payload();
     let sanitized = redact_sensitive(&payload.message);
     log::error!(
@@ -19,7 +19,7 @@ fn log_command_error(command: &str, error: AppError) -> String {
         payload.code,
         sanitized
     );
-    payload.message
+    payload
 }
 
 #[tauri::command]
@@ -27,7 +27,7 @@ fn log_command_error(command: &str, error: AppError) -> String {
 pub async fn vault_sync_now(
     state: State<'_, AppState>,
     request: SyncNowRequestDto,
-) -> Result<SyncStatusResponseDto, String> {
+) -> Result<SyncStatusResponseDto, ErrorPayload> {
     let auth_session = session::ensure_fresh_auth_session(&state)
         .await
         .map_err(|error| log_command_error("vault_sync_now", error))?;
@@ -65,7 +65,7 @@ pub async fn vault_sync_now(
 pub async fn vault_sync_status(
     state: State<'_, AppState>,
     _request: SyncStatusRequestDto,
-) -> Result<SyncStatusResponseDto, String> {
+) -> Result<SyncStatusResponseDto, ErrorPayload> {
     let account_id = state
         .require_auth_session()
         .map(|value| value.account_id)
@@ -88,7 +88,7 @@ pub async fn vault_sync_status(
 pub async fn vault_sync_check_revision(
     state: State<'_, AppState>,
     _request: SyncStatusRequestDto,
-) -> Result<SyncStatusResponseDto, String> {
+) -> Result<SyncStatusResponseDto, ErrorPayload> {
     let auth_session = session::ensure_fresh_auth_session(&state)
         .await
         .map_err(|error| log_command_error("vault_sync_check_revision", error))?;

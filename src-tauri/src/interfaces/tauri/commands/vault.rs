@@ -25,10 +25,10 @@ use crate::interfaces::tauri::dto::vault::{
     VaultUnlockRequestDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
-use crate::support::error::AppError;
+use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
 
-fn log_command_error(command: &str, error: &AppError) -> String {
+fn log_command_error(command: &str, error: &AppError) -> ErrorPayload {
     let payload = error.to_payload();
     let sanitized = redact_sensitive(&payload.message);
     log::error!(
@@ -37,8 +37,7 @@ fn log_command_error(command: &str, error: &AppError) -> String {
         payload.code,
         sanitized
     );
-    // 返回序列化的 ErrorPayload JSON 字符串
-    serde_json::to_string(&payload).unwrap_or_else(|_| payload.message)
+    payload
 }
 
 fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
@@ -56,7 +55,7 @@ fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
     let account_id = match state.active_account_id() {
         Ok(value) => value,
         Err(
@@ -80,7 +79,7 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
     let account_id = match state.active_account_id() {
         Ok(value) => value,
         Err(
@@ -104,7 +103,7 @@ pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, Strin
 pub async fn vault_unlock(
     state: State<'_, AppState>,
     request: VaultUnlockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     build_unlock_use_case(&state)
         .execute(
             &*state,
@@ -122,7 +121,7 @@ pub async fn vault_unlock(
 #[specta::specta]
 pub async fn vault_get_biometric_status(
     state: State<'_, AppState>,
-) -> Result<VaultBiometricStatusResponseDto, String> {
+) -> Result<VaultBiometricStatusResponseDto, ErrorPayload> {
     let status = VaultBiometricUseCase::new(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
@@ -138,7 +137,7 @@ pub async fn vault_get_biometric_status(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
     VaultBiometricUseCase::new(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
@@ -153,7 +152,7 @@ pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Resu
 pub async fn vault_enable_biometric_unlock(
     state: State<'_, AppState>,
     _request: VaultEnableBiometricUnlockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     VaultBiometricUseCase::new(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
@@ -167,7 +166,7 @@ pub async fn vault_enable_biometric_unlock(
 pub async fn vault_disable_biometric_unlock(
     state: State<'_, AppState>,
     _request: VaultDisableBiometricUnlockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     VaultBiometricUseCase::new(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
@@ -180,7 +179,7 @@ pub async fn vault_disable_biometric_unlock(
 #[specta::specta]
 pub async fn vault_get_pin_status(
     state: State<'_, AppState>,
-) -> Result<VaultPinStatusResponseDto, String> {
+) -> Result<VaultPinStatusResponseDto, ErrorPayload> {
     let status = VaultPinUseCase::new(state.pin_unlock_port())
         .pin_status(&*state)
         .await
@@ -198,7 +197,7 @@ pub async fn vault_get_pin_status(
 pub async fn vault_enable_pin_unlock(
     state: State<'_, AppState>,
     request: VaultEnablePinUnlockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     VaultPinUseCase::new(state.pin_unlock_port())
         .enable_pin_unlock(
             &*state,
@@ -216,7 +215,7 @@ pub async fn vault_enable_pin_unlock(
 pub async fn vault_disable_pin_unlock(
     state: State<'_, AppState>,
     _request: VaultDisablePinUnlockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     VaultPinUseCase::new(state.pin_unlock_port())
         .disable_pin_unlock(&*state)
         .await
@@ -228,7 +227,7 @@ pub async fn vault_disable_pin_unlock(
 pub async fn vault_lock(
     state: State<'_, AppState>,
     _request: VaultLockRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     VaultBiometricUseCase::new(
         state.master_password_unlock_data_port(),
         state.biometric_unlock_port(),
@@ -241,7 +240,7 @@ pub async fn vault_lock(
 #[specta::specta]
 pub async fn vault_get_view_data(
     state: State<'_, AppState>,
-) -> Result<VaultViewDataResponseDto, String> {
+) -> Result<VaultViewDataResponseDto, ErrorPayload> {
     let view_data = GetVaultViewDataUseCase::new(state.sync_service())
         .execute(&*state)
         .await
@@ -288,7 +287,7 @@ pub async fn vault_get_view_data(
 pub async fn vault_get_cipher_detail(
     state: State<'_, AppState>,
     request: VaultCipherDetailRequestDto,
-) -> Result<VaultCipherDetailResponseDto, String> {
+) -> Result<VaultCipherDetailResponseDto, ErrorPayload> {
     let account_id = state
         .active_account_id()
         .map_err(|error| { log_command_error("vault_get_cipher_detail", &error) })?;
@@ -337,7 +336,7 @@ pub async fn vault_get_cipher_detail(
 pub async fn vault_copy_cipher_field(
     state: State<'_, AppState>,
     request: VaultCopyCipherFieldRequestDto,
-) -> Result<VaultCopyCipherFieldResponseDto, String> {
+) -> Result<VaultCopyCipherFieldResponseDto, ErrorPayload> {
     let result =
         CopyCipherFieldUseCase::new(state.get_cipher_detail_use_case(), state.clipboard_port())
             .execute(
@@ -362,7 +361,7 @@ pub async fn vault_copy_cipher_field(
 pub async fn vault_get_cipher_totp_code(
     state: State<'_, AppState>,
     request: VaultCipherTotpCodeRequestDto,
-) -> Result<VaultCipherTotpCodeResponseDto, String> {
+) -> Result<VaultCipherTotpCodeResponseDto, ErrorPayload> {
     let result = GetCipherTotpCodeUseCase::new(state.get_cipher_detail_use_case())
         .execute(
             &*state,
@@ -383,7 +382,7 @@ pub async fn vault_get_cipher_totp_code(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_get_icon_server(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn vault_get_icon_server(state: State<'_, AppState>) -> Result<String, ErrorPayload> {
     let session = state
         .auth_session()
         .map_err(|error| { log_command_error("vault_get_icon_server", &error) })?;

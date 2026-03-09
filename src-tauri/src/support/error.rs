@@ -4,7 +4,7 @@ use crate::support::redaction::redact_sensitive;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "lowercase")]
 pub enum ErrorSeverity {
     Info,
@@ -258,7 +258,7 @@ impl Serialize for AppError {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorPayload {
     pub code: String,
@@ -267,11 +267,4 @@ pub struct ErrorPayload {
     pub details: Option<serde_json::Value>,
     pub timestamp: i64,
     pub severity: ErrorSeverity,
-}
-
-// 为 tauri-specta 实现 Type trait
-impl Type for ErrorPayload {
-    fn inline(_: &mut specta::TypeMap, _: specta::Generics) -> specta::DataType {
-        specta::DataType::Any
-    }
 }

@@ -5,7 +5,7 @@
 
 
 export const commands = {
-async authLoginWithPassword(request: PasswordLoginRequestDto) : Promise<Result<PasswordLoginResponseDto, string>> {
+async authLoginWithPassword(request: PasswordLoginRequestDto) : Promise<Result<PasswordLoginResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_login_with_password", { request }) };
 } catch (e) {
@@ -13,7 +13,7 @@ async authLoginWithPassword(request: PasswordLoginRequestDto) : Promise<Result<P
     else return { status: "error", error: e  as any };
 }
 },
-async authSendEmailLogin(request: SendEmailLoginRequestDto) : Promise<Result<null, string>> {
+async authSendEmailLogin(request: SendEmailLoginRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_send_email_login", { request }) };
 } catch (e) {
@@ -21,7 +21,7 @@ async authSendEmailLogin(request: SendEmailLoginRequestDto) : Promise<Result<nul
     else return { status: "error", error: e  as any };
 }
 },
-async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result<null, string>> {
+async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_verify_email_token", { request }) };
 } catch (e) {
@@ -29,7 +29,7 @@ async authVerifyEmailToken(request: VerifyEmailTokenRequestDto) : Promise<Result
     else return { status: "error", error: e  as any };
 }
 },
-async authRestoreState(request: RestoreAuthStateRequestDto) : Promise<Result<RestoreAuthStateResponseDto, string>> {
+async authRestoreState(request: RestoreAuthStateRequestDto) : Promise<Result<RestoreAuthStateResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_restore_state", { request }) };
 } catch (e) {
@@ -37,7 +37,7 @@ async authRestoreState(request: RestoreAuthStateRequestDto) : Promise<Result<Res
     else return { status: "error", error: e  as any };
 }
 },
-async authLogout(request: LogoutRequestDto) : Promise<Result<null, string>> {
+async authLogout(request: LogoutRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("auth_logout", { request }) };
 } catch (e) {
@@ -53,7 +53,7 @@ async desktopOpenMainWindow() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_now", { request }) };
 } catch (e) {
@@ -61,7 +61,7 @@ async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusRespon
     else return { status: "error", error: e  as any };
 }
 },
-async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_status", { request }) };
 } catch (e) {
@@ -69,7 +69,7 @@ async vaultSyncStatus(request: SyncStatusRequestDto) : Promise<Result<SyncStatus
     else return { status: "error", error: e  as any };
 }
 },
-async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, string>> {
+async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<SyncStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_check_revision", { request }) };
 } catch (e) {
@@ -77,7 +77,7 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
     else return { status: "error", error: e  as any };
 }
 },
-async vaultCanUnlock() : Promise<Result<boolean, string>> {
+async vaultCanUnlock() : Promise<Result<boolean, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock") };
 } catch (e) {
@@ -85,7 +85,7 @@ async vaultCanUnlock() : Promise<Result<boolean, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultIsUnlocked() : Promise<Result<boolean, string>> {
+async vaultIsUnlocked() : Promise<Result<boolean, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_is_unlocked") };
 } catch (e) {
@@ -93,7 +93,7 @@ async vaultIsUnlocked() : Promise<Result<boolean, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto, string>> {
+async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_biometric_status") };
 } catch (e) {
@@ -101,7 +101,7 @@ async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetPinStatus() : Promise<Result<VaultPinStatusResponseDto, string>> {
+async vaultGetPinStatus() : Promise<Result<VaultPinStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_pin_status") };
 } catch (e) {
@@ -109,7 +109,7 @@ async vaultGetPinStatus() : Promise<Result<VaultPinStatusResponseDto, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultCanUnlockWithBiometric() : Promise<Result<boolean, string>> {
+async vaultCanUnlockWithBiometric() : Promise<Result<boolean, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock_with_biometric") };
 } catch (e) {
@@ -117,7 +117,7 @@ async vaultCanUnlockWithBiometric() : Promise<Result<boolean, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultUnlock(request: VaultUnlockRequestDto) : Promise<Result<null, string>> {
+async vaultUnlock(request: VaultUnlockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_unlock", { request }) };
 } catch (e) {
@@ -125,7 +125,7 @@ async vaultUnlock(request: VaultUnlockRequestDto) : Promise<Result<null, string>
     else return { status: "error", error: e  as any };
 }
 },
-async vaultEnablePinUnlock(request: VaultEnablePinUnlockRequestDto) : Promise<Result<null, string>> {
+async vaultEnablePinUnlock(request: VaultEnablePinUnlockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_enable_pin_unlock", { request }) };
 } catch (e) {
@@ -133,7 +133,7 @@ async vaultEnablePinUnlock(request: VaultEnablePinUnlockRequestDto) : Promise<Re
     else return { status: "error", error: e  as any };
 }
 },
-async vaultDisablePinUnlock(request: VaultDisablePinUnlockRequestDto) : Promise<Result<null, string>> {
+async vaultDisablePinUnlock(request: VaultDisablePinUnlockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_disable_pin_unlock", { request }) };
 } catch (e) {
@@ -141,7 +141,7 @@ async vaultDisablePinUnlock(request: VaultDisablePinUnlockRequestDto) : Promise<
     else return { status: "error", error: e  as any };
 }
 },
-async vaultEnableBiometricUnlock(request: VaultEnableBiometricUnlockRequestDto) : Promise<Result<null, string>> {
+async vaultEnableBiometricUnlock(request: VaultEnableBiometricUnlockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_enable_biometric_unlock", { request }) };
 } catch (e) {
@@ -149,7 +149,7 @@ async vaultEnableBiometricUnlock(request: VaultEnableBiometricUnlockRequestDto) 
     else return { status: "error", error: e  as any };
 }
 },
-async vaultDisableBiometricUnlock(request: VaultDisableBiometricUnlockRequestDto) : Promise<Result<null, string>> {
+async vaultDisableBiometricUnlock(request: VaultDisableBiometricUnlockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_disable_biometric_unlock", { request }) };
 } catch (e) {
@@ -157,7 +157,7 @@ async vaultDisableBiometricUnlock(request: VaultDisableBiometricUnlockRequestDto
     else return { status: "error", error: e  as any };
 }
 },
-async vaultLock(request: VaultLockRequestDto) : Promise<Result<null, string>> {
+async vaultLock(request: VaultLockRequestDto) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_lock", { request }) };
 } catch (e) {
@@ -165,7 +165,7 @@ async vaultLock(request: VaultLockRequestDto) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetViewData() : Promise<Result<VaultViewDataResponseDto, string>> {
+async vaultGetViewData() : Promise<Result<VaultViewDataResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_view_data") };
 } catch (e) {
@@ -173,7 +173,7 @@ async vaultGetViewData() : Promise<Result<VaultViewDataResponseDto, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Result<VaultCipherDetailResponseDto, string>> {
+async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Result<VaultCipherDetailResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_detail", { request }) };
 } catch (e) {
@@ -181,7 +181,7 @@ async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Resul
     else return { status: "error", error: e  as any };
 }
 },
-async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Result<VaultCopyCipherFieldResponseDto, string>> {
+async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Result<VaultCopyCipherFieldResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_copy_cipher_field", { request }) };
 } catch (e) {
@@ -189,7 +189,7 @@ async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Re
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<Result<VaultCipherTotpCodeResponseDto, string>> {
+async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<Result<VaultCipherTotpCodeResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_totp_code", { request }) };
 } catch (e) {
@@ -197,7 +197,7 @@ async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<R
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetIconServer() : Promise<Result<string, string>> {
+async vaultGetIconServer() : Promise<Result<string, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_icon_server") };
 } catch (e) {
@@ -230,6 +230,9 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
+export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
+export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }

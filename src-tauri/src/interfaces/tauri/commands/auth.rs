@@ -10,10 +10,10 @@ use crate::interfaces::tauri::dto::auth::{
 };
 use crate::interfaces::tauri::mapping;
 use crate::interfaces::tauri::session;
-use crate::support::error::AppError;
+use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
 
-fn log_command_error(command: &str, error: AppError) -> String {
+fn log_command_error(command: &str, error: AppError) -> ErrorPayload {
     let payload = error.to_payload();
     let sanitized = redact_sensitive(&payload.message);
     log::error!(
@@ -22,7 +22,7 @@ fn log_command_error(command: &str, error: AppError) -> String {
         payload.code,
         sanitized
     );
-    payload.message
+    payload
 }
 
 async fn initialize_authenticated_session(
@@ -59,7 +59,7 @@ async fn initialize_authenticated_session(
 pub async fn auth_login_with_password(
     state: State<'_, AppState>,
     request: PasswordLoginRequestDto,
-) -> Result<PasswordLoginResponseDto, String> {
+) -> Result<PasswordLoginResponseDto, ErrorPayload> {
     let base_url = request.base_url.clone();
     let email = request.email.clone();
     let master_password = request.master_password.clone();
@@ -99,7 +99,7 @@ pub async fn auth_login_with_password(
 pub async fn auth_send_email_login(
     state: State<'_, AppState>,
     request: SendEmailLoginRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     let command = mapping::to_send_email_login_command(request);
     state
         .auth_service()
@@ -114,7 +114,7 @@ pub async fn auth_send_email_login(
 pub async fn auth_restore_state(
     state: State<'_, AppState>,
     _request: RestoreAuthStateRequestDto,
-) -> Result<RestoreAuthStateResponseDto, String> {
+) -> Result<RestoreAuthStateResponseDto, ErrorPayload> {
     if let Some(session) = state
         .auth_session()
         .map_err(|error| log_command_error("auth_restore_state", error))?
@@ -152,7 +152,7 @@ pub async fn auth_restore_state(
 pub async fn auth_verify_email_token(
     state: State<'_, AppState>,
     request: VerifyEmailTokenRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     let command = mapping::to_verify_email_token_command(request);
     state
         .auth_service()
@@ -167,7 +167,7 @@ pub async fn auth_verify_email_token(
 pub async fn auth_logout(
     state: State<'_, AppState>,
     _request: LogoutRequestDto,
-) -> Result<(), String> {
+) -> Result<(), ErrorPayload> {
     let active_session_account_id = state
         .auth_session()
         .map_err(|error| log_command_error("auth_logout", error))?
