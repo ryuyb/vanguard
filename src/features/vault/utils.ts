@@ -4,6 +4,7 @@ import type {
   VaultFolderItemDto,
 } from "@/bindings";
 import { toErrorText } from "@/features/auth/shared/utils";
+import { DEFAULT_ICON_SERVER } from "@/features/vault/constants";
 import type {
   CipherTypeFilter,
   FolderTreeNode,
@@ -236,8 +237,6 @@ function normalizeIconHost(hostname: string): string | null {
   }
   return normalized;
 }
-
-const DEFAULT_ICON_SERVER = "https://icons.bitwarden.net";
 
 function normalizeServerUrl(url: string): string {
   return url.replace(/\/+$/, "");

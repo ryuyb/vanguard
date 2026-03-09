@@ -7,6 +7,7 @@ import {
 } from "@/bindings";
 import {
   ALL_ITEMS_ID,
+  DEFAULT_ICON_SERVER,
   FAVORITES_ID,
   TRASH_ID,
 } from "@/features/vault/constants";
@@ -110,6 +111,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       const iconServerResult = await commands.vaultGetIconServer();
       if (iconServerResult.status === "ok") {
         setIconServer(iconServerResult.data);
+      } else {
+        console.warn(
+          "Failed to fetch icon server, using default:",
+          iconServerResult.error,
+        );
+        setIconServer(DEFAULT_ICON_SERVER);
       }
 
       const result = await commands.vaultGetViewData();

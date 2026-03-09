@@ -4,6 +4,10 @@ import type { CipherIconLoadState } from "@/features/vault/types";
 
 export type IconStateMap = Record<string, CipherIconLoadState>;
 
+/**
+ * Hook for managing icon loading state across all ciphers
+ * Integrates with icon cache for optimal performance
+ */
 export function useIconState() {
   const [iconLoadStates, setIconLoadStates] = useState<IconStateMap>({});
   const [visibleCipherIds, setVisibleCipherIds] = useState<Set<string>>(
@@ -110,7 +114,7 @@ export function useIconState() {
 
   const getIconLoadState = useCallback(
     (cipherId: string, iconUrl?: string): CipherIconLoadState => {
-      // Check cache first
+      // Check cache first for better performance
       if (iconUrl) {
         const cachedStatus = getCachedStatus(iconUrl);
         if (cachedStatus === "loaded") {

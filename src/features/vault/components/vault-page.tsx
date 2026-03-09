@@ -41,6 +41,7 @@ import {
   type CipherTypeFilter,
   FAVORITES_ID,
   FolderTreeMenuItem,
+  ICON_OBSERVER_CONFIG,
   TRASH_ID,
   toTypeFilterLabel,
   VaultSettingsDialog,
@@ -52,11 +53,6 @@ import { getCipherIconUrl } from "@/features/vault/utils";
 type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
 };
-
-const ICON_OBSERVER_CONFIG = {
-  rootMargin: "120px 0px",
-  threshold: 0.01,
-} as const;
 
 function CipherRowObserver({
   children,
