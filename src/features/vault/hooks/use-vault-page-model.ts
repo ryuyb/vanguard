@@ -30,9 +30,9 @@ import {
   getCipherIconUrl,
   sortFolders,
   toAvatarText,
-  toVaultErrorText,
 } from "@/features/vault/utils";
 import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
+import { errorHandler } from "@/lib/error-handler";
 
 export type VaultPageNavigationTarget = SessionRoute;
 
@@ -99,7 +99,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       const restore = await commands.authRestoreState({});
       if (restore.status === "error") {
         setPageState("error");
-        setErrorText(toVaultErrorText(restore.error));
+        errorHandler.handle(restore.error);
         setUserEmail("未登录");
         setUserBaseUrl("未知服务");
         return;
@@ -122,12 +122,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       const result = await commands.vaultGetViewData();
 
       if (result.status === "error") {
-        const text = toVaultErrorText(result.error);
-        if (text.toLowerCase().includes("vault is locked")) {
+        errorHandler.handle(result.error);
+        const errorStr = String(result.error);
+        if (errorStr.toLowerCase().includes("vault is locked")) {
           await navigateTo("/unlock");
         } else {
           setPageState("error");
-          setErrorText(text);
         }
         setViewData(null);
         return;
@@ -137,7 +137,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       setPageState("ready");
     } catch (error) {
       setPageState("error");
-      setErrorText(toVaultErrorText(error));
+      errorHandler.handle(error);
       setViewData(null);
     } finally {
       setIsRefreshing(false);

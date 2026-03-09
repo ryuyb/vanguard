@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { commands } from "@/bindings";
 import { DETAIL_ACTIONS } from "@/features/spotlight/constants";
-import { logClientError } from "@/features/spotlight/logging";
 import type { DetailAction, SpotlightItem } from "@/features/spotlight/types";
+import { errorHandler } from "@/lib/error-handler";
 
 type UseSpotlightDetailActionsParams = {
   detailItem: SpotlightItem | null;
@@ -44,7 +44,7 @@ export function useSpotlightDetailActions({
           cipherId: detailItem.cipherId,
         });
         if (result.status === "error") {
-          logClientError("Failed to load cipher detail for totp", result.error);
+          errorHandler.handle(result.error);
           return;
         }
 
@@ -52,7 +52,7 @@ export function useSpotlightDetailActions({
           setDetailHasTotp(result.data.cipher.hasTotp);
         }
       } catch (error) {
-        logClientError("Failed to load cipher detail for totp", error);
+        errorHandler.handle(error);
       }
     };
 

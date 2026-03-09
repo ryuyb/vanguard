@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { commands, type VaultCipherDetailDto } from "@/bindings";
-import { toVaultErrorText } from "@/features/vault/utils";
+import { errorHandler } from "@/lib/error-handler";
 
 export function useCipherDetailSelection() {
   const [selectedCipherId, setSelectedCipherId] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function useCipherDetailSelection() {
       }
 
       if (detail.status === "error") {
-        setCipherDetailError(toVaultErrorText(detail.error));
+        errorHandler.handle(detail.error);
         return;
       }
 
@@ -51,7 +51,7 @@ export function useCipherDetailSelection() {
       if (requestSeq !== detailRequestSeqRef.current) {
         return;
       }
-      setCipherDetailError(toVaultErrorText(error));
+      errorHandler.handle(error);
     } finally {
       if (requestSeq === detailRequestSeqRef.current) {
         setIsCipherDetailLoading(false);

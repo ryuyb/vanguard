@@ -1,10 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useState } from "react";
 import { commands } from "@/bindings";
-import { logClientError } from "@/features/spotlight/logging";
 import type { SpotlightItem } from "@/features/spotlight/types";
 import { toCipherItem } from "@/features/spotlight/utils";
 import { resolveSessionRoute } from "@/lib/route-session";
+import { errorHandler } from "@/lib/error-handler";
 
 type UseSpotlightSessionResult = {
   hideSpotlight: () => Promise<void>;
@@ -21,7 +21,7 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
     try {
       await getCurrentWindow().hide();
     } catch (error) {
-      logClientError("Failed to hide spotlight", error);
+      errorHandler.handle(error);
     }
   }, []);
 
@@ -29,13 +29,10 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
     try {
       const result = await commands.desktopOpenMainWindow();
       if (result.status === "error") {
-        logClientError(
-          "Failed to open main window via desktop command",
-          result.error,
-        );
+        errorHandler.handle(result.error);
       }
     } catch (error) {
-      logClientError("Failed to open main window via desktop command", error);
+      errorHandler.handle(error);
     } finally {
       await hideSpotlight();
     }
@@ -51,7 +48,7 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
       await openMainWindow();
       return false;
     } catch (error) {
-      logClientError("Failed to resolve spotlight session route", error);
+      errorHandler.handle(error);
       await hideSpotlight();
       return false;
     }
@@ -63,7 +60,7 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
     try {
       const viewData = await commands.vaultGetViewData();
       if (viewData.status === "error") {
-        logClientError("Failed to load vault data", viewData.error);
+        errorHandler.handle(viewData.error);
         setVaultItems([]);
         return;
       }
@@ -71,7 +68,7 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
       const ciphers = viewData.data.ciphers.map(toCipherItem);
       setVaultItems(ciphers);
     } catch (error) {
-      logClientError("Failed to load vault data", error);
+      errorHandler.handle(error);
       setVaultItems([]);
     } finally {
       setIsLoadingVault(false);
@@ -109,7 +106,7 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
         unlisten = unsubscribe;
       })
       .catch((error) => {
-        logClientError("Failed to subscribe spotlight focus events", error);
+        errorHandler.handle(error);
       });
 
     return () => {

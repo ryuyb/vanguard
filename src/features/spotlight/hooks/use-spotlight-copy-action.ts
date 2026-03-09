@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { commands } from "@/bindings";
 import { COPY_FLASH_DURATION_MS } from "@/features/spotlight/constants";
-import { logClientError } from "@/features/spotlight/logging";
 import type { CopyField, SpotlightItem } from "@/features/spotlight/types";
+import { errorHandler } from "@/lib/error-handler";
 
 type UseSpotlightCopyActionParams = {
   hideSpotlight: () => Promise<void>;
@@ -38,7 +38,7 @@ export function useSpotlightCopyAction({
           clearAfterMs: null,
         });
         if (result.status === "error") {
-          logClientError("Failed to copy cipher field", result.error);
+          errorHandler.handle(result.error);
           return;
         }
 
@@ -51,7 +51,7 @@ export function useSpotlightCopyAction({
         setCopiedDetailField(null);
         await hideSpotlight();
       } catch (error) {
-        logClientError("Failed to copy cipher field", error);
+        errorHandler.handle(error);
       } finally {
         setIsCopying(false);
       }

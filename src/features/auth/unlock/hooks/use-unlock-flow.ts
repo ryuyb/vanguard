@@ -4,7 +4,6 @@ import { commands, type RestoreAuthStateResponseDto } from "@/bindings";
 import type { UnlockFeedback } from "@/features/auth/unlock/types";
 import { loadUnlockCapabilities } from "./load-unlock-capabilities";
 import {
-  toUnlockErrorText,
   unlockWithBiometric,
   unlockWithMasterPassword,
   unlockWithPin,
@@ -13,6 +12,7 @@ import {
   createDefaultUnlockCapabilities,
   type UnlockMethod,
 } from "./unlock-capabilities";
+import { errorHandler } from "@/lib/error-handler";
 
 type UseUnlockFlowParams = {
   navigateToHome: () => Promise<void>;
@@ -73,7 +73,7 @@ export function useUnlockFlow({
       const nextCapabilities = await loadUnlockCapabilities();
       setCapabilities(nextCapabilities);
     } catch (error) {
-      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+      errorHandler.handle(error);
       setCapabilities(createDefaultUnlockCapabilities());
     } finally {
       setIsRestoring(false);
@@ -157,7 +157,7 @@ export function useUnlockFlow({
       const result = await unlockWithMasterPassword(trimmedPassword);
 
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
 
@@ -165,7 +165,7 @@ export function useUnlockFlow({
       setPin("");
       await navigateToVault();
     } catch (error) {
-      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setIsUnlocking(false);
     }
@@ -206,7 +206,7 @@ export function useUnlockFlow({
       const result = await unlockWithPin(trimmedPin);
 
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
 
@@ -214,7 +214,7 @@ export function useUnlockFlow({
       setMasterPassword("");
       await navigateToVault();
     } catch (error) {
-      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setIsPinUnlocking(false);
     }
@@ -238,14 +238,14 @@ export function useUnlockFlow({
     try {
       const result = await unlockWithBiometric();
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
       setPin("");
       setMasterPassword("");
       await navigateToVault();
     } catch (error) {
-      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setIsBiometricUnlocking(false);
     }
@@ -257,14 +257,14 @@ export function useUnlockFlow({
     try {
       const result = await commands.authLogout({});
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toUnlockErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
       setPin("");
       setMasterPassword("");
       await navigateToHome();
     } catch (error) {
-      setFeedback({ kind: "error", text: toUnlockErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setIsLoggingOut(false);
     }

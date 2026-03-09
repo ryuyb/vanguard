@@ -310,10 +310,7 @@ fn decrypt_user_key_with_pin(
     })?;
     let plaintext = cipher
         .decrypt(XNonce::from_slice(&nonce), ciphertext.as_ref())
-        .map_err(|_| AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "invalid pin or corrupted pin envelope".into(),
-        })?;
+        .map_err(|_| AppError::AuthInvalidPin)?;
 
     vault_crypto::parse_user_key_material(&plaintext)
 }

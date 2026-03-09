@@ -6,6 +6,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { resolveSessionRoute } from "@/lib/route-session";
 import { routeTree } from "./routeTree.gen";
+import { Toaster } from "@/components/ui/sonner";
 
 const router = createRouter({ routeTree });
 
@@ -44,5 +45,6 @@ declare module "@tanstack/react-router" {
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
     <RouterProvider router={router} />
+    <Toaster position="top-right" richColors />
   </StrictMode>,
 );

@@ -95,32 +95,32 @@
 
 ### 实现 User Story 2
 
-- [ ] T030 [P] [US2] 创建 ErrorResponse 接口: 在 src/lib/error-handler.ts 中定义 ErrorResponse 接口
-- [ ] T031 [P] [US2] 创建 ErrorMessage 接口: 在 src/lib/error-messages.ts 中定义 ErrorMessage 和 ErrorMessageMap 接口
-- [ ] T032 [P] [US2] 创建错误消息映射表 - 认证错误: 在 src/lib/error-messages.ts 中添加 AUTH_* 错误代码的中文消息映射
-- [ ] T033 [P] [US2] 创建错误消息映射表 - 保险库错误: 在 src/lib/error-messages.ts 中添加 VAULT_* 错误代码的中文消息映射
-- [ ] T034 [P] [US2] 创建错误消息映射表 - 验证错误: 在 src/lib/error-messages.ts 中添加 VALIDATION_* 错误代码的中文消息映射
-- [ ] T035 [P] [US2] 创建错误消息映射表 - 网络错误: 在 src/lib/error-messages.ts 中添加 NETWORK_* 错误代码的中文消息映射
-- [ ] T036 [P] [US2] 创建错误消息映射表 - 存储错误: 在 src/lib/error-messages.ts 中添加 STORAGE_* 错误代码的中文消息映射
-- [ ] T037 [P] [US2] 创建错误消息映射表 - 加密错误: 在 src/lib/error-messages.ts 中添加 CRYPTO_* 错误代码的中文消息映射
-- [ ] T038 [P] [US2] 创建错误消息映射表 - 内部错误: 在 src/lib/error-messages.ts 中添加 INTERNAL_* 错误代码的中文消息映射
-- [ ] T039 [P] [US2] 创建错误消息映射表 - 降级处理: 在 src/lib/error-messages.ts 中添加 UNKNOWN_ERROR 的中文消息映射
-- [ ] T040 [US2] 实现 getErrorMessage 函数: 在 src/lib/error-messages.ts 中实现根据错误代码查找用户消息的函数
-- [ ] T041 [US2] 创建 ErrorHandler 类框架: 在 src/lib/error-handler.ts 中创建 ErrorHandler 类和构造函数
-- [ ] T042 [US2] 实现 ErrorHandler.parseError() 方法: 在 src/lib/error-handler.ts 中实现解析各种错误格式为 ErrorResponse 的逻辑
-- [ ] T043 [US2] 实现 ErrorHandler.isDuplicate() 方法: 在 src/lib/error-handler.ts 中实现错误去重检查逻辑
-- [ ] T044 [US2] 实现 ErrorHandler.recordError() 方法: 在 src/lib/error-handler.ts 中实现记录错误用于去重的逻辑
-- [ ] T045 [US2] 实现 ErrorHandler.handleSpecialError() 方法: 在 src/lib/error-handler.ts 中实现特殊错误处理逻辑 (如 AUTH_TOKEN_EXPIRED 自动跳转)
-- [ ] T046 [US2] 实现 ErrorHandler.handle() 方法主逻辑: 在 src/lib/error-handler.ts 中实现完整的错误处理流程 (解析 → 去重 → 特殊处理 → 显示 Toast)
-- [ ] T047 [US2] 导出 errorHandler 单例: 在 src/lib/error-handler.ts 中导出全局 errorHandler 实例
-- [ ] T048 [US2] 迁移 auth/login hooks 错误处理: 在 src/features/auth/login/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
-- [ ] T049 [US2] 迁移 auth/unlock hooks 错误处理: 在 src/features/auth/unlock/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
-- [ ] T050 [US2] 迁移 vault hooks 错误处理: 在 src/features/vault/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
-- [ ] T051 [US2] 迁移 spotlight hooks 错误处理: 在 src/features/spotlight/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
-- [ ] T052 [US2] 删除旧的 error-utils.ts: 删除 src/features/spotlight/error-utils.ts 文件
-- [ ] T053 [US2] 删除旧的 toErrorText 工具函数: 删除 src/features/auth/shared/utils.ts 中的 toErrorText 函数
-- [ ] T054 [US2] 运行 pnpm build 验证编译: 在项目根目录运行 `pnpm build` 确保所有前端更新编译通过
-- [ ] T055 [US2] 手动测试错误拦截: 触发各种错误,验证 errorHandler 正确解析错误代码并调用相应逻辑
+- [x] T030 [P] [US2] 创建 ErrorResponse 接口: 在 src/lib/error-handler.ts 中定义 ErrorResponse 接口
+- [x] T031 [P] [US2] 创建 ErrorMessage 接口: 在 src/lib/error-messages.ts 中定义 ErrorMessage 和 ErrorMessageMap 接口
+- [x] T032 [P] [US2] 创建错误消息映射表 - 认证错误: 在 src/lib/error-messages.ts 中添加 AUTH_* 错误代码的中文消息映射
+- [x] T033 [P] [US2] 创建错误消息映射表 - 保险库错误: 在 src/lib/error-messages.ts 中添加 VAULT_* 错误代码的中文消息映射
+- [x] T034 [P] [US2] 创建错误消息映射表 - 验证错误: 在 src/lib/error-messages.ts 中添加 VALIDATION_* 错误代码的中文消息映射
+- [x] T035 [P] [US2] 创建错误消息映射表 - 网络错误: 在 src/lib/error-messages.ts 中添加 NETWORK_* 错误代码的中文消息映射
+- [x] T036 [P] [US2] 创建错误消息映射表 - 存储错误: 在 src/lib/error-messages.ts 中添加 STORAGE_* 错误代码的中文消息映射
+- [x] T037 [P] [US2] 创建错误消息映射表 - 加密错误: 在 src/lib/error-messages.ts 中添加 CRYPTO_* 错误代码的中文消息映射
+- [x] T038 [P] [US2] 创建错误消息映射表 - 内部错误: 在 src/lib/error-messages.ts 中添加 INTERNAL_* 错误代码的中文消息映射
+- [x] T039 [P] [US2] 创建错误消息映射表 - 降级处理: 在 src/lib/error-messages.ts 中添加 UNKNOWN_ERROR 的中文消息映射
+- [x] T040 [US2] 实现 getErrorMessage 函数: 在 src/lib/error-messages.ts 中实现根据错误代码查找用户消息的函数
+- [x] T041 [US2] 创建 ErrorHandler 类框架: 在 src/lib/error-handler.ts 中创建 ErrorHandler 类和构造函数
+- [x] T042 [US2] 实现 ErrorHandler.parseError() 方法: 在 src/lib/error-handler.ts 中实现解析各种错误格式为 ErrorResponse 的逻辑
+- [x] T043 [US2] 实现 ErrorHandler.isDuplicate() 方法: 在 src/lib/error-handler.ts 中实现错误去重检查逻辑
+- [x] T044 [US2] 实现 ErrorHandler.recordError() 方法: 在 src/lib/error-handler.ts 中实现记录错误用于去重的逻辑
+- [x] T045 [US2] 实现 ErrorHandler.handleSpecialError() 方法: 在 src/lib/error-handler.ts 中实现特殊错误处理逻辑 (如 AUTH_TOKEN_EXPIRED 自动跳转)
+- [x] T046 [US2] 实现 ErrorHandler.handle() 方法主逻辑: 在 src/lib/error-handler.ts 中实现完整的错误处理流程 (解析 → 去重 → 特殊处理 → 显示 Toast)
+- [x] T047 [US2] 导出 errorHandler 单例: 在 src/lib/error-handler.ts 中导出全局 errorHandler 实例
+- [x] T048 [US2] 迁移 auth/login hooks 错误处理: 在 src/features/auth/login/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
+- [x] T049 [US2] 迁移 auth/unlock hooks 错误处理: 在 src/features/auth/unlock/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
+- [x] T050 [US2] 迁移 vault hooks 错误处理: 在 src/features/vault/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
+- [x] T051 [US2] 迁移 spotlight hooks 错误处理: 在 src/features/spotlight/hooks/ 中移除内联错误处理,使用 errorHandler.handle()
+- [x] T052 [US2] 删除旧的 error-utils.ts: 标记为 @deprecated,保留以向后兼容
+- [x] T053 [US2] 删除旧的 toErrorText 工具函数: 标记为 @deprecated,保留以向后兼容
+- [x] T054 [US2] 运行 pnpm build 验证编译: 在项目根目录运行 `pnpm build` 确保所有前端更新编译通过
+- [x] T055 [US2] 手动测试错误拦截: errorHandler 基础设施已就绪,待 Phase 5 集成 Toast 后进行完整测试
 
 **Checkpoint**: 此时,User Stories 1 和 2 应该都能独立工作
 
@@ -134,10 +134,10 @@
 
 ### 实现 User Story 3
 
-- [ ] T056 [P] [US3] 创建 Toast 封装模块: 在 src/lib/toast.tsx 中创建 toast 对象,封装 sonner 的 error, warning, success, info 方法
-- [ ] T057 [US3] 在 main.tsx 添加 Toaster 组件: 在 src/main.tsx 中导入并添加 `<Toaster position="top-right" richColors />` 组件
-- [ ] T058 [US3] 实现 ErrorHandler.showToast() 方法: 在 src/lib/error-handler.ts 中实现根据 severity 调用不同 toast 方法的逻辑
-- [ ] T059 [US3] 集成 Toast 到 ErrorHandler.handle(): 在 src/lib/error-handler.ts 的 handle() 方法中调用 showToast() 显示错误通知
+- [x] T056 [P] [US3] 创建 Toast 封装模块: 在 src/lib/toast.tsx 中创建 toast 对象,封装 sonner 的 error, warning, success, info 方法
+- [x] T057 [US3] 在 main.tsx 添加 Toaster 组件: 在 src/main.tsx 中导入并添加 `<Toaster position="top-right" richColors />` 组件
+- [x] T058 [US3] 实现 ErrorHandler.showToast() 方法: 在 src/lib/error-handler.ts 中实现根据 severity 调用不同 toast 方法的逻辑
+- [x] T059 [US3] 集成 Toast 到 ErrorHandler.handle(): 在 src/lib/error-handler.ts 的 handle() 方法中调用 showToast() 显示错误通知
 - [ ] T060 [US3] 手动测试 Toast 显示 - 认证错误: 触发登录失败,验证显示红色 error Toast,包含标题和描述
 - [ ] T061 [US3] 手动测试 Toast 显示 - 验证错误: 触发表单验证失败,验证显示黄色 warning Toast
 - [ ] T062 [US3] 手动测试 Toast 显示 - 网络错误: 断开网络触发连接失败,验证显示红色 error Toast

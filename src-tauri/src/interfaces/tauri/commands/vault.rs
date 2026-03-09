@@ -28,7 +28,7 @@ use crate::interfaces::tauri::mapping;
 use crate::support::error::AppError;
 use crate::support::redaction::redact_sensitive;
 
-fn log_command_error(command: &str, error: AppError) -> String {
+fn log_command_error(command: &str, error: &AppError) -> String {
     let payload = error.to_payload();
     let sanitized = redact_sensitive(&payload.message);
     log::error!(
@@ -37,7 +37,8 @@ fn log_command_error(command: &str, error: AppError) -> String {
         payload.code,
         sanitized
     );
-    payload.message
+    // 返回序列化的 ErrorPayload JSON 字符串
+    serde_json::to_string(&payload).unwrap_or_else(|_| payload.message)
 }
 
 fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
@@ -63,14 +64,16 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String
             | AppError::ValidationFormatError { .. }
             | AppError::ValidationRequired { .. },
         ) => return Ok(false),
-        Err(error) => return Err(log_command_error("vault_can_unlock", error)),
+        Err(error) => {
+            return Err(log_command_error("vault_can_unlock", &error));
+        }
     };
 
     let unlock_data = state
         .master_password_unlock_data_port()
         .load_master_password_unlock_data(&account_id)
         .await
-        .map_err(|error| log_command_error("vault_can_unlock", error))?;
+        .map_err(|error| log_command_error("vault_can_unlock", &error))?;
 
     Ok(unlock_data.is_some())
 }
@@ -85,13 +88,15 @@ pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, Strin
             | AppError::ValidationFormatError { .. }
             | AppError::ValidationRequired { .. },
         ) => return Ok(false),
-        Err(error) => return Err(log_command_error("vault_is_unlocked", error)),
+        Err(error) => {
+            return Err(log_command_error("vault_is_unlocked", &error));
+        }
     };
 
     state
         .get_vault_user_key(&account_id)
         .map(|value| value.is_some())
-        .map_err(|error| log_command_error("vault_is_unlocked", error))
+        .map_err(|error| log_command_error("vault_is_unlocked", &error))
 }
 
 #[tauri::command]
@@ -108,7 +113,7 @@ pub async fn vault_unlock(
             },
         )
         .await
-        .map_err(|error| log_command_error("vault_unlock", error))?;
+        .map_err(|error| log_command_error("vault_unlock", &error))?;
 
     Ok(())
 }
@@ -124,7 +129,7 @@ pub async fn vault_get_biometric_status(
     )
     .biometric_status(&*state)
     .await
-    .map_err(|error| log_command_error("vault_get_biometric_status", error))?;
+    .map_err(|error| { log_command_error("vault_get_biometric_status", &error) })?;
     Ok(VaultBiometricStatusResponseDto {
         supported: status.supported,
         enabled: status.enabled,
@@ -140,7 +145,7 @@ pub async fn vault_can_unlock_with_biometric(state: State<'_, AppState>) -> Resu
     )
     .can_unlock_with_biometric(&*state)
     .await
-    .map_err(|error| log_command_error("vault_can_unlock_with_biometric", error))
+    .map_err(|error| { log_command_error("vault_can_unlock_with_biometric", &error) })
 }
 
 #[tauri::command]
@@ -154,7 +159,7 @@ pub async fn vault_enable_biometric_unlock(
         state.biometric_unlock_port(),
     )
     .enable_biometric_unlock(&*state)
-    .map_err(|error| log_command_error("vault_enable_biometric_unlock", error))
+    .map_err(|error| { log_command_error("vault_enable_biometric_unlock", &error) })
 }
 
 #[tauri::command]
@@ -168,7 +173,7 @@ pub async fn vault_disable_biometric_unlock(
         state.biometric_unlock_port(),
     )
     .disable_biometric_unlock(&*state)
-    .map_err(|error| log_command_error("vault_disable_biometric_unlock", error))
+    .map_err(|error| { log_command_error("vault_disable_biometric_unlock", &error) })
 }
 
 #[tauri::command]
@@ -179,7 +184,7 @@ pub async fn vault_get_pin_status(
     let status = VaultPinUseCase::new(state.pin_unlock_port())
         .pin_status(&*state)
         .await
-        .map_err(|error| log_command_error("vault_get_pin_status", error))?;
+        .map_err(|error| { log_command_error("vault_get_pin_status", &error) })?;
 
     Ok(VaultPinStatusResponseDto {
         supported: status.supported,
@@ -203,7 +208,7 @@ pub async fn vault_enable_pin_unlock(
             },
         )
         .await
-        .map_err(|error| log_command_error("vault_enable_pin_unlock", error))
+        .map_err(|error| { log_command_error("vault_enable_pin_unlock", &error) })
 }
 
 #[tauri::command]
@@ -215,7 +220,7 @@ pub async fn vault_disable_pin_unlock(
     VaultPinUseCase::new(state.pin_unlock_port())
         .disable_pin_unlock(&*state)
         .await
-        .map_err(|error| log_command_error("vault_disable_pin_unlock", error))
+        .map_err(|error| { log_command_error("vault_disable_pin_unlock", &error) })
 }
 
 #[tauri::command]
@@ -229,7 +234,7 @@ pub async fn vault_lock(
         state.biometric_unlock_port(),
     )
     .lock(&*state)
-    .map_err(|error| log_command_error("vault_lock", error))
+    .map_err(|error| { log_command_error("vault_lock", &error) })
 }
 
 #[tauri::command]
@@ -240,7 +245,7 @@ pub async fn vault_get_view_data(
     let view_data = GetVaultViewDataUseCase::new(state.sync_service())
         .execute(&*state)
         .await
-        .map_err(|error| log_command_error("vault_get_view_data", error))?;
+        .map_err(|error| { log_command_error("vault_get_view_data", &error) })?;
 
     Ok(VaultViewDataResponseDto {
         account_id: view_data.account_id,
@@ -286,12 +291,12 @@ pub async fn vault_get_cipher_detail(
 ) -> Result<VaultCipherDetailResponseDto, String> {
     let account_id = state
         .active_account_id()
-        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+        .map_err(|error| { log_command_error("vault_get_cipher_detail", &error) })?;
     let cipher_id = request.cipher_id.trim();
     if cipher_id.is_empty() {
         return Err(log_command_error(
             "vault_get_cipher_detail",
-            AppError::ValidationFieldError {
+            &AppError::ValidationFieldError {
                 field: "unknown".to_string(),
                 message: "cipher_id cannot be empty".to_string(),
             },
@@ -300,11 +305,11 @@ pub async fn vault_get_cipher_detail(
 
     let user_key = state
         .get_vault_user_key(&account_id)
-        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?
+        .map_err(|error| { log_command_error("vault_get_cipher_detail", &error) })?
         .ok_or_else(|| {
             log_command_error(
                 "vault_get_cipher_detail",
-                AppError::ValidationFieldError {
+                &AppError::ValidationFieldError {
                     field: "unknown".to_string(),
                     message: "vault is locked, please unlock with master password first"
                         .to_string(),
@@ -320,9 +325,9 @@ pub async fn vault_get_cipher_detail(
             user_key: (&user_key).into(),
         })
         .await
-        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+        .map_err(|error| { log_command_error("vault_get_cipher_detail", &error) })?;
     let cipher = mapping::to_vault_cipher_detail_dto(cipher)
-        .map_err(|error| log_command_error("vault_get_cipher_detail", error))?;
+        .map_err(|error| { log_command_error("vault_get_cipher_detail", &error) })?;
 
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
 }
@@ -344,7 +349,7 @@ pub async fn vault_copy_cipher_field(
                 },
             )
             .await
-            .map_err(|error| log_command_error("vault_copy_cipher_field", error))?;
+            .map_err(|error| { log_command_error("vault_copy_cipher_field", &error) })?;
 
     Ok(VaultCopyCipherFieldResponseDto {
         copied: result.copied,
@@ -366,7 +371,7 @@ pub async fn vault_get_cipher_totp_code(
             },
         )
         .await
-        .map_err(|error| log_command_error("vault_get_cipher_totp_code", error))?;
+        .map_err(|error| { log_command_error("vault_get_cipher_totp_code", &error) })?;
 
     Ok(VaultCipherTotpCodeResponseDto {
         code: result.code,
@@ -381,18 +386,18 @@ pub async fn vault_get_cipher_totp_code(
 pub async fn vault_get_icon_server(state: State<'_, AppState>) -> Result<String, String> {
     let session = state
         .auth_session()
-        .map_err(|error| log_command_error("vault_get_icon_server", error))?;
+        .map_err(|error| { log_command_error("vault_get_icon_server", &error) })?;
 
     let base_url = match session {
         Some(session) => session.base_url,
         None => {
             let context = state
                 .persisted_auth_context()
-                .map_err(|error| log_command_error("vault_get_icon_server", error))?
+                .map_err(|error| { log_command_error("vault_get_icon_server", &error) })?
                 .ok_or_else(|| {
                     log_command_error(
                         "vault_get_icon_server",
-                        AppError::ValidationFieldError {
+                        &AppError::ValidationFieldError {
                             field: "unknown".to_string(),
                             message: "no authenticated session or persisted context found"
                                 .to_string(),

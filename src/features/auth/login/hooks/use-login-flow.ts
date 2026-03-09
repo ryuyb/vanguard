@@ -9,7 +9,6 @@ import {
   restoreLoginHints,
   sendEmailLoginCode,
   syncVaultAfterLogin,
-  toLoginErrorText,
   toProviderId,
   toProviderLabel,
   toServerUrlOption,
@@ -19,6 +18,7 @@ import type {
   LoginFeedback,
   TwoFactorState,
 } from "@/features/auth/login/types";
+import { errorHandler } from "@/lib/error-handler";
 
 type UseLoginFlowParams = {
   navigateToVault: () => Promise<void>;
@@ -201,7 +201,7 @@ export function useLoginFlow({
       });
 
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toLoginErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
 
@@ -211,10 +211,7 @@ export function useLoginFlow({
 
         const canUnlockResult = await canVaultUnlockAfterLogin();
         if (canUnlockResult.status === "error") {
-          setFeedback({
-            kind: "error",
-            text: `你已登录成功，但暂时无法判断解锁状态：${toLoginErrorText(canUnlockResult.error)}`,
-          });
+          errorHandler.handle(canUnlockResult.error);
           return;
         }
         const canUnlock = canUnlockResult.data;
@@ -223,10 +220,7 @@ export function useLoginFlow({
           setSubmitProgressText("正在解锁本地密码库...");
           const unlockResult = await unlockVaultAfterLogin(masterPassword);
           if (unlockResult.status === "error") {
-            setFeedback({
-              kind: "error",
-              text: `你已登录成功，但解锁失败：${toLoginErrorText(unlockResult.error)}`,
-            });
+            errorHandler.handle(unlockResult.error);
             return;
           }
 
@@ -246,20 +240,14 @@ export function useLoginFlow({
         setSubmitProgressText("正在首次同步密码库...");
         const syncResult = await syncVaultAfterLogin();
         if (syncResult.status === "error") {
-          setFeedback({
-            kind: "error",
-            text: `你已登录成功，但首次同步失败：${toLoginErrorText(syncResult.error)}`,
-          });
+          errorHandler.handle(syncResult.error);
           return;
         }
 
         setSubmitProgressText("正在完成解锁...");
         const unlockResult = await unlockVaultAfterLogin(masterPassword);
         if (unlockResult.status === "error") {
-          setFeedback({
-            kind: "error",
-            text: `首次同步已完成，但解锁失败：${toLoginErrorText(unlockResult.error)}`,
-          });
+          errorHandler.handle(unlockResult.error);
           return;
         }
 
@@ -288,7 +276,7 @@ export function useLoginFlow({
         text: `需要二步验证，请输入验证码继续（可用方式：${providers.map(toProviderLabel).join("、") || "未知方式"}）。`,
       });
     } catch (error) {
-      setFeedback({ kind: "error", text: toLoginErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setIsSubmitting(false);
       setSubmitProgressText("");
@@ -330,7 +318,7 @@ export function useLoginFlow({
       });
 
       if (result.status === "error") {
-        setFeedback({ kind: "error", text: toLoginErrorText(result.error) });
+        errorHandler.handle(result.error);
         return;
       }
 
@@ -339,7 +327,7 @@ export function useLoginFlow({
         text: "验证码已发送到邮箱，请查收后输入并继续登录。",
       });
     } catch (error) {
-      setFeedback({ kind: "error", text: toLoginErrorText(error) });
+      errorHandler.handle(error);
     } finally {
       setTwoFactorState((previous) =>
         previous ? { ...previous, isSendingEmailCode: false } : previous,

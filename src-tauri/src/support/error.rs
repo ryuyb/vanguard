@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::support::redaction::redact_sensitive;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -21,6 +22,7 @@ pub enum AppError {
     AuthPermissionDenied,
     AuthAccountLocked,
     AuthTwoFactorRequired,
+    AuthInvalidPin,
 
     // === 保险库错误 ===
     VaultCipherNotFound { cipher_id: String },
@@ -66,6 +68,7 @@ impl AppError {
             Self::AuthPermissionDenied => "AUTH_PERMISSION_DENIED",
             Self::AuthAccountLocked => "AUTH_ACCOUNT_LOCKED",
             Self::AuthTwoFactorRequired => "AUTH_TWO_FACTOR_REQUIRED",
+            Self::AuthInvalidPin => "AUTH_INVALID_PIN",
 
             // 保险库
             Self::VaultCipherNotFound { .. } => "VAULT_CIPHER_NOT_FOUND",
@@ -118,6 +121,7 @@ impl AppError {
             Self::AuthPermissionDenied => "Permission denied".to_string(),
             Self::AuthAccountLocked => "Account is locked".to_string(),
             Self::AuthTwoFactorRequired => "Two-factor authentication required".to_string(),
+            Self::AuthInvalidPin => "Invalid PIN".to_string(),
 
             // 保险库
             Self::VaultCipherNotFound { cipher_id } => format!("Cipher not found: {}", cipher_id),
@@ -263,4 +267,11 @@ pub struct ErrorPayload {
     pub details: Option<serde_json::Value>,
     pub timestamp: i64,
     pub severity: ErrorSeverity,
+}
+
+// 为 tauri-specta 实现 Type trait
+impl Type for ErrorPayload {
+    fn inline(_: &mut specta::TypeMap, _: specta::Generics) -> specta::DataType {
+        specta::DataType::Any
+    }
 }
