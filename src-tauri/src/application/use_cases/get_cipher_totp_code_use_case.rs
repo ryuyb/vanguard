@@ -28,14 +28,18 @@ impl GetCipherTotpCodeUseCase {
     ) -> AppResult<GetCipherTotpCodeResult> {
         let cipher_id = command.cipher_id.trim();
         if cipher_id.is_empty() {
-            return Err(AppError::validation("cipher_id cannot be empty"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cipher_id cannot be empty".into(),
+            });
         }
 
         let account_id = runtime.active_account_id()?;
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
-            .ok_or_else(|| {
-                AppError::validation("vault is locked, please unlock with master password first")
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "vault is locked, please unlock with master password first".into(),
             })?;
 
         let cipher = self
@@ -51,7 +55,10 @@ impl GetCipherTotpCodeUseCase {
             cipher.login.as_ref().and_then(|entry| entry.totp.clone()),
             cipher.data.as_ref().and_then(|entry| entry.totp.clone()),
         ])
-        .ok_or_else(|| AppError::validation("requested field is empty: totp"))?;
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "requested field is empty: totp".into(),
+        })?;
 
         let snapshot = generate_current_totp(&raw_totp, current_unix_seconds()?)?;
         Ok(GetCipherTotpCodeResult {

@@ -17,22 +17,28 @@ pub fn current_unix_seconds() -> AppResult<u64> {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
-        .map_err(|_| AppError::internal("failed to read system time for totp generation"))
+        .map_err(|_| AppError::InternalUnexpected {
+            message: "failed to read system time for totp generation".into(),
+        })
 }
 
 pub fn generate_current_totp(raw_totp: &str, unix_seconds: u64) -> AppResult<TotpCodeSnapshot> {
     let totp = parse_totp(raw_totp)?;
     let code = totp.generate(unix_seconds);
     let remaining_seconds = totp.step - (unix_seconds % totp.step);
-    let expires_at_seconds = unix_seconds
-        .checked_add(remaining_seconds)
-        .ok_or_else(|| AppError::internal("totp expiration timestamp overflow"))?;
-    let expires_at_ms = i64::try_from(
-        expires_at_seconds
-            .checked_mul(1000)
-            .ok_or_else(|| AppError::internal("totp expiration timestamp overflow"))?,
-    )
-    .map_err(|_| AppError::internal("totp expiration timestamp overflow"))?;
+    let expires_at_seconds = unix_seconds.checked_add(remaining_seconds).ok_or_else(|| {
+        AppError::InternalUnexpected {
+            message: "totp expiration timestamp overflow".into(),
+        }
+    })?;
+    let expires_at_ms = i64::try_from(expires_at_seconds.checked_mul(1000).ok_or_else(|| {
+        AppError::InternalUnexpected {
+            message: "totp expiration timestamp overflow".into(),
+        }
+    })?)
+    .map_err(|_| AppError::InternalUnexpected {
+        message: "totp expiration timestamp overflow".into(),
+    })?;
 
     Ok(TotpCodeSnapshot {
         code,
@@ -45,24 +51,38 @@ pub fn generate_current_totp(raw_totp: &str, unix_seconds: u64) -> AppResult<Tot
 fn parse_totp(raw_totp: &str) -> AppResult<TOTP> {
     let raw = raw_totp.trim();
     if raw.is_empty() {
-        return Err(AppError::validation("invalid totp configuration"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid totp configuration".to_string(),
+        });
     }
 
     let totp = if raw.to_ascii_lowercase().starts_with("otpauth://") {
-        TOTP::from_url_unchecked(raw)
-            .map_err(|_| AppError::validation("invalid totp configuration"))?
+        TOTP::from_url_unchecked(raw).map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid totp configuration".to_string(),
+        })?
     } else {
-        let secret = Secret::Encoded(String::from(raw))
-            .to_bytes()
-            .map_err(|_| AppError::validation("invalid totp configuration"))?;
+        let secret = Secret::Encoded(String::from(raw)).to_bytes().map_err(|_| {
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "invalid totp configuration".to_string(),
+            }
+        })?;
         TOTP::new_unchecked(Algorithm::SHA1, 6, 1, 30, secret, None, String::new())
     };
 
     if totp.step == 0 || totp.step > 300 || totp.secret.is_empty() {
-        return Err(AppError::validation("invalid totp configuration"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid totp configuration".to_string(),
+        });
     }
     if totp.digits < 6 || totp.digits > 9 {
-        return Err(AppError::validation("invalid totp configuration"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid totp configuration".to_string(),
+        });
     }
 
     Ok(totp)

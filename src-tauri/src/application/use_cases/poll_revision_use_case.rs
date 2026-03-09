@@ -24,7 +24,10 @@ impl PollRevisionUseCase {
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("{field} cannot be empty"),
+        });
     }
     Ok(())
 }

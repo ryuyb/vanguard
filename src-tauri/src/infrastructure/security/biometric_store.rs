@@ -125,11 +125,15 @@ mod imp {
     pub fn save_unlock_bundle(account_id: &str, bundle: &BiometricUnlockBundle) -> AppResult<()> {
         let account_key = normalize_account_id(account_id)?;
         if bundle.account_id.trim() != account_key {
-            return Err(AppError::validation("biometric bundle account_id mismatch"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "biometric bundle account_id mismatch".to_string(),
+            });
         }
-        let serialized = serde_json::to_string(bundle).map_err(|error| {
-            AppError::internal(format!("failed to serialize biometric bundle: {error}"))
-        })?;
+        let serialized =
+            serde_json::to_string(bundle).map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to serialize biometric bundle: {error}"),
+            })?;
 
         let mut delete_options = options_for_account(&account_key);
         delete_options.set_access_synchronized(Some(false));
@@ -159,27 +163,38 @@ mod imp {
 
         match generic_password(options) {
             Ok(value) => {
-                let text = String::from_utf8(value).map_err(|error| {
-                    AppError::internal(format!(
-                        "biometric keychain entry contains non-utf8 data: {error}"
-                    ))
-                })?;
+                let text =
+                    String::from_utf8(value).map_err(|error| AppError::InternalUnexpected {
+                        message: format!(
+                            "biometric keychain entry contains non-utf8 data: {error}"
+                        ),
+                    })?;
                 let bundle = serde_json::from_str::<BiometricUnlockBundle>(&text).map_err(|error| {
-                    AppError::validation(format!(
-                        "biometric keychain entry is invalid or legacy format, please disable and re-enable touch id: {error}"
-                    ))
+                    AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: format!(
+                            "biometric keychain entry is invalid or legacy format, please disable and re-enable touch id: {error}"
+                        ),
+                    }
                 })?;
                 Ok(bundle)
             }
-            Err(error) if error.code() == errSecItemNotFound => Err(AppError::validation(
-                "biometric unlock is not configured for this account",
-            )),
-            Err(error) if error.code() == ERR_SEC_USER_CANCELED => Err(AppError::validation(
-                "biometric authentication was cancelled",
-            )),
-            Err(error) if error.code() == errSecAuthFailed => {
-                Err(AppError::validation("biometric authentication failed"))
+            Err(error) if error.code() == errSecItemNotFound => {
+                Err(AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "biometric unlock is not configured for this account".to_string(),
+                })
             }
+            Err(error) if error.code() == ERR_SEC_USER_CANCELED => {
+                Err(AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "biometric authentication was cancelled".to_string(),
+                })
+            }
+            Err(error) if error.code() == errSecAuthFailed => Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "biometric authentication failed".to_string(),
+            }),
             Err(error) => Err(map_keychain_error(
                 "failed to read biometric keychain entry",
                 error,
@@ -230,19 +245,23 @@ mod imp {
     fn normalize_account_id(value: &str) -> AppResult<String> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err(AppError::validation(
-                "account_id is empty, cannot use biometric unlock",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "account_id is empty, cannot use biometric unlock".to_string(),
+            });
         }
         Ok(String::from(trimmed))
     }
 
     fn map_keychain_error(context: &str, error: Error) -> AppError {
         match error.code() {
-            ERR_SEC_MISSING_ENTITLEMENT => AppError::validation(
-                "touch id requires a signed macOS app with keychain entitlements (errSecMissingEntitlement, -34018). tauri dev's unsigned runtime cannot use biometric keychain items; run a signed .app build instead",
-            ),
-            _ => AppError::internal(format!("{context}: status={} error={error}", error.code())),
+            ERR_SEC_MISSING_ENTITLEMENT => AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "touch id requires a signed macOS app with keychain entitlements (errSecMissingEntitlement, -34018). tauri dev's unsigned runtime cannot use biometric keychain items; run a signed .app build instead".to_string(),
+            },
+            _ => AppError::InternalUnexpected {
+                message: format!("{context}: status={} error={error}", error.code()),
+            },
         }
     }
 }
@@ -258,15 +277,17 @@ mod imp {
     }
 
     pub fn save_unlock_bundle(_account_id: &str, _bundle: &BiometricUnlockBundle) -> AppResult<()> {
-        Err(AppError::validation(
-            "biometric unlock is only supported on macOS",
-        ))
+        Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "biometric unlock is only supported on macOS".to_string(),
+        })
     }
 
     pub fn load_unlock_bundle(_account_id: &str) -> AppResult<BiometricUnlockBundle> {
-        Err(AppError::validation(
-            "biometric unlock is only supported on macOS",
-        ))
+        Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "biometric unlock is only supported on macOS".to_string(),
+        })
     }
 
     pub fn has_unlock_bundle(_account_id: &str) -> AppResult<bool> {

@@ -21,13 +21,17 @@ impl<R: Runtime> ClipboardPort for TauriClipboardPortAdapter<R> {
         self.app_handle
             .clipboard()
             .write_text(text)
-            .map_err(|error| AppError::internal(format!("failed to write clipboard text: {error}")))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to write clipboard text: {error}"),
+            })
     }
 
     fn clear(&self) -> AppResult<()> {
         self.app_handle
             .clipboard()
             .clear()
-            .map_err(|error| AppError::internal(format!("failed to clear clipboard: {error}")))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear clipboard: {error}"),
+            })
     }
 }

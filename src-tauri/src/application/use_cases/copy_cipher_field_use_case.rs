@@ -38,15 +38,19 @@ impl CopyCipherFieldUseCase {
     ) -> AppResult<CopyCipherFieldResult> {
         let cipher_id = command.cipher_id.trim();
         if cipher_id.is_empty() {
-            return Err(AppError::validation("cipher_id cannot be empty"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cipher_id cannot be empty".to_string(),
+            });
         }
 
         let clear_after_ms = validate_clear_after_ms(command.clear_after_ms)?;
         let account_id = runtime.active_account_id()?;
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
-            .ok_or_else(|| {
-                AppError::validation("vault is locked, please unlock with master password first")
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "vault is locked, please unlock with master password first".to_string(),
             })?;
 
         let cipher = self
@@ -88,15 +92,16 @@ fn validate_clear_after_ms(value: Option<u64>) -> AppResult<Option<u64>> {
         return Ok(None);
     };
     if value == 0 {
-        return Err(AppError::validation(
-            "clear_after_ms must be greater than 0",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "clear_after_ms must be greater than 0".to_string(),
+        });
     }
     if value > MAX_CLEAR_AFTER_MS {
-        return Err(AppError::validation(format!(
-            "clear_after_ms cannot exceed {}",
-            MAX_CLEAR_AFTER_MS
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("clear_after_ms cannot exceed {}", MAX_CLEAR_AFTER_MS),
+        });
     }
     Ok(Some(value))
 }
@@ -117,7 +122,10 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
                 .as_ref()
                 .and_then(|entry| entry.username.clone()),
         ])
-        .ok_or_else(|| AppError::validation("requested field is empty: username")),
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "requested field is empty: username".to_string(),
+        }),
         VaultCopyField::Password => pick_first_non_empty(&[
             cipher
                 .login
@@ -128,13 +136,19 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
                 .as_ref()
                 .and_then(|entry| entry.password.clone()),
         ])
-        .ok_or_else(|| AppError::validation("requested field is empty: password")),
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "requested field is empty: password".to_string(),
+        }),
         VaultCopyField::Totp => {
             let raw_totp = pick_first_non_empty(&[
                 cipher.login.as_ref().and_then(|entry| entry.totp.clone()),
                 cipher.data.as_ref().and_then(|entry| entry.totp.clone()),
             ])
-            .ok_or_else(|| AppError::validation("requested field is empty: totp"))?;
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: totp".to_string(),
+            })?;
             let snapshot = generate_current_totp(&raw_totp, current_unix_seconds()?)?;
             Ok(snapshot.code)
         }

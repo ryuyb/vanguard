@@ -63,7 +63,10 @@ impl UnlockVaultUseCase {
             UnlockMethod::MasterPassword { password } => {
                 let trimmed = password.trim().to_string();
                 if trimmed.is_empty() {
-                    return Err(AppError::validation("master_password cannot be empty"));
+                    return Err(AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: "master_password cannot be empty".to_string(),
+                    });
                 }
                 self.master_password_executor
                     .execute_master_password_unlock(runtime, trimmed)
@@ -72,7 +75,10 @@ impl UnlockVaultUseCase {
             UnlockMethod::Pin { pin } => {
                 let trimmed = pin.trim().to_string();
                 if trimmed.is_empty() {
-                    return Err(AppError::validation("pin cannot be empty"));
+                    return Err(AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: "pin cannot be empty".to_string(),
+                    });
                 }
                 self.pin_executor.execute_pin_unlock(runtime, trimmed).await
             }
@@ -323,7 +329,7 @@ mod tests {
             .expect_err("empty password should fail");
 
         match error {
-            AppError::Validation(message) => assert_eq!(message, "master_password cannot be empty"),
+            AppError::ValidationRequired { field } => assert_eq!(field, "master_password"),
             other => panic!("unexpected error variant: {other:?}"),
         }
         assert!(master_calls.lock().expect("master calls lock").is_empty());
@@ -355,7 +361,7 @@ mod tests {
             .expect_err("empty pin should fail");
 
         match error {
-            AppError::Validation(message) => assert_eq!(message, "pin cannot be empty"),
+            AppError::ValidationRequired { field } => assert_eq!(field, "pin"),
             other => panic!("unexpected error variant: {other:?}"),
         }
         assert!(master_calls.lock().expect("master calls lock").is_empty());

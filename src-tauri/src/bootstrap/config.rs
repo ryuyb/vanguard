@@ -24,7 +24,9 @@ impl AppConfig {
     pub fn load<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<Self> {
         let store = manager
             .store(STORE_PATH)
-            .map_err(|error| AppError::internal(format!("failed to open config store: {error}")))?;
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to open config store: {error}"),
+            })?;
 
         let device_identifier = read_store_string(&store, KEY_DEVICE_IDENTIFIER)
             .filter(|value| uuid::Uuid::parse_str(value).is_ok())
@@ -45,9 +47,9 @@ impl AppConfig {
             KEY_SYNC_POLL_INTERVAL_SECONDS.to_string(),
             json!(sync_poll_interval_seconds),
         );
-        store
-            .save()
-            .map_err(|error| AppError::internal(format!("failed to save config store: {error}")))?;
+        store.save().map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to save config store: {error}"),
+        })?;
 
         Ok(Self {
             device_identifier,

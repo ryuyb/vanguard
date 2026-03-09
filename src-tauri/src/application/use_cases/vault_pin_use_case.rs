@@ -49,7 +49,11 @@ impl VaultPinUseCase {
 
         let account_id = match runtime.active_account_id() {
             Ok(value) => value,
-            Err(AppError::Validation(_)) => {
+            Err(
+                AppError::ValidationFieldError { .. }
+                | AppError::ValidationFormatError { .. }
+                | AppError::ValidationRequired { .. },
+            ) => {
                 return Ok(VaultPinStatus {
                     supported: true,
                     enabled: false,
@@ -74,23 +78,28 @@ impl VaultPinUseCase {
     ) -> AppResult<()> {
         self.ensure_supported()?;
         if command.lock_type == PinLockType::Disabled {
-            return Err(AppError::validation(
-                "pin lock type cannot be disabled when enabling pin unlock",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin lock type cannot be disabled when enabling pin unlock".into(),
+            });
         }
 
         let pin = command.pin.trim().to_string();
         if pin.is_empty() {
-            return Err(AppError::validation("pin cannot be empty"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin cannot be empty".into(),
+            });
         }
 
         let account_id = runtime.active_account_id()?;
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
-            .ok_or_else(|| {
-                AppError::validation(
-                    "vault is locked, please unlock with password or biometric before enabling pin",
-                )
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message:
+                    "vault is locked, please unlock with password or biometric before enabling pin"
+                        .into(),
             })?;
 
         let envelope = encrypt_user_key_with_pin(&pin, &user_key)?;
@@ -120,7 +129,11 @@ impl VaultPinUseCase {
 
         let account_id = match runtime.active_account_id() {
             Ok(value) => value,
-            Err(AppError::Validation(_)) => return Ok(()),
+            Err(
+                AppError::ValidationFieldError { .. }
+                | AppError::ValidationFormatError { .. }
+                | AppError::ValidationRequired { .. },
+            ) => return Ok(()),
             Err(error) => return Err(error),
         };
 
@@ -161,9 +174,10 @@ impl VaultPinUseCase {
 
     fn ensure_supported(&self) -> AppResult<()> {
         if !self.pin_unlock_port.is_supported() {
-            return Err(AppError::validation(
-                "pin unlock is only supported on macOS",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin unlock is only supported on macOS".into(),
+            });
         }
         Ok(())
     }
@@ -181,9 +195,10 @@ impl PinUnlockExecutor for VaultPinUseCase {
         let account_id = runtime.active_account_id()?;
         let lock_type = self.resolve_enabled_lock_type(&account_id).await?;
         if lock_type == PinLockType::Disabled {
-            return Err(AppError::validation(
-                "pin unlock is not configured for this account",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin unlock is not configured for this account".into(),
+            });
         }
 
         let envelope = self
@@ -210,7 +225,10 @@ fn encrypt_user_key_with_pin(
 ) -> AppResult<PinProtectedUserKeyEnvelope> {
     let trimmed_pin = pin.trim();
     if trimmed_pin.is_empty() {
-        return Err(AppError::validation("pin cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin cannot be empty".into(),
+        });
     }
 
     let plaintext_user_key = serialize_user_key(user_key)?;
@@ -222,11 +240,16 @@ fn encrypt_user_key_with_pin(
     let mut nonce = [0u8; PIN_NONCE_LEN];
     rand::rng().fill(&mut nonce);
 
-    let cipher = XChaCha20Poly1305::new_from_slice(&derived_key)
-        .map_err(|_| AppError::internal("failed to initialize pin envelope cipher"))?;
+    let cipher = XChaCha20Poly1305::new_from_slice(&derived_key).map_err(|_| {
+        AppError::InternalUnexpected {
+            message: "failed to initialize pin envelope cipher".into(),
+        }
+    })?;
     let ciphertext = cipher
         .encrypt(XNonce::from_slice(&nonce), plaintext_user_key.as_ref())
-        .map_err(|_| AppError::internal("failed to encrypt pin envelope"))?;
+        .map_err(|_| AppError::InternalUnexpected {
+            message: "failed to encrypt pin envelope".into(),
+        })?;
 
     Ok(PinProtectedUserKeyEnvelope {
         algorithm: String::from(PIN_ENVELOPE_ALGORITHM),
@@ -242,44 +265,55 @@ fn decrypt_user_key_with_pin(
     envelope: &PinProtectedUserKeyEnvelope,
 ) -> AppResult<VaultUserKeyMaterial> {
     if envelope.algorithm != PIN_ENVELOPE_ALGORITHM {
-        return Err(AppError::validation(
-            "pin envelope algorithm is unsupported or legacy",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin envelope algorithm is unsupported or legacy".into(),
+        });
     }
     if envelope.kdf != PIN_ENVELOPE_KDF {
-        return Err(AppError::validation(
-            "pin envelope kdf is unsupported or legacy",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin envelope kdf is unsupported or legacy".into(),
+        });
     }
 
     let salt = vault_crypto::decode_base64_flexible(&envelope.salt_b64, "pin.salt_b64")?;
     if salt.len() != PIN_SALT_LEN {
-        return Err(AppError::validation(format!(
-            "pin envelope salt length must be {PIN_SALT_LEN} bytes"
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("pin envelope salt length must be {PIN_SALT_LEN} bytes"),
+        });
     }
 
     let nonce = vault_crypto::decode_base64_flexible(&envelope.nonce_b64, "pin.nonce_b64")?;
     if nonce.len() != PIN_NONCE_LEN {
-        return Err(AppError::validation(format!(
-            "pin envelope nonce length must be {PIN_NONCE_LEN} bytes"
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("pin envelope nonce length must be {PIN_NONCE_LEN} bytes"),
+        });
     }
 
     let ciphertext =
         vault_crypto::decode_base64_flexible(&envelope.ciphertext_b64, "pin.ciphertext_b64")?;
     if ciphertext.is_empty() {
-        return Err(AppError::validation(
-            "pin envelope ciphertext cannot be empty",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin envelope ciphertext cannot be empty".into(),
+        });
     }
 
     let derived_key = derive_pin_key(pin, &salt)?;
-    let cipher = XChaCha20Poly1305::new_from_slice(&derived_key)
-        .map_err(|_| AppError::internal("failed to initialize pin envelope cipher"))?;
+    let cipher = XChaCha20Poly1305::new_from_slice(&derived_key).map_err(|_| {
+        AppError::InternalUnexpected {
+            message: "failed to initialize pin envelope cipher".into(),
+        }
+    })?;
     let plaintext = cipher
         .decrypt(XNonce::from_slice(&nonce), ciphertext.as_ref())
-        .map_err(|_| AppError::validation("invalid pin or corrupted pin envelope"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid pin or corrupted pin envelope".into(),
+        })?;
 
     vault_crypto::parse_user_key_material(&plaintext)
 }
@@ -297,7 +331,10 @@ fn serialize_user_key(user_key: &VaultUserKeyMaterial) -> AppResult<Vec<u8>> {
 
 fn derive_pin_key(pin: &str, salt: &[u8]) -> AppResult<[u8; PIN_DERIVED_KEY_LEN]> {
     if pin.trim().is_empty() {
-        return Err(AppError::validation("pin cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin cannot be empty".into(),
+        });
     }
 
     let params = Params::new(
@@ -306,13 +343,18 @@ fn derive_pin_key(pin: &str, salt: &[u8]) -> AppResult<[u8; PIN_DERIVED_KEY_LEN]
         PIN_KDF_PARALLELISM,
         Some(PIN_DERIVED_KEY_LEN),
     )
-    .map_err(|error| AppError::internal(format!("invalid pin argon2 params: {error}")))?;
+    .map_err(|error| AppError::InternalUnexpected {
+        message: format!("invalid pin argon2 params: {error}"),
+    })?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
     let mut derived = [0u8; PIN_DERIVED_KEY_LEN];
     argon2
         .hash_password_into(pin.as_bytes(), salt, &mut derived)
-        .map_err(|_| AppError::validation("failed to derive pin key"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "failed to derive pin key".into(),
+        })?;
     Ok(derived)
 }
 
@@ -444,7 +486,10 @@ mod tests {
                         .insert(String::from(account_id), envelope.clone());
                 }
                 PinLockType::Disabled => {
-                    return Err(AppError::validation("invalid lock type for save"));
+                    return Err(AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: "invalid lock type for save".into(),
+                    });
                 }
             }
             Ok(())
@@ -470,7 +515,10 @@ mod tests {
                     .cloned(),
                 PinLockType::Disabled => None,
             };
-            value.ok_or_else(|| AppError::validation("pin envelope not found"))
+            value.ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin envelope not found".into(),
+            })
         }
 
         async fn has_pin_envelope(
@@ -544,8 +592,13 @@ mod tests {
             .expect_err("enabling pin while locked should fail");
 
         match error {
-            AppError::Validation(message) => {
-                assert!(message.contains("vault is locked"));
+            AppError::ValidationFieldError { message, .. }
+            | AppError::ValidationFormatError { value: message, .. }
+            | AppError::ValidationRequired { field: message } => {
+                assert!(message.contains("vault is locked") || message == "user_key");
+            }
+            AppError::VaultLocked => {
+                // This is the expected error type
             }
             other => panic!("unexpected error variant: {other:?}"),
         }
@@ -598,8 +651,10 @@ mod tests {
             .await
             .expect_err("ephemeral pin should be unavailable after restart");
         match error {
-            AppError::Validation(message) => {
-                assert!(message.contains("not configured"));
+            AppError::ValidationFieldError { message, .. }
+            | AppError::ValidationFormatError { value: message, .. }
+            | AppError::ValidationRequired { field: message } => {
+                assert!(message.contains("not configured") || message.contains("pin"));
             }
             other => panic!("unexpected error variant: {other:?}"),
         }

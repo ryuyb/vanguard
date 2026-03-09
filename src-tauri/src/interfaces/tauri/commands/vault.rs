@@ -58,7 +58,11 @@ fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
 pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String> {
     let account_id = match state.active_account_id() {
         Ok(value) => value,
-        Err(AppError::Validation(_)) => return Ok(false),
+        Err(
+            AppError::ValidationFieldError { .. }
+            | AppError::ValidationFormatError { .. }
+            | AppError::ValidationRequired { .. },
+        ) => return Ok(false),
         Err(error) => return Err(log_command_error("vault_can_unlock", error)),
     };
 
@@ -76,7 +80,11 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, String
 pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, String> {
     let account_id = match state.active_account_id() {
         Ok(value) => value,
-        Err(AppError::Validation(_)) => return Ok(false),
+        Err(
+            AppError::ValidationFieldError { .. }
+            | AppError::ValidationFormatError { .. }
+            | AppError::ValidationRequired { .. },
+        ) => return Ok(false),
         Err(error) => return Err(log_command_error("vault_is_unlocked", error)),
     };
 
@@ -283,7 +291,10 @@ pub async fn vault_get_cipher_detail(
     if cipher_id.is_empty() {
         return Err(log_command_error(
             "vault_get_cipher_detail",
-            AppError::validation("cipher_id cannot be empty"),
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cipher_id cannot be empty".to_string(),
+            },
         ));
     }
 
@@ -293,7 +304,11 @@ pub async fn vault_get_cipher_detail(
         .ok_or_else(|| {
             log_command_error(
                 "vault_get_cipher_detail",
-                AppError::validation("vault is locked, please unlock with master password first"),
+                AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "vault is locked, please unlock with master password first"
+                        .to_string(),
+                },
             )
         })?;
 
@@ -377,7 +392,11 @@ pub async fn vault_get_icon_server(state: State<'_, AppState>) -> Result<String,
                 .ok_or_else(|| {
                     log_command_error(
                         "vault_get_icon_server",
-                        AppError::validation("no authenticated session or persisted context found"),
+                        AppError::ValidationFieldError {
+                            field: "unknown".to_string(),
+                            message: "no authenticated session or persisted context found"
+                                .to_string(),
+                        },
                     )
                 })?;
             context.base_url

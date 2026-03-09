@@ -45,7 +45,11 @@ impl VaultBiometricUseCase {
 
         let account_id = match runtime.active_account_id() {
             Ok(value) => value,
-            Err(AppError::Validation(_)) => {
+            Err(
+                AppError::ValidationFieldError { .. }
+                | AppError::ValidationFormatError { .. }
+                | AppError::ValidationRequired { .. },
+            ) => {
                 return Ok(VaultBiometricStatus {
                     supported: true,
                     enabled: false,
@@ -71,7 +75,11 @@ impl VaultBiometricUseCase {
 
         let account_id = match runtime.active_account_id() {
             Ok(value) => value,
-            Err(AppError::Validation(_)) => return Ok(false),
+            Err(
+                AppError::ValidationFieldError { .. }
+                | AppError::ValidationFormatError { .. }
+                | AppError::ValidationRequired { .. },
+            ) => return Ok(false),
             Err(error) => return Err(error),
         };
 
@@ -89,18 +97,19 @@ impl VaultBiometricUseCase {
 
     pub fn enable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         if !self.biometric_unlock_port.is_supported() {
-            return Err(AppError::validation(
-                "biometric unlock is only supported on macOS",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "biometric unlock is only supported on macOS".to_string(),
+            });
         }
 
         let account_id = runtime.active_account_id()?;
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
-            .ok_or_else(|| {
-                AppError::validation(
-                    "vault is locked, please unlock with password before enabling touch id",
-                )
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "vault is locked, please unlock with password before enabling touch id"
+                    .to_string(),
             })?;
 
         let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key)?;
@@ -108,9 +117,9 @@ impl VaultBiometricUseCase {
             .save_unlock_bundle(&account_id, &bundle)?;
         let verified_bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
         if verified_bundle.account_id != account_id {
-            return Err(AppError::internal(
-                "biometric verification returned mismatched account id",
-            ));
+            return Err(AppError::InternalUnexpected {
+                message: "biometric verification returned mismatched account id".into(),
+            });
         }
 
         log::info!(
@@ -128,7 +137,11 @@ impl VaultBiometricUseCase {
 
         let account_id = match runtime.active_account_id() {
             Ok(value) => value,
-            Err(AppError::Validation(_)) => return Ok(()),
+            Err(
+                AppError::ValidationFieldError { .. }
+                | AppError::ValidationFormatError { .. }
+                | AppError::ValidationRequired { .. },
+            ) => return Ok(()),
             Err(error) => return Err(error),
         };
 
@@ -147,17 +160,19 @@ impl VaultBiometricUseCase {
         runtime: &dyn VaultRuntimePort,
     ) -> AppResult<UnlockVaultResult> {
         if !self.biometric_unlock_port.is_supported() {
-            return Err(AppError::validation(
-                "biometric unlock is only supported on macOS",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "biometric unlock is only supported on macOS".to_string(),
+            });
         }
 
         let account_id = runtime.active_account_id()?;
         let bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
         if bundle.account_id != account_id {
-            return Err(AppError::validation(
-                "biometric unlock account does not match current account",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "biometric unlock account does not match current account".to_string(),
+            });
         }
 
         let user_key = biometric_bundle_to_vault_user_key(&bundle)?;
@@ -206,9 +221,10 @@ fn biometric_bundle_to_vault_user_key(
     bundle: &VaultBiometricBundle,
 ) -> Result<VaultUserKeyMaterial, AppError> {
     if bundle.account_id.trim().is_empty() {
-        return Err(AppError::validation(
-            "biometric unlock bundle account_id is empty",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "biometric unlock bundle account_id is empty".to_string(),
+        });
     }
 
     let enc_key =

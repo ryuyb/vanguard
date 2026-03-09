@@ -25,8 +25,9 @@ impl GetVaultViewDataUseCase {
 
         let user_key = runtime
             .get_vault_user_key_material(&account_id)?
-            .ok_or_else(|| {
-                AppError::validation("vault is locked, please unlock with master password first")
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "vault is locked, please unlock with master password first".to_string(),
             })?;
 
         let sync_context = self.sync_service.sync_status(account_id.clone()).await?;

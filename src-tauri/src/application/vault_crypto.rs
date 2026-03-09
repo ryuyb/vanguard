@@ -25,11 +25,12 @@ pub fn decrypt_optional_field(
 
             decrypt_cipher_string(&raw, user_key)
                 .map(Some)
-                .map_err(|error| {
-                    AppError::validation(format!(
+                .map_err(|error| AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: format!(
                         "failed to decrypt field `{field_name}`: {}",
                         error.message()
-                    ))
+                    ),
                 })
         }
     }
@@ -38,7 +39,10 @@ pub fn decrypt_optional_field(
 pub fn parse_user_key(raw: &str) -> Result<VaultUserKeyMaterial, AppError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err(AppError::validation("user_key cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "user_key cannot be empty".to_string(),
+        });
     }
 
     if let Some((enc, mac)) = trimmed.split_once('|') {
@@ -61,25 +65,28 @@ pub fn parse_user_key(raw: &str) -> Result<VaultUserKeyMaterial, AppError> {
             enc_key: raw_bytes[..32].to_vec(),
             mac_key: Some(raw_bytes[32..].to_vec()),
         }),
-        len => Err(AppError::validation(format!(
-            "user_key length must be 32 or 64 bytes after base64 decode, got {len}"
-        ))),
+        len => Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!(
+                "user_key length must be 32 or 64 bytes after base64 decode, got {len}"
+            ),
+        }),
     }
 }
 
 pub fn validate_key_lengths(enc_key: &[u8], mac_key: Option<&[u8]>) -> Result<(), AppError> {
     if enc_key.len() != 32 {
-        return Err(AppError::validation(format!(
-            "enc key must be 32 bytes, got {}",
-            enc_key.len()
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("enc key must be 32 bytes, got {}", enc_key.len()),
+        });
     }
     if let Some(mac_key) = mac_key {
         if mac_key.len() != 32 {
-            return Err(AppError::validation(format!(
-                "mac key must be 32 bytes, got {}",
-                mac_key.len()
-            )));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("mac key must be 32 bytes, got {}", mac_key.len()),
+            });
         }
     }
     Ok(())
@@ -87,21 +94,33 @@ pub fn validate_key_lengths(enc_key: &[u8], mac_key: Option<&[u8]>) -> Result<()
 
 pub fn decrypt_cipher_string(value: &str, key: &VaultUserKeyMaterial) -> Result<String, AppError> {
     let plaintext = decrypt_cipher_bytes(value, key)?;
-    String::from_utf8(plaintext)
-        .map_err(|error| AppError::validation(format!("plaintext is not utf-8: {error}")))
+    String::from_utf8(plaintext).map_err(|error| AppError::ValidationFieldError {
+        field: "unknown".to_string(),
+        message: format!("plaintext is not utf-8: {error}"),
+    })
 }
 
 pub fn decrypt_cipher_bytes(value: &str, key: &VaultUserKeyMaterial) -> Result<Vec<u8>, AppError> {
     let trimmed = value.trim();
-    let (enc_type, payload) = trimmed
-        .split_once('.')
-        .ok_or_else(|| AppError::validation("cipher string missing encryption type"))?;
+    let (enc_type, payload) =
+        trimmed
+            .split_once('.')
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cipher string missing encryption type".to_string(),
+            })?;
     if enc_type.is_empty() || payload.is_empty() {
-        return Err(AppError::validation("cipher string has empty segments"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "cipher string has empty segments".to_string(),
+        });
     }
     let enc_type = enc_type
         .parse::<u8>()
-        .map_err(|_| AppError::validation("cipher string has invalid encryption type"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "cipher string has invalid encryption type".to_string(),
+        })?;
 
     match enc_type {
         0 => {
@@ -120,9 +139,10 @@ pub fn decrypt_cipher_bytes(value: &str, key: &VaultUserKeyMaterial) -> Result<V
             verify_mac(&iv, &ciphertext, &mac, key.mac_key.as_deref())?;
             decrypt_aes_cbc(&iv, &ciphertext, &key.enc_key)
         }
-        _ => Err(AppError::validation(format!(
-            "unsupported cipher string encryption type: {enc_type}"
-        ))),
+        _ => Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("unsupported cipher string encryption type: {enc_type}"),
+        }),
     }
 }
 
@@ -132,7 +152,10 @@ pub fn decode_base64_flexible(value: &str, label: &str) -> Result<Vec<u8>, AppEr
         .or_else(|_| STANDARD_NO_PAD.decode(value))
         .or_else(|_| URL_SAFE.decode(value))
         .or_else(|_| URL_SAFE_NO_PAD.decode(value))
-        .map_err(|_| AppError::validation(format!("{label} is not valid base64")))
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("{label} is not valid base64"),
+        })
 }
 
 pub fn looks_like_cipher_string(value: &str) -> bool {
@@ -163,8 +186,9 @@ pub fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKeyMaterial, AppEr
         _ => {}
     }
 
-    let text = std::str::from_utf8(raw).map_err(|error| {
-        AppError::validation(format!("user_key plaintext is not utf-8: {error}"))
+    let text = std::str::from_utf8(raw).map_err(|error| AppError::ValidationFieldError {
+        field: "unknown".to_string(),
+        message: format!("user_key plaintext is not utf-8: {error}"),
     })?;
     parse_user_key(text)
 }
@@ -172,9 +196,10 @@ pub fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKeyMaterial, AppEr
 fn split_cipher_payload(payload: &str, expected: usize) -> Result<Vec<&str>, AppError> {
     let parts: Vec<&str> = payload.split('|').collect();
     if parts.len() != expected || parts.iter().any(|part| part.trim().is_empty()) {
-        return Err(AppError::validation(
-            "cipher string payload shape is invalid",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "cipher string payload shape is invalid".to_string(),
+        });
     }
     Ok(parts)
 }
@@ -185,24 +210,39 @@ fn verify_mac(
     mac: &[u8],
     mac_key: Option<&[u8]>,
 ) -> Result<(), AppError> {
-    let mac_key =
-        mac_key.ok_or_else(|| AppError::validation("mac key required for encryption type 2"))?;
-    let mut signer = HmacSha256::new_from_slice(mac_key)
-        .map_err(|error| AppError::validation(format!("invalid mac key: {error}")))?;
+    let mac_key = mac_key.ok_or_else(|| AppError::ValidationFieldError {
+        field: "unknown".to_string(),
+        message: "mac key required for encryption type 2".to_string(),
+    })?;
+    let mut signer =
+        HmacSha256::new_from_slice(mac_key).map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("invalid mac key: {error}"),
+        })?;
     signer.update(iv);
     signer.update(ciphertext);
     signer
         .verify_slice(mac)
-        .map_err(|_| AppError::validation("cipher string mac verification failed"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "cipher string mac verification failed".to_string(),
+        })?;
     Ok(())
 }
 
 fn decrypt_aes_cbc(iv: &[u8], ciphertext: &[u8], enc_key: &[u8]) -> Result<Vec<u8>, AppError> {
     let mut buffer = ciphertext.to_vec();
-    let decryptor = Aes256CbcDecryptor::new_from_slices(enc_key, iv)
-        .map_err(|error| AppError::validation(format!("invalid aes key/iv: {error}")))?;
+    let decryptor = Aes256CbcDecryptor::new_from_slices(enc_key, iv).map_err(|error| {
+        AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("invalid aes key/iv: {error}"),
+        }
+    })?;
     let plaintext = decryptor
         .decrypt_padded_mut::<Pkcs7>(&mut buffer)
-        .map_err(|_| AppError::validation("ciphertext decryption failed"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "ciphertext decryption failed".to_string(),
+        })?;
     Ok(plaintext.to_vec())
 }

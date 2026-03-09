@@ -52,36 +52,46 @@ impl NotificationPort for VaultwardenNotificationPort {
         require_non_empty(&command.base_url, "base_url")?;
         require_non_empty(&command.access_token, "access_token")?;
         if command.queue_limit == 0 {
-            return Err(AppError::validation(
-                "queue_limit must be greater than zero",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "queue_limit must be greater than zero".to_string(),
+            });
         }
         if command.connect_timeout_ms == 0 {
-            return Err(AppError::validation(
-                "connect_timeout_ms must be greater than zero",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "connect_timeout_ms must be greater than zero".to_string(),
+            });
         }
         if command.handshake_timeout_ms == 0 {
-            return Err(AppError::validation(
-                "handshake_timeout_ms must be greater than zero",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "handshake_timeout_ms must be greater than zero".to_string(),
+            });
         }
         if command.shutdown_timeout_ms == 0 {
-            return Err(AppError::validation(
-                "shutdown_timeout_ms must be greater than zero",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "shutdown_timeout_ms must be greater than zero".to_string(),
+            });
         }
 
         self.disconnect(&command.account_id).await?;
 
         let endpoint = websocket_endpoint(&command.base_url)?;
-        let mut request = endpoint.into_client_request().map_err(|error| {
-            AppError::remote(format!("failed to build websocket request: {error}"))
-        })?;
+        let mut request =
+            endpoint
+                .into_client_request()
+                .map_err(|error| AppError::NetworkRemoteError {
+                    status: 0,
+                    message: format!("failed to build websocket request: {error}"),
+                })?;
         let bearer = format!("Bearer {}", command.access_token);
-        let header_value = HeaderValue::from_str(&bearer).map_err(|error| {
-            AppError::validation(format!("invalid access token header: {error}"))
-        })?;
+        let header_value =
+            HeaderValue::from_str(&bearer).map_err(|error| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("invalid access token header: {error}"),
+            })?;
         request.headers_mut().insert(AUTHORIZATION, header_value);
 
         let (mut stream, _) = timeout(
@@ -89,20 +99,25 @@ impl NotificationPort for VaultwardenNotificationPort {
             connect_async(request),
         )
         .await
-        .map_err(|_| {
-            AppError::remote(format!(
+        .map_err(|_| AppError::NetworkRemoteError {
+            status: 0,
+            message: format!(
                 "websocket connect timeout after {}ms",
                 command.connect_timeout_ms
-            ))
+            ),
         })?
-        .map_err(|error| AppError::remote(format!("failed to connect websocket: {error}")))?;
+        .map_err(|error| AppError::NetworkRemoteError {
+            status: 0,
+            message: format!("failed to connect websocket: {error}"),
+        })?;
 
         let handshake_message = format!("{INITIAL_HANDSHAKE_PAYLOAD}{RECORD_SEPARATOR}");
         stream
             .send(Message::Text(handshake_message.into()))
             .await
-            .map_err(|error| {
-                AppError::remote(format!("failed to send websocket handshake: {error}"))
+            .map_err(|error| AppError::NetworkRemoteError {
+                status: 0,
+                message: format!("failed to send websocket handshake: {error}"),
             })?;
 
         if let Err(error) = wait_handshake_ack(&mut stream, command.handshake_timeout_ms).await {
@@ -200,18 +215,25 @@ async fn wait_handshake_ack(
 
     loop {
         let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now()) else {
-            return Err(AppError::remote(format!(
-                "websocket handshake ack timeout after {}ms",
-                handshake_timeout_ms
-            )));
+            return Err(AppError::NetworkRemoteError {
+                status: 0,
+                message: format!(
+                    "websocket handshake ack timeout after {}ms",
+                    handshake_timeout_ms
+                ),
+            });
         };
 
-        let message = timeout(remaining, stream.next()).await.map_err(|_| {
-            AppError::remote(format!(
-                "websocket handshake ack timeout after {}ms",
-                handshake_timeout_ms
-            ))
-        })?;
+        let message =
+            timeout(remaining, stream.next())
+                .await
+                .map_err(|_| AppError::NetworkRemoteError {
+                    status: 0,
+                    message: format!(
+                        "websocket handshake ack timeout after {}ms",
+                        handshake_timeout_ms
+                    ),
+                })?;
 
         match message {
             Some(Ok(Message::Text(text))) => {
@@ -219,41 +241,54 @@ async fn wait_handshake_ack(
                     return Ok(());
                 }
 
-                return Err(AppError::remote(format!(
-                    "unexpected websocket handshake ack text payload: {text}"
-                )));
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: format!("unexpected websocket handshake ack text payload: {text}"),
+                });
             }
             Some(Ok(Message::Binary(payload))) => {
                 if is_handshake_ack_binary(&payload) {
                     return Ok(());
                 }
 
-                return Err(AppError::remote(
-                    "unexpected websocket handshake ack binary payload",
-                ));
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: "unexpected websocket handshake ack binary payload".to_string(),
+                });
             }
             Some(Ok(Message::Ping(payload))) => {
                 stream.send(Message::Pong(payload)).await.map_err(|error| {
-                    AppError::remote(format!(
-                        "failed to send websocket pong during handshake: {error}"
-                    ))
+                    AppError::NetworkRemoteError {
+                        status: 0,
+                        message: format!("failed to send websocket pong during handshake: {error}"),
+                    }
                 })?;
             }
             Some(Ok(Message::Pong(_))) => {}
             Some(Ok(Message::Close(_))) => {
-                return Err(AppError::remote("websocket closed before handshake ack"));
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: "websocket closed before handshake ack".to_string(),
+                });
             }
             Some(Ok(other)) => {
-                return Err(AppError::remote(format!(
-                    "unexpected websocket handshake ack frame: {other:?}"
-                )));
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: format!("unexpected websocket handshake ack frame: {other:?}"),
+                });
             }
             Some(Err(error)) => {
-                return Err(AppError::remote(format!(
-                    "websocket handshake ack failed: {error}"
-                )));
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: format!("websocket handshake ack failed: {error}"),
+                });
             }
-            None => return Err(AppError::remote("websocket closed before handshake ack")),
+            None => {
+                return Err(AppError::NetworkRemoteError {
+                    status: 0,
+                    message: "websocket closed before handshake ack".to_string(),
+                })
+            }
         }
     }
 }
@@ -375,9 +410,10 @@ fn websocket_endpoint(base_url: &str) -> AppResult<String> {
         return Ok(endpoint.replacen("http://", "ws://", 1));
     }
 
-    Err(AppError::validation(
-        "base_url must start with http:// or https://",
-    ))
+    Err(AppError::ValidationFieldError {
+        field: "unknown".to_string(),
+        message: "base_url must start with http:// or https://".to_string(),
+    })
 }
 
 fn is_handshake_ack_text(value: &str) -> bool {
@@ -393,20 +429,28 @@ fn parse_signalr_payload(bytes: &[u8]) -> AppResult<Vec<MsgpackValue>> {
     let mut values = Vec::new();
 
     while cursor < bytes.len() {
-        let (frame_length, consumed_bytes) = decode_varint(&bytes[cursor..])
-            .ok_or_else(|| AppError::remote("invalid signalr websocket frame length prefix"))?;
+        let (frame_length, consumed_bytes) =
+            decode_varint(&bytes[cursor..]).ok_or_else(|| AppError::NetworkRemoteError {
+                status: 0,
+                message: "invalid signalr websocket frame length prefix".to_string(),
+            })?;
         cursor = cursor.saturating_add(consumed_bytes);
 
         let frame_end = cursor.saturating_add(frame_length);
         if frame_end > bytes.len() {
-            return Err(AppError::remote(
-                "signalr websocket frame length exceeds payload",
-            ));
+            return Err(AppError::NetworkRemoteError {
+                status: 0,
+                message: "signalr websocket frame length exceeds payload".to_string(),
+            });
         }
 
         let frame_bytes = &bytes[cursor..frame_end];
-        let value = read_value(&mut Cursor::new(frame_bytes))
-            .map_err(|error| AppError::remote(format!("messagepack decode failed: {error}")))?;
+        let value = read_value(&mut Cursor::new(frame_bytes)).map_err(|error| {
+            AppError::NetworkRemoteError {
+                status: 0,
+                message: format!("messagepack decode failed: {error}"),
+            }
+        })?;
         values.push(value);
         cursor = frame_end;
     }
@@ -552,13 +596,18 @@ fn msgpack_to_json(value: &MsgpackValue) -> JsonValue {
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("{field} cannot be empty"),
+        });
     }
     Ok(())
 }

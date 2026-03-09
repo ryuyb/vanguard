@@ -98,10 +98,16 @@ pub fn encrypt_refresh_token(
     refresh_token: &str,
 ) -> AppResult<(PersistedEncryptedSession, SessionWrapRuntime)> {
     if master_password.trim().is_empty() {
-        return Err(AppError::validation("master_password cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "master_password cannot be empty".to_string(),
+        });
     }
     if refresh_token.trim().is_empty() {
-        return Err(AppError::validation("refresh_token cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "refresh_token cannot be empty".to_string(),
+        });
     }
 
     let mut salt = [0u8; WRAP_SALT_LEN];
@@ -133,19 +139,25 @@ pub fn decrypt_refresh_token(
     encrypted: &PersistedEncryptedSession,
 ) -> AppResult<(String, SessionWrapRuntime)> {
     if master_password.trim().is_empty() {
-        return Err(AppError::validation("master_password cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "master_password cannot be empty".to_string(),
+        });
     }
     if encrypted.algorithm != WRAP_ALGORITHM {
-        return Err(AppError::validation(format!(
-            "unsupported encrypted session algorithm: {}",
-            encrypted.algorithm
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!(
+                "unsupported encrypted session algorithm: {}",
+                encrypted.algorithm
+            ),
+        });
     }
     if encrypted.kdf != WRAP_KDF {
-        return Err(AppError::validation(format!(
-            "unsupported encrypted session kdf: {}",
-            encrypted.kdf
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("unsupported encrypted session kdf: {}", encrypted.kdf),
+        });
     }
 
     let salt = decode_fixed_len(
@@ -160,13 +172,15 @@ pub fn decrypt_refresh_token(
     )?;
     let ciphertext = STANDARD_NO_PAD
         .decode(encrypted.ciphertext_b64.as_bytes())
-        .map_err(|_| {
-            AppError::validation("encrypted_session.ciphertext_b64 is not valid base64")
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "encrypted_session.ciphertext_b64 is not valid base64".to_string(),
         })?;
     if ciphertext.is_empty() {
-        return Err(AppError::validation(
-            "encrypted_session.ciphertext_b64 is empty",
-        ));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "encrypted_session.ciphertext_b64 is empty".to_string(),
+        });
     }
 
     let key = derive_wrap_key(
@@ -186,14 +200,16 @@ pub fn decrypt_refresh_token(
                 aad: aad.as_bytes(),
             },
         )
-        .map_err(|_| {
-            AppError::validation(
-                "failed to decrypt persisted session with provided master password",
-            )
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "failed to decrypt persisted session with provided master password"
+                .to_string(),
         })?;
-    let refresh_token = String::from_utf8(plaintext).map_err(|error| {
-        AppError::validation(format!("decrypted session is not utf-8: {error}"))
-    })?;
+    let refresh_token =
+        String::from_utf8(plaintext).map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("decrypted session is not utf-8: {error}"),
+        })?;
     let runtime = SessionWrapRuntime {
         key,
         kdf_memory_kib: encrypted.kdf_memory_kib,
@@ -212,7 +228,10 @@ pub fn encrypt_refresh_token_with_runtime(
     refresh_token: &str,
 ) -> AppResult<PersistedEncryptedSession> {
     if refresh_token.trim().is_empty() {
-        return Err(AppError::validation("refresh_token cannot be empty"));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "refresh_token cannot be empty".to_string(),
+        });
     }
 
     let mut nonce = [0u8; WRAP_NONCE_LEN];
@@ -227,7 +246,10 @@ pub fn encrypt_refresh_token_with_runtime(
                 aad: aad.as_bytes(),
             },
         )
-        .map_err(|_| AppError::validation("failed to encrypt persisted refresh token"))?;
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "failed to encrypt persisted refresh token".to_string(),
+        })?;
 
     Ok(PersistedEncryptedSession {
         algorithm: String::from(WRAP_ALGORITHM),
@@ -242,14 +264,21 @@ pub fn encrypt_refresh_token_with_runtime(
 }
 
 fn decode_fixed_len(value: &str, expected_len: usize, field_name: &str) -> AppResult<Vec<u8>> {
-    let decoded = STANDARD_NO_PAD
-        .decode(value.as_bytes())
-        .map_err(|_| AppError::validation(format!("{field_name} is not valid base64")))?;
+    let decoded =
+        STANDARD_NO_PAD
+            .decode(value.as_bytes())
+            .map_err(|_| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("{field_name} is not valid base64"),
+            })?;
     if decoded.len() != expected_len {
-        return Err(AppError::validation(format!(
-            "{field_name} must decode to {expected_len} bytes, got {}",
-            decoded.len()
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!(
+                "{field_name} must decode to {expected_len} bytes, got {}",
+                decoded.len()
+            ),
+        });
     }
     Ok(decoded)
 }
@@ -263,18 +292,20 @@ fn derive_wrap_key(
 ) -> AppResult<[u8; WRAP_KEY_LEN]> {
     let params = Params::new(memory_kib, iterations, parallelism, Some(WRAP_KEY_LEN))
         .map_err(|error| {
-            AppError::validation(format!(
-                "invalid session wrap argon2 params memory_kib={memory_kib} iterations={iterations} parallelism={parallelism}: {error}"
-            ))
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!(
+                    "invalid session wrap argon2 params memory_kib={memory_kib} iterations={iterations} parallelism={parallelism}: {error}"
+                ),
+            }
         })?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut key = [0u8; WRAP_KEY_LEN];
     argon2
         .hash_password_into(master_password.as_bytes(), salt, &mut key)
-        .map_err(|error| {
-            AppError::validation(format!(
-                "failed to derive session wrap key with argon2id: {error}"
-            ))
+        .map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("failed to derive session wrap key with argon2id: {error}"),
         })?;
     Ok(key)
 }
@@ -290,7 +321,9 @@ fn build_aad(account_id: &str, base_url: &str, email: &str) -> String {
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }
 

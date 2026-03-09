@@ -71,11 +71,15 @@ mod imp {
     ) -> AppResult<()> {
         let account_key = normalize_account_id(account_id)?;
         if envelope.account_id.trim() != account_key {
-            return Err(AppError::validation("pin envelope account_id mismatch"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin envelope account_id mismatch".to_string(),
+            });
         }
-        let serialized = serde_json::to_string(envelope).map_err(|error| {
-            AppError::internal(format!("failed to serialize pin envelope: {error}"))
-        })?;
+        let serialized =
+            serde_json::to_string(envelope).map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to serialize pin envelope: {error}"),
+            })?;
 
         let mut delete_options = options_for_account(&account_key);
         delete_options.set_access_synchronized(Some(false));
@@ -104,21 +108,26 @@ mod imp {
 
         match generic_password(options) {
             Ok(value) => {
-                let text = String::from_utf8(value).map_err(|error| {
-                    AppError::internal(format!(
-                        "pin keychain entry contains non-utf8 data: {error}"
-                    ))
-                })?;
+                let text =
+                    String::from_utf8(value).map_err(|error| AppError::InternalUnexpected {
+                        message: format!("pin keychain entry contains non-utf8 data: {error}"),
+                    })?;
                 let payload = serde_json::from_str::<PersistentPinEnvelope>(&text).map_err(|error| {
-                    AppError::validation(format!(
-                        "pin keychain entry is invalid or legacy format, please disable and re-enable pin unlock: {error}"
-                    ))
+                    AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: format!(
+                            "pin keychain entry is invalid or legacy format, please disable and re-enable pin unlock: {error}"
+                        ),
+                    }
                 })?;
                 Ok(payload)
             }
-            Err(error) if error.code() == errSecItemNotFound => Err(AppError::validation(
-                "persistent pin unlock is not configured for this account",
-            )),
+            Err(error) if error.code() == errSecItemNotFound => {
+                Err(AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "persistent pin unlock is not configured for this account".to_string(),
+                })
+            }
             Err(error) => Err(map_keychain_error(
                 "failed to read pin keychain entry",
                 error,
@@ -163,19 +172,23 @@ mod imp {
     fn normalize_account_id(value: &str) -> AppResult<String> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
-            return Err(AppError::validation(
-                "account_id is empty, cannot use pin unlock",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "account_id is empty, cannot use pin unlock".to_string(),
+            });
         }
         Ok(String::from(trimmed))
     }
 
     fn map_keychain_error(context: &str, error: Error) -> AppError {
         match error.code() {
-            ERR_SEC_MISSING_ENTITLEMENT => AppError::validation(
-                "pin unlock requires a signed macOS app with keychain entitlements (errSecMissingEntitlement, -34018). tauri dev's unsigned runtime cannot use persistent pin items; run a signed .app build instead",
-            ),
-            _ => AppError::internal(format!("{context}: status={} error={error}", error.code())),
+            ERR_SEC_MISSING_ENTITLEMENT => AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "pin unlock requires a signed macOS app with keychain entitlements (errSecMissingEntitlement, -34018). tauri dev's unsigned runtime cannot use persistent pin items; run a signed .app build instead".to_string(),
+            },
+            _ => AppError::InternalUnexpected {
+                message: format!("{context}: status={} error={error}", error.code()),
+            },
         }
     }
 }
@@ -190,15 +203,17 @@ mod imp {
         _account_id: &str,
         _envelope: &PersistentPinEnvelope,
     ) -> AppResult<()> {
-        Err(AppError::validation(
-            "pin unlock is only supported on macOS",
-        ))
+        Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin unlock is only supported on macOS".to_string(),
+        })
     }
 
     pub fn load_persistent_pin_envelope(_account_id: &str) -> AppResult<PersistentPinEnvelope> {
-        Err(AppError::validation(
-            "pin unlock is only supported on macOS",
-        ))
+        Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "pin unlock is only supported on macOS".to_string(),
+        })
     }
 
     pub fn has_persistent_pin_envelope(_account_id: &str) -> AppResult<bool> {

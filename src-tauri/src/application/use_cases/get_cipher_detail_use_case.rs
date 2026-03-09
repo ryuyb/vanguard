@@ -39,8 +39,9 @@ impl GetCipherDetailUseCase {
             .sync_service
             .get_live_cipher(query.account_id.clone(), query.cipher_id.clone())
             .await?
-            .ok_or_else(|| {
-                AppError::validation(format!("cipher not found: {}", query.cipher_id))
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("cipher not found: {}", query.cipher_id),
             })?;
 
         decrypt_cipher_detail(cipher, &query.user_key)
@@ -110,24 +111,25 @@ fn resolve_cipher_decryption_key(
 
     if vault_crypto::looks_like_cipher_string(trimmed) {
         let decrypted = vault_crypto::decrypt_cipher_bytes(trimmed, user_key).map_err(|error| {
-            AppError::validation(format!(
-                "failed to decrypt field `cipher.key`: {}",
-                error.message()
-            ))
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("failed to decrypt field `cipher.key`: {}", error.message()),
+            }
         })?;
         return vault_crypto::parse_user_key_material(&decrypted).map_err(|error| {
-            AppError::validation(format!(
-                "failed to parse decrypted field `cipher.key`: {}",
-                error.message()
-            ))
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!(
+                    "failed to parse decrypted field `cipher.key`: {}",
+                    error.message()
+                ),
+            }
         });
     }
 
-    vault_crypto::parse_user_key(trimmed).map_err(|error| {
-        AppError::validation(format!(
-            "failed to parse field `cipher.key`: {}",
-            error.message()
-        ))
+    vault_crypto::parse_user_key(trimmed).map_err(|error| AppError::ValidationFieldError {
+        field: "unknown".to_string(),
+        message: format!("failed to parse field `cipher.key`: {}", error.message()),
     })
 }
 
@@ -676,7 +678,10 @@ fn decrypt_cipher_ssh_key_detail(
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("{field} cannot be empty"),
+        });
     }
     Ok(())
 }

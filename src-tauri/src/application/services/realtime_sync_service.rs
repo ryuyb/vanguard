@@ -84,7 +84,9 @@ impl RealtimeSyncService {
         let mut workers = self
             .workers
             .lock()
-            .map_err(|_| AppError::internal("failed to lock realtime sync workers"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock realtime sync workers".to_string(),
+            })?;
         workers.insert(account_id, handle);
         Ok(())
     }
@@ -112,7 +114,9 @@ impl RealtimeSyncService {
         let mut workers = self
             .workers
             .lock()
-            .map_err(|_| AppError::internal("failed to lock realtime sync workers"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock realtime sync workers".to_string(),
+            })?;
         if let Some(handle) = workers.remove(account_id) {
             handle.abort();
             log::info!(
@@ -768,7 +772,9 @@ fn reconnect_delay_ms(base_ms: u64, max_ms: u64, attempt: usize) -> u64 {
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationRequired {
+            field: field.to_string(),
+        });
     }
     Ok(())
 }
@@ -794,7 +800,12 @@ fn is_retryable_ws_error(error: &AppError) -> bool {
         return false;
     }
 
-    !matches!(error, AppError::Validation(_))
+    !matches!(
+        error,
+        AppError::ValidationFieldError { .. }
+            | AppError::ValidationFormatError { .. }
+            | AppError::ValidationRequired { .. }
+    )
 }
 
 fn is_sync_event_type(event_type: i32) -> bool {
@@ -930,27 +941,29 @@ mod tests {
 
     #[test]
     fn retryable_ws_error_reconnects_for_transient_disconnects() {
-        assert!(is_retryable_ws_error(&AppError::remote(
-            "connection reset by peer"
-        )));
-        assert!(is_retryable_ws_error(&AppError::remote_status(
-            502,
-            "bad gateway"
-        )));
+        assert!(is_retryable_ws_error(&AppError::NetworkRemoteError {
+            status: 0,
+            message: "connection reset by peer".to_string(),
+        }));
+        assert!(is_retryable_ws_error(&AppError::NetworkRemoteError {
+            status: 502,
+            message: "bad gateway".to_string()
+        }));
     }
 
     #[test]
     fn retryable_ws_error_stops_for_auth_and_validation() {
-        assert!(!is_retryable_ws_error(&AppError::remote_status(
-            401,
-            "unauthorized"
-        )));
-        assert!(!is_retryable_ws_error(&AppError::remote_status(
-            403,
-            "forbidden"
-        )));
-        assert!(!is_retryable_ws_error(&AppError::validation(
-            "invalid websocket endpoint"
-        )));
+        assert!(!is_retryable_ws_error(&AppError::NetworkRemoteError {
+            status: 401,
+            message: "unauthorized".to_string()
+        }));
+        assert!(!is_retryable_ws_error(&AppError::NetworkRemoteError {
+            status: 403,
+            message: "forbidden".to_string()
+        }));
+        assert!(!is_retryable_ws_error(&AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid websocket endpoint".to_string(),
+        }));
     }
 }

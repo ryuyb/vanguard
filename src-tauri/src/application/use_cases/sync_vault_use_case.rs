@@ -68,9 +68,9 @@ impl SyncVaultUseCase {
             }
         }
 
-        Err(AppError::internal(
-            "sync retry loop terminated unexpectedly without result",
-        ))
+        Err(AppError::InternalUnexpected {
+            message: "sync retry loop terminated unexpectedly without result".into(),
+        })
     }
 
     pub async fn execute_cipher_incremental(
@@ -526,10 +526,10 @@ impl SyncVaultUseCase {
         .await
         {
             Ok(result) => result,
-            Err(_) => Err(AppError::remote(format!(
-                "sync timed out after {}ms",
-                self.sync_policy.timeout_ms
-            ))),
+            Err(_) => Err(AppError::NetworkRemoteError {
+                status: 0,
+                message: format!("sync timed out after {}ms", self.sync_policy.timeout_ms),
+            }),
         }
     }
 
@@ -1104,7 +1104,12 @@ fn backoff_for_attempt(base_backoff_ms: u64, attempt: usize) -> u64 {
 }
 
 fn is_retryable_error(error: &AppError) -> bool {
-    if matches!(error, AppError::Validation(_)) {
+    if matches!(
+        error,
+        AppError::ValidationFieldError { .. }
+            | AppError::ValidationFormatError { .. }
+            | AppError::ValidationRequired { .. }
+    ) {
         return false;
     }
 
@@ -1156,13 +1161,18 @@ fn summarize_counts(payload: &crate::application::dto::sync::SyncVaultPayload) -
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("{field} cannot be empty"),
+        });
     }
     Ok(())
 }
@@ -1252,27 +1262,29 @@ mod tests {
 
     #[test]
     fn retryable_error_classifies_network_jitter_as_retryable() {
-        assert!(is_retryable_error(&AppError::remote(
-            "temporary network jitter"
-        )));
-        assert!(is_retryable_error(&AppError::remote_status(
-            503,
-            "service unavailable"
-        )));
+        assert!(is_retryable_error(&AppError::NetworkRemoteError {
+            status: 0,
+            message: "temporary network jitter".to_string(),
+        }));
+        assert!(is_retryable_error(&AppError::NetworkRemoteError {
+            status: 503,
+            message: "service unavailable".to_string()
+        }));
     }
 
     #[test]
     fn retryable_error_does_not_retry_auth_or_validation() {
-        assert!(!is_retryable_error(&AppError::remote_status(
-            401,
-            "unauthorized"
-        )));
-        assert!(!is_retryable_error(&AppError::remote_status(
-            403,
-            "forbidden"
-        )));
-        assert!(!is_retryable_error(&AppError::validation(
-            "invalid request"
-        )));
+        assert!(!is_retryable_error(&AppError::NetworkRemoteError {
+            status: 401,
+            message: "unauthorized".to_string()
+        }));
+        assert!(!is_retryable_error(&AppError::NetworkRemoteError {
+            status: 403,
+            message: "forbidden".to_string()
+        }));
+        assert!(!is_retryable_error(&AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "invalid request".to_string(),
+        }));
     }
 }

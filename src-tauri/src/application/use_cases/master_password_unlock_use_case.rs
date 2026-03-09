@@ -42,7 +42,10 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
     ) -> AppResult<UnlockVaultResult> {
         let master_password = master_password.trim().to_string();
         if master_password.is_empty() {
-            return Err(AppError::validation("master_password cannot be empty"));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "master_password cannot be empty".into(),
+            });
         }
 
         let unlock_context = resolve_unlock_context(runtime)?;
@@ -50,10 +53,10 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
             .master_password_unlock_data_port
             .load_master_password_unlock_data(&unlock_context.account_id)
             .await?
-            .ok_or_else(|| {
-                AppError::validation(
-                    "missing canonical master_password_unlock data in local vault metadata",
-                )
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "missing canonical master_password_unlock data in local vault metadata"
+                    .into(),
             })?;
 
         let master_key = derive_master_key(
@@ -64,10 +67,9 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
             unlock_data.kdf.memory,
             unlock_data.kdf.parallelism,
         )
-        .map_err(|error| {
-            AppError::validation(format!(
-                "failed to derive master key with canonical kdf params: {error}"
-            ))
+        .map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("failed to derive master key with canonical kdf params: {error}"),
         })?;
 
         let wrapping_key = derive_wrapping_key_material(&master_key)?;
@@ -75,18 +77,19 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
             unlock_data.master_key_wrapped_user_key.trim(),
             &wrapping_key,
         )
-        .map_err(|error| {
-            AppError::validation(format!(
+        .map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!(
                 "failed to decrypt master_key_wrapped_user_key: {}",
                 error.message()
-            ))
+            ),
         })?;
         let user_key =
             vault_crypto::parse_user_key_material(&plaintext_user_key).map_err(|error| {
-                AppError::validation(format!(
-                    "failed to parse decrypted user_key: {}",
-                    error.message()
-                ))
+                AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: format!("failed to parse decrypted user_key: {}", error.message()),
+                }
             })?;
 
         runtime.set_vault_user_key_material(unlock_context.account_id.clone(), user_key)?;
@@ -108,19 +111,23 @@ fn resolve_unlock_context(runtime: &dyn VaultRuntimePort) -> AppResult<VaultUnlo
         return Ok(auth_session);
     }
 
-    runtime.persisted_auth_context()?.ok_or_else(|| {
-        AppError::validation(
-            "no authenticated or persisted account state found, please login first",
-        )
-    })
+    runtime
+        .persisted_auth_context()?
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "no authenticated or persisted account state found, please login first".into(),
+        })
 }
 
 fn derive_wrapping_key_material(master_key: &[u8]) -> Result<VaultUserKeyMaterial, AppError> {
     if master_key.len() != MASTER_KEY_LEN {
-        return Err(AppError::validation(format!(
-            "master key length must be {MASTER_KEY_LEN} bytes, got {}",
-            master_key.len()
-        )));
+        return Err(AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!(
+                "master key length must be {MASTER_KEY_LEN} bytes, got {}",
+                master_key.len()
+            ),
+        });
     }
 
     Ok(VaultUserKeyMaterial {

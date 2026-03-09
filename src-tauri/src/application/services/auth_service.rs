@@ -55,7 +55,9 @@ impl AuthService {
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationRequired {
+            field: field.to_string(),
+        });
     }
 
     Ok(())

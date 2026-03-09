@@ -52,8 +52,9 @@ pub async fn restore_auth_session_with_master_password(
 ) -> AppResult<AuthSession> {
     let persisted = state
         .decrypt_persisted_auth_secret(master_password)?
-        .ok_or_else(|| {
-            AppError::validation("no persisted login state found in backend, please login first")
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "no persisted login state found in backend, please login first".to_string(),
         })?;
     let refresh_token = persisted.refresh_token.clone();
     let refreshed = match state
@@ -149,9 +150,14 @@ async fn refresh_auth_session_locked(
     state: &AppState,
     current: AuthSession,
 ) -> AppResult<AuthSession> {
-    let refresh_token = current.refresh_token.clone().ok_or_else(|| {
-        AppError::validation("current session missing refresh token, please login again")
-    })?;
+    let refresh_token =
+        current
+            .refresh_token
+            .clone()
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "current session missing refresh token, please login again".to_string(),
+            })?;
 
     let refreshed = match state
         .auth_service()
@@ -212,7 +218,9 @@ fn acquire_refresh_singleflight_lock(account_id: &str) -> AppResult<RefreshSingl
     let lock_store = REFRESH_SINGLEFLIGHT_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
     let mut locks = lock_store
         .lock()
-        .map_err(|_| AppError::internal("failed to lock refresh singleflight store"))?;
+        .map_err(|_| AppError::InternalUnexpected {
+            message: "failed to lock refresh singleflight store".to_string(),
+        })?;
     Ok(locks
         .entry(account_id.to_string())
         .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
@@ -282,6 +290,8 @@ fn calc_expires_at_ms(expires_in_seconds: i64) -> AppResult<i64> {
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }

@@ -28,11 +28,11 @@ const SQLITE_BUSY_TIMEOUT_MS: u64 = 5_000;
 impl SqliteVaultRepository {
     pub fn new<P: AsRef<Path>>(db_dir: P) -> AppResult<Self> {
         let db_dir = db_dir.as_ref().to_path_buf();
-        std::fs::create_dir_all(&db_dir).map_err(|error| {
-            AppError::internal(format!(
+        std::fs::create_dir_all(&db_dir).map_err(|error| AppError::InternalUnexpected {
+            message: format!(
                 "failed to create sqlite directory {}: {error}",
                 db_dir.display()
-            ))
+            ),
         })?;
 
         Ok(Self {
@@ -43,10 +43,12 @@ impl SqliteVaultRepository {
 
     fn account_connection(&self, account_id: &str) -> AppResult<Arc<Mutex<Connection>>> {
         {
-            let connections = self
-                .connections
-                .lock()
-                .map_err(|_| AppError::internal("failed to lock sqlite connections cache"))?;
+            let connections =
+                self.connections
+                    .lock()
+                    .map_err(|_| AppError::InternalUnexpected {
+                        message: "failed to lock sqlite connections cache".into(),
+                    })?;
             if let Some(connection) = connections.get(account_id) {
                 return Ok(Arc::clone(connection));
             }
@@ -55,10 +57,12 @@ impl SqliteVaultRepository {
         let db_path = self.db_path_for_account(account_id);
         let new_connection = Arc::new(Mutex::new(Self::open_connection(&db_path)?));
 
-        let mut connections = self
-            .connections
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock sqlite connections cache"))?;
+        let mut connections =
+            self.connections
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock sqlite connections cache".into(),
+                })?;
         if let Some(connection) = connections.get(account_id) {
             return Ok(Arc::clone(connection));
         }
@@ -81,11 +85,15 @@ impl SqliteVaultRepository {
         tokio::task::spawn_blocking(move || {
             let mut connection = connection
                 .lock()
-                .map_err(|_| AppError::internal("failed to lock sqlite account connection"))?;
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock sqlite account connection".into(),
+                })?;
             f(&mut connection, &account_id)
         })
         .await
-        .map_err(|error| AppError::internal(format!("sqlite task join error: {error}")))?
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("sqlite task join error: {error}"),
+        })?
     }
 
     fn db_path_for_account(&self, account_id: &str) -> PathBuf {
@@ -100,16 +108,17 @@ impl SqliteVaultRepository {
     }
 
     fn open_connection(db_path: &Path) -> AppResult<Connection> {
-        let connection = Connection::open(db_path).map_err(|error| {
-            AppError::internal(format!(
-                "failed to open sqlite database {}: {error}",
-                db_path.display()
-            ))
-        })?;
+        let connection =
+            Connection::open(db_path).map_err(|error| AppError::InternalUnexpected {
+                message: format!(
+                    "failed to open sqlite database {}: {error}",
+                    db_path.display()
+                ),
+            })?;
         connection
             .busy_timeout(Duration::from_millis(SQLITE_BUSY_TIMEOUT_MS))
-            .map_err(|error| {
-                AppError::internal(format!("failed to configure sqlite busy timeout: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to configure sqlite busy timeout: {error}"),
             })?;
         Self::initialize_schema(&connection)?;
         Ok(connection)
@@ -231,8 +240,8 @@ impl SqliteVaultRepository {
                 );
                 "#,
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to initialize sqlite schema: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to initialize sqlite schema: {error}"),
             })?;
         Ok(())
     }
@@ -259,8 +268,8 @@ impl SqliteVaultRepository {
                 "#,
                 params![account_id],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to ensure sync context row: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to ensure sync context row: {error}"),
             })?;
         Ok(())
     }
@@ -315,7 +324,9 @@ impl SqliteVaultRepository {
                 },
             )
             .optional()
-            .map_err(|error| AppError::internal(format!("failed to read sync context: {error}")))?;
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to read sync context: {error}"),
+            })?;
 
         match row {
             None => Ok(None),
@@ -356,9 +367,11 @@ impl SqliteVaultRepository {
     }
 
     fn begin_sql_transaction(connection: &mut Connection) -> AppResult<Transaction<'_>> {
-        connection.transaction().map_err(|error| {
-            AppError::internal(format!("failed to begin sqlite transaction: {error}"))
-        })
+        connection
+            .transaction()
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to begin sqlite transaction: {error}"),
+            })
     }
 
     fn ensure_active_transaction(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
@@ -369,15 +382,16 @@ impl SqliteVaultRepository {
                 |row| row.get::<_, i64>(0),
             )
             .optional()
-            .map_err(|error| {
-                AppError::internal(format!("failed to query active sync transaction: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to query active sync transaction: {error}"),
             })?
             .is_some();
 
         if !exists {
-            return Err(AppError::validation(format!(
-                "no active sync transaction for account_id={account_id}"
-            )));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("no active sync transaction for account_id={account_id}"),
+            });
         }
 
         Ok(())
@@ -388,41 +402,51 @@ impl SqliteVaultRepository {
             "DELETE FROM staging_profile WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear staging profile: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging profile: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM staging_folders WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear staging folders: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging folders: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM staging_collections WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to clear staging collections: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging collections: {error}"),
         })?;
         tx.execute(
             "DELETE FROM staging_policies WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to clear staging policies: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging policies: {error}"),
         })?;
         tx.execute(
             "DELETE FROM staging_ciphers WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear staging ciphers: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging ciphers: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM staging_sends WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear staging sends: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging sends: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM staging_meta WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear staging meta: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear staging meta: {error}"),
+        })?;
         Ok(())
     }
 
@@ -436,8 +460,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live profile to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live profile to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -448,8 +472,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live folders to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live folders to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -460,10 +484,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!(
-                "failed to copy live collections to staging: {error}"
-            ))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live collections to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -474,8 +496,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live policies to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live policies to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -486,8 +508,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live ciphers to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live ciphers to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -498,8 +520,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live sends to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live sends to staging: {error}"),
         })?;
         tx.execute(
             r#"
@@ -510,8 +532,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy live meta to staging: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy live meta to staging: {error}"),
         })?;
         Ok(())
     }
@@ -521,39 +543,51 @@ impl SqliteVaultRepository {
             "DELETE FROM live_profile WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live profile: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live profile: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM live_folders WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live folders: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live folders: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM live_collections WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to clear live collections: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live collections: {error}"),
         })?;
         tx.execute(
             "DELETE FROM live_policies WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live policies: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live policies: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM live_ciphers WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live ciphers: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live ciphers: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM live_sends WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live sends: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live sends: {error}"),
+        })?;
         tx.execute(
             "DELETE FROM live_meta WHERE account_id = ?1",
             params![account_id],
         )
-        .map_err(|error| AppError::internal(format!("failed to clear live meta: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to clear live meta: {error}"),
+        })?;
         Ok(())
     }
 
@@ -567,8 +601,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging profile to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging profile to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -579,8 +613,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging folders to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging folders to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -591,10 +625,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!(
-                "failed to copy staging collections to live: {error}"
-            ))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging collections to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -605,8 +637,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging policies to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging policies to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -617,8 +649,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging ciphers to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging ciphers to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -629,8 +661,8 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging sends to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging sends to live: {error}"),
         })?;
         tx.execute(
             r#"
@@ -641,20 +673,22 @@ impl SqliteVaultRepository {
             "#,
             params![account_id],
         )
-        .map_err(|error| {
-            AppError::internal(format!("failed to copy staging meta to live: {error}"))
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to copy staging meta to live: {error}"),
         })?;
         Ok(())
     }
 
     fn to_json<T: serde::Serialize>(value: &T, label: &str) -> AppResult<String> {
-        serde_json::to_string(value)
-            .map_err(|error| AppError::internal(format!("failed to serialize {label}: {error}")))
+        serde_json::to_string(value).map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to serialize {label}: {error}"),
+        })
     }
 
     fn from_json<T: serde::de::DeserializeOwned>(value: &str, label: &str) -> AppResult<T> {
-        serde_json::from_str(value)
-            .map_err(|error| AppError::internal(format!("failed to deserialize {label}: {error}")))
+        serde_json::from_str(value).map_err(|error| AppError::InternalUnexpected {
+            message: format!("failed to deserialize {label}: {error}"),
+        })
     }
 }
 
@@ -676,14 +710,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, base_url],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to set sync running: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to set sync running: {error}"),
                 })?;
 
             Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
-                AppError::internal(format!(
-                    "sync context missing after set_sync_running for account_id={account_id}"
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "sync context missing after set_sync_running for account_id={account_id}"
+                    ),
+                }
             })
         })
         .await
@@ -729,14 +765,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         i64::from(counts.sends)
                     ],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to set sync succeeded: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to set sync succeeded: {error}"),
                 })?;
 
             Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
-                AppError::internal(format!(
-                    "sync context missing after set_sync_succeeded for account_id={account_id}"
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "sync context missing after set_sync_succeeded for account_id={account_id}"
+                    ),
+                }
             })
         })
         .await
@@ -763,14 +801,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, base_url, error_message],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to set sync failed: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to set sync failed: {error}"),
                 })?;
 
             Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
-                AppError::internal(format!(
-                    "sync context missing after set_sync_failed for account_id={account_id}"
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "sync context missing after set_sync_failed for account_id={account_id}"
+                    ),
+                }
             })
         })
         .await
@@ -797,14 +837,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, base_url, error_message],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to set sync degraded: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to set sync degraded: {error}"),
                 })?;
 
             Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
-                AppError::internal(format!(
-                    "sync context missing after set_sync_degraded for account_id={account_id}"
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "sync context missing after set_sync_degraded for account_id={account_id}"
+                    ),
+                }
             })
         })
         .await
@@ -829,14 +871,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, ws_status_value(ws_status)],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to set websocket status: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to set websocket status: {error}"),
                 })?;
 
             Self::read_sync_context(connection, account_id)?.ok_or_else(|| {
-                AppError::internal(format!(
-                    "sync context missing after set_ws_status for account_id={account_id}"
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "sync context missing after set_ws_status for account_id={account_id}"
+                    ),
+                }
             })
         })
         .await
@@ -853,31 +897,32 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     |row| row.get::<_, i64>(0),
                 )
                 .optional()
-                .map_err(|error| {
-                    AppError::internal(format!(
-                        "failed to check existing sync transaction: {error}"
-                    ))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to check existing sync transaction: {error}"),
                 })?
                 .is_some();
             if exists {
-                return Err(AppError::validation(format!(
-                    "sync transaction already started for account_id={account_id}"
-                )));
+                return Err(AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: format!(
+                        "sync transaction already started for account_id={account_id}"
+                    ),
+                });
             }
 
             tx.execute(
                 "INSERT INTO sync_transactions (account_id, started_at_ms) VALUES (?1, ?2)",
                 params![account_id, now_unix_ms()?],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to create sync transaction marker: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to create sync transaction marker: {error}"),
             })?;
 
             Self::clear_staging_snapshot(&tx, account_id)?;
             Self::copy_live_to_staging(&tx, account_id)?;
 
-            tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit begin sync transaction: {error}"))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit begin sync transaction: {error}"),
             })?;
             Ok(())
         })
@@ -896,12 +941,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "DELETE FROM sync_transactions WHERE account_id = ?1",
                 params![account_id],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to clear sync transaction marker: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear sync transaction marker: {error}"),
             })?;
 
-            tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit sync transaction: {error}"))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit sync transaction: {error}"),
             })?;
             Ok(())
         })
@@ -917,11 +962,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "DELETE FROM sync_transactions WHERE account_id = ?1",
                 params![account_id],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to clear sync transaction marker: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear sync transaction marker: {error}"),
             })?;
-            tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to rollback sync transaction: {error}"))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to rollback sync transaction: {error}"),
             })?;
             Ok(())
         })
@@ -941,13 +986,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "#,
                 params![account_id, payload_json],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to upsert staging profile: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to upsert staging profile: {error}"),
             })?;
-            tx.commit().map_err(|error| {
-                AppError::internal(format!(
-                    "failed to commit upsert profile transaction: {error}"
-                ))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert profile transaction: {error}"),
             })?;
             Ok(())
         })
@@ -968,19 +1011,19 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         "#,
                     )
                     .map_err(|error| {
-                        AppError::internal(format!("failed to prepare folder upsert statement: {error}"))
+                        AppError::InternalUnexpected { message: format!("failed to prepare folder upsert statement: {error}") }
                     })?;
                 for folder in folders {
                     let payload_json = Self::to_json(&folder, "sync folder")?;
                     statement
                         .execute(params![account_id, folder.id, payload_json])
                         .map_err(|error| {
-                            AppError::internal(format!("failed to upsert staging folder: {error}"))
+                            AppError::InternalUnexpected { message: format!("failed to upsert staging folder: {error}") }
                         })?;
                 }
             }
             tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit upsert folders transaction: {error}"))
+                AppError::InternalUnexpected { message: format!("failed to commit upsert folders transaction: {error}") }
             })?;
             Ok(())
         })
@@ -999,8 +1042,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, folder.id, payload_json],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to upsert live folder: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to upsert live folder: {error}"),
                 })?;
             Ok(())
         })
@@ -1015,8 +1058,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "DELETE FROM live_folders WHERE account_id = ?1 AND id = ?2",
                     params![account_id, folder_id],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to delete live folder: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to delete live folder: {error}"),
                 })?;
             Ok(())
         })
@@ -1031,8 +1074,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     params![account_id],
                     |row| row.get::<_, i64>(0),
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to count live folders: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to count live folders: {error}"),
                 })?;
             to_u32(count, "live_folders_count")
         })
@@ -1050,23 +1093,24 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     ORDER BY id ASC
                     "#,
                 )
-                .map_err(|error| {
-                    AppError::internal(format!(
-                        "failed to prepare list live folders statement: {error}"
-                    ))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to prepare list live folders statement: {error}"),
                 })?;
 
             let mut rows = statement.query(params![account_id]).map_err(|error| {
-                AppError::internal(format!("failed to query live folders: {error}"))
+                AppError::InternalUnexpected {
+                    message: format!("failed to query live folders: {error}"),
+                }
             })?;
 
             let mut folders = Vec::new();
-            while let Some(row) = rows.next().map_err(|error| {
-                AppError::internal(format!("failed to iterate live folders: {error}"))
+            while let Some(row) = rows.next().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to iterate live folders: {error}"),
             })? {
-                let payload_json: String = row.get(0).map_err(|error| {
-                    AppError::internal(format!("failed to read live folder payload: {error}"))
-                })?;
+                let payload_json: String =
+                    row.get(0).map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to read live folder payload: {error}"),
+                    })?;
                 folders.push(Self::from_json(&payload_json, "live sync folder payload")?);
             }
 
@@ -1093,25 +1137,25 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         "#,
                     )
                     .map_err(|error| {
-                        AppError::internal(format!(
+                        AppError::InternalUnexpected { message: format!(
                             "failed to prepare collection upsert statement: {error}"
-                        ))
+                        ) }
                     })?;
                 for collection in collections {
                     let payload_json = Self::to_json(&collection, "sync collection")?;
                     statement
                         .execute(params![account_id, collection.id, payload_json])
                         .map_err(|error| {
-                            AppError::internal(format!(
+                            AppError::InternalUnexpected { message: format!(
                                 "failed to upsert staging collection: {error}"
-                            ))
+                            ) }
                         })?;
                 }
             }
             tx.commit().map_err(|error| {
-                AppError::internal(format!(
+                AppError::InternalUnexpected { message: format!(
                     "failed to commit upsert collections transaction: {error}"
-                ))
+                ) }
             })?;
             Ok(())
         })
@@ -1132,19 +1176,19 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         "#,
                     )
                     .map_err(|error| {
-                        AppError::internal(format!("failed to prepare policy upsert statement: {error}"))
+                        AppError::InternalUnexpected { message: format!("failed to prepare policy upsert statement: {error}") }
                     })?;
                 for policy in policies {
                     let payload_json = Self::to_json(&policy, "sync policy")?;
                     statement
                         .execute(params![account_id, policy.id, payload_json])
                         .map_err(|error| {
-                            AppError::internal(format!("failed to upsert staging policy: {error}"))
+                            AppError::InternalUnexpected { message: format!("failed to upsert staging policy: {error}") }
                         })?;
                 }
             }
             tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit upsert policies transaction: {error}"))
+                AppError::InternalUnexpected { message: format!("failed to commit upsert policies transaction: {error}") }
             })?;
             Ok(())
         })
@@ -1165,7 +1209,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         "#,
                     )
                     .map_err(|error| {
-                        AppError::internal(format!("failed to prepare cipher upsert statement: {error}"))
+                        AppError::InternalUnexpected { message: format!("failed to prepare cipher upsert statement: {error}") }
                     })?;
                 for cipher in ciphers {
                     let sanitized = sanitize_cipher_for_persistence(cipher);
@@ -1173,12 +1217,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     statement
                         .execute(params![account_id, sanitized.id, payload_json])
                         .map_err(|error| {
-                            AppError::internal(format!("failed to upsert staging cipher: {error}"))
+                            AppError::InternalUnexpected { message: format!("failed to upsert staging cipher: {error}") }
                         })?;
                 }
             }
             tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit upsert ciphers transaction: {error}"))
+                AppError::InternalUnexpected { message: format!("failed to commit upsert ciphers transaction: {error}") }
             })?;
             Ok(())
         })
@@ -1198,8 +1242,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, sanitized.id, payload_json],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to upsert live cipher: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to upsert live cipher: {error}"),
                 })?;
             Ok(())
         })
@@ -1214,8 +1258,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "DELETE FROM live_ciphers WHERE account_id = ?1 AND id = ?2",
                     params![account_id, cipher_id],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to delete live cipher: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to delete live cipher: {error}"),
                 })?;
             Ok(())
         })
@@ -1230,8 +1274,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     params![account_id],
                     |row| row.get::<_, i64>(0),
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to count live ciphers: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to count live ciphers: {error}"),
                 })?;
             to_u32(count, "live_ciphers_count")
         })
@@ -1258,8 +1302,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     |row| row.get(0),
                 )
                 .optional()
-                .map_err(|error| {
-                    AppError::internal(format!("failed to query live cipher by id: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to query live cipher by id: {error}"),
                 })?;
 
             payload_json
@@ -1286,25 +1330,24 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     LIMIT ?2 OFFSET ?3
                     "#,
                 )
-                .map_err(|error| {
-                    AppError::internal(format!(
-                        "failed to prepare list live ciphers statement: {error}"
-                    ))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to prepare list live ciphers statement: {error}"),
                 })?;
 
             let mut rows = statement
                 .query(params![account_id, i64::from(limit), i64::from(offset)])
-                .map_err(|error| {
-                    AppError::internal(format!("failed to query live ciphers: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to query live ciphers: {error}"),
                 })?;
 
             let mut ciphers = Vec::new();
-            while let Some(row) = rows.next().map_err(|error| {
-                AppError::internal(format!("failed to iterate live ciphers: {error}"))
+            while let Some(row) = rows.next().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to iterate live ciphers: {error}"),
             })? {
-                let payload_json: String = row.get(0).map_err(|error| {
-                    AppError::internal(format!("failed to read live cipher payload: {error}"))
-                })?;
+                let payload_json: String =
+                    row.get(0).map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to read live cipher payload: {error}"),
+                    })?;
                 ciphers.push(Self::from_json(&payload_json, "live sync cipher payload")?);
             }
 
@@ -1327,19 +1370,19 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         "#,
                     )
                     .map_err(|error| {
-                        AppError::internal(format!("failed to prepare send upsert statement: {error}"))
+                        AppError::InternalUnexpected { message: format!("failed to prepare send upsert statement: {error}") }
                     })?;
                 for send in sends {
                     let payload_json = Self::to_json(&send, "sync send")?;
                     statement
                         .execute(params![account_id, send.id, payload_json])
                         .map_err(|error| {
-                            AppError::internal(format!("failed to upsert staging send: {error}"))
+                            AppError::InternalUnexpected { message: format!("failed to upsert staging send: {error}") }
                         })?;
                 }
             }
             tx.commit().map_err(|error| {
-                AppError::internal(format!("failed to commit upsert sends transaction: {error}"))
+                AppError::InternalUnexpected { message: format!("failed to commit upsert sends transaction: {error}") }
             })?;
             Ok(())
         })
@@ -1358,8 +1401,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "#,
                     params![account_id, send.id, payload_json],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to upsert live send: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to upsert live send: {error}"),
                 })?;
             Ok(())
         })
@@ -1374,8 +1417,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     "DELETE FROM live_sends WHERE account_id = ?1 AND id = ?2",
                     params![account_id, send_id],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to delete live send: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to delete live send: {error}"),
                 })?;
             Ok(())
         })
@@ -1390,8 +1433,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     params![account_id],
                     |row| row.get::<_, i64>(0),
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to count live sends: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to count live sends: {error}"),
                 })?;
             to_u32(count, "live_sends_count")
         })
@@ -1414,10 +1457,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "#,
                 params![account_id],
             )
-            .map_err(|error| {
-                AppError::internal(format!(
-                    "failed to ensure staging meta row for domains: {error}"
-                ))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to ensure staging meta row for domains: {error}"),
             })?;
 
             let domains_json = domains
@@ -1428,14 +1469,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "UPDATE staging_meta SET domains_json = ?2 WHERE account_id = ?1",
                 params![account_id, domains_json],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to upsert staging domains: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to upsert staging domains: {error}"),
             })?;
 
-            tx.commit().map_err(|error| {
-                AppError::internal(format!(
-                    "failed to commit upsert domains transaction: {error}"
-                ))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert domains transaction: {error}"),
             })?;
             Ok(())
         })
@@ -1458,10 +1497,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "#,
                 params![account_id],
             )
-            .map_err(|error| {
-                AppError::internal(format!(
-                    "failed to ensure staging meta row for user decryption: {error}"
-                ))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to ensure staging meta row for user decryption: {error}"),
             })?;
 
             let user_decryption_json = user_decryption
@@ -1472,14 +1509,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 "UPDATE staging_meta SET user_decryption_json = ?2 WHERE account_id = ?1",
                 params![account_id, user_decryption_json],
             )
-            .map_err(|error| {
-                AppError::internal(format!("failed to upsert staging user decryption: {error}"))
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to upsert staging user decryption: {error}"),
             })?;
 
-            tx.commit().map_err(|error| {
-                AppError::internal(format!(
-                    "failed to commit upsert user decryption transaction: {error}"
-                ))
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert user decryption transaction: {error}"),
             })?;
             Ok(())
         })
@@ -1502,8 +1537,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     |row| row.get::<_, Option<String>>(0),
                 )
                 .optional()
-                .map_err(|error| {
-                    AppError::internal(format!("failed to load live user decryption row: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to load live user decryption row: {error}"),
                 })?;
 
             match payload {
@@ -1546,8 +1581,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         sync_trigger_value(snapshot_meta.source)
                     ],
                 )
-                .map_err(|error| {
-                    AppError::internal(format!("failed to save vault snapshot meta: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to save vault snapshot meta: {error}"),
                 })?;
             Ok(())
         })
@@ -1576,8 +1611,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     },
                 )
                 .optional()
-                .map_err(|error| {
-                    AppError::internal(format!("failed to load vault snapshot meta: {error}"))
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to load vault snapshot meta: {error}"),
                 })?
                 .map(|(snapshot_revision_ms, snapshot_synced_at_ms, source)| {
                     Ok(VaultSnapshotMeta {
@@ -1599,9 +1634,9 @@ fn parse_sync_state(value: &str) -> AppResult<SyncState> {
         "succeeded" => Ok(SyncState::Succeeded),
         "degraded" => Ok(SyncState::Degraded),
         "failed" => Ok(SyncState::Failed),
-        _ => Err(AppError::internal(format!(
-            "invalid sync state value in database: {value}"
-        ))),
+        _ => Err(AppError::InternalUnexpected {
+            message: format!("invalid sync state value in database: {value}"),
+        }),
     }
 }
 
@@ -1610,9 +1645,9 @@ fn parse_ws_status(value: &str) -> AppResult<WsStatus> {
         "unknown" => Ok(WsStatus::Unknown),
         "connected" => Ok(WsStatus::Connected),
         "disconnected" => Ok(WsStatus::Disconnected),
-        _ => Err(AppError::internal(format!(
-            "invalid ws status value in database: {value}"
-        ))),
+        _ => Err(AppError::InternalUnexpected {
+            message: format!("invalid ws status value in database: {value}"),
+        }),
     }
 }
 
@@ -1631,9 +1666,9 @@ fn parse_sync_trigger(value: &str) -> AppResult<SyncTrigger> {
         "poll" => Ok(SyncTrigger::Poll),
         "websocket" => Ok(SyncTrigger::WebSocket),
         "foreground" => Ok(SyncTrigger::Foreground),
-        _ => Err(AppError::internal(format!(
-            "invalid sync trigger value in database: {value}"
-        ))),
+        _ => Err(AppError::InternalUnexpected {
+            message: format!("invalid sync trigger value in database: {value}"),
+        }),
     }
 }
 
@@ -1649,9 +1684,9 @@ fn sync_trigger_value(value: SyncTrigger) -> &'static str {
 
 fn to_u32(value: i64, field: &str) -> AppResult<u32> {
     if value < 0 || value > i64::from(u32::MAX) {
-        return Err(AppError::internal(format!(
-            "invalid non-u32 value for {field}: {value}"
-        )));
+        return Err(AppError::InternalUnexpected {
+            message: format!("invalid non-u32 value for {field}: {value}"),
+        });
     }
     Ok(value as u32)
 }
@@ -1659,7 +1694,9 @@ fn to_u32(value: i64, field: &str) -> AppResult<u32> {
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }
 

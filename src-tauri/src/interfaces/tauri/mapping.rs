@@ -179,16 +179,14 @@ pub fn to_vault_cipher_detail_dto(
     detail: VaultCipherDetail,
 ) -> Result<VaultCipherDetailDto, AppError> {
     let has_totp = has_cipher_totp(&detail);
-    let mut raw = serde_json::to_value(detail).map_err(|error| {
-        AppError::internal(format!(
-            "failed to serialize application vault cipher detail: {error}"
-        ))
+    let mut raw = serde_json::to_value(detail).map_err(|error| AppError::InternalUnexpected {
+        message: format!("failed to serialize application vault cipher detail: {error}"),
     })?;
 
     let Some(root) = raw.as_object_mut() else {
-        return Err(AppError::internal(
-            "failed to map vault cipher detail dto: expected object payload",
-        ));
+        return Err(AppError::InternalUnexpected {
+            message: "failed to map vault cipher detail dto: expected object payload".to_string(),
+        });
     };
 
     if let Some(serde_json::Value::Object(login)) = root.get_mut("login") {
@@ -200,9 +198,9 @@ pub fn to_vault_cipher_detail_dto(
     root.insert(String::from("hasTotp"), serde_json::Value::Bool(has_totp));
 
     serde_json::from_value::<VaultCipherDetailDto>(raw).map_err(|error| {
-        AppError::internal(format!(
-            "failed to deserialize interface vault cipher detail dto: {error}"
-        ))
+        AppError::InternalUnexpected {
+            message: format!("failed to deserialize interface vault cipher detail dto: {error}"),
+        }
     })
 }
 

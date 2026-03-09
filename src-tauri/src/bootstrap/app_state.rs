@@ -168,7 +168,9 @@ impl AppState {
         let mut store = self
             .vault_user_keys
             .lock()
-            .map_err(|_| AppError::internal("failed to lock vault user key store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock vault user key store".to_string(),
+            })?;
         store.insert(account_id, key);
         Ok(())
     }
@@ -177,7 +179,9 @@ impl AppState {
         let mut store = self
             .vault_user_keys
             .lock()
-            .map_err(|_| AppError::internal("failed to lock vault user key store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock vault user key store".to_string(),
+            })?;
         store.remove(account_id);
         Ok(())
     }
@@ -186,7 +190,9 @@ impl AppState {
         let store = self
             .vault_user_keys
             .lock()
-            .map_err(|_| AppError::internal("failed to lock vault user key store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock vault user key store".to_string(),
+            })?;
         Ok(store.get(account_id).cloned())
     }
 
@@ -195,7 +201,9 @@ impl AppState {
             let mut store = self
                 .auth_session
                 .lock()
-                .map_err(|_| AppError::internal("failed to lock auth session store"))?;
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock auth session store".to_string(),
+                })?;
             let previous = store.as_ref().map(|value| value.account_id.clone());
             *store = Some(session.clone());
             previous
@@ -215,7 +223,9 @@ impl AppState {
             let mut store = self
                 .auth_session
                 .lock()
-                .map_err(|_| AppError::internal("failed to lock auth session store"))?;
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock auth session store".to_string(),
+                })?;
             let previous = store.as_ref().map(|value| value.account_id.clone());
             *store = None;
             previous
@@ -238,14 +248,18 @@ impl AppState {
         let store = self
             .auth_session
             .lock()
-            .map_err(|_| AppError::internal("failed to lock auth session store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock auth session store".to_string(),
+            })?;
         Ok(store.clone())
     }
 
     pub fn require_auth_session(&self) -> AppResult<AuthSession> {
-        self.auth_session()?.ok_or_else(|| {
-            AppError::validation("no authenticated session in backend, please login first")
-        })
+        self.auth_session()?
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "no authenticated session in backend, please login first".to_string(),
+            })
     }
 
     pub fn active_account_id(&self) -> AppResult<String> {
@@ -254,8 +268,9 @@ impl AppState {
         }
         self.persisted_auth_context()?
             .map(|value| value.account_id)
-            .ok_or_else(|| {
-                AppError::validation("no cached account context in backend, please login first")
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "no cached account context in backend, please login first".to_string(),
             })
     }
 
@@ -264,9 +279,14 @@ impl AppState {
         session: &AuthSession,
         master_password: &str,
     ) -> AppResult<()> {
-        let refresh_token = session.refresh_token.clone().ok_or_else(|| {
-            AppError::validation("refresh_token is missing, cannot persist auth state")
-        })?;
+        let refresh_token =
+            session
+                .refresh_token
+                .clone()
+                .ok_or_else(|| AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "refresh_token is missing, cannot persist auth state".to_string(),
+                })?;
         let (encrypted_session, runtime) = encrypt_refresh_token(
             master_password,
             &session.account_id,
@@ -283,13 +303,19 @@ impl AppState {
     }
 
     pub fn persist_auth_state_with_cached_wrap(&self, session: &AuthSession) -> AppResult<()> {
-        let refresh_token = session.refresh_token.clone().ok_or_else(|| {
-            AppError::validation("refresh_token is missing, cannot persist auth state")
-        })?;
+        let refresh_token =
+            session
+                .refresh_token
+                .clone()
+                .ok_or_else(|| AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "refresh_token is missing, cannot persist auth state".to_string(),
+                })?;
         let runtime = self.auth_wrap_runtime()?.ok_or_else(|| {
-            AppError::validation(
-                "session wrap runtime is missing, cannot persist auth state without master password",
-            )
+            AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "session wrap runtime is missing, cannot persist auth state without master password".to_string(),
+            }
         })?;
         let encrypted_session = encrypt_refresh_token_with_runtime(
             &runtime,
@@ -359,15 +385,19 @@ impl AppState {
         let store = self
             .auth_wrap_runtime
             .lock()
-            .map_err(|_| AppError::internal("failed to lock auth wrap runtime store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock auth wrap runtime store".to_string(),
+            })?;
         Ok(store.clone())
     }
 
     pub fn set_auth_wrap_runtime(&self, value: Option<SessionWrapRuntime>) -> AppResult<()> {
-        let mut store = self
-            .auth_wrap_runtime
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock auth wrap runtime store"))?;
+        let mut store =
+            self.auth_wrap_runtime
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock auth wrap runtime store".to_string(),
+                })?;
         *store = value;
         Ok(())
     }
@@ -380,20 +410,26 @@ impl AppState {
         let store = self
             .persisted_auth_state
             .lock()
-            .map_err(|_| AppError::internal("failed to lock persisted auth state store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock persisted auth state store".to_string(),
+            })?;
         Ok(store.clone())
     }
 
     fn store_persisted_auth_state(&self, value: Option<PersistedAuthState>) -> AppResult<()> {
-        let _persist_guard = self
-            .auth_state_persist_lock
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock auth state persistence"))?;
+        let _persist_guard =
+            self.auth_state_persist_lock
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock auth state persistence".to_string(),
+                })?;
         persist_persisted_auth_state_to_disk(self.auth_state_path.as_ref(), value.as_ref())?;
-        let mut store = self
-            .persisted_auth_state
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock persisted auth state store"))?;
+        let mut store =
+            self.persisted_auth_state
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock persisted auth state store".to_string(),
+                })?;
         *store = value;
         Ok(())
     }
@@ -466,7 +502,9 @@ impl VaultRuntimePort for AppState {
 fn now_unix_ms() -> AppResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|error| AppError::internal(format!("system clock before unix epoch: {error}")))?;
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("system clock before unix epoch: {error}"),
+        })?;
     Ok(duration.as_millis().min(i64::MAX as u128) as i64)
 }
 
@@ -474,17 +512,19 @@ fn load_persisted_auth_state_from_disk(path: &Path) -> AppResult<Option<Persiste
     if !path.exists() {
         return Ok(None);
     }
-    let raw = std::fs::read_to_string(path).map_err(|error| {
-        AppError::internal(format!(
+    let raw = std::fs::read_to_string(path).map_err(|error| AppError::InternalUnexpected {
+        message: format!(
             "failed to read persisted auth state {}: {error}",
             path.display()
-        ))
+        ),
     })?;
     let parsed = serde_json::from_str::<PersistedAuthState>(&raw).map_err(|error| {
-        AppError::internal(format!(
-            "failed to parse persisted auth state {}: {error}",
-            path.display()
-        ))
+        AppError::InternalUnexpected {
+            message: format!(
+                "failed to parse persisted auth state {}: {error}",
+                path.display()
+            ),
+        }
     })?;
     Ok(Some(parsed))
 }
@@ -496,42 +536,42 @@ fn persist_persisted_auth_state_to_disk(
     match value {
         None => {
             if path.exists() {
-                std::fs::remove_file(path).map_err(|error| {
-                    AppError::internal(format!(
+                std::fs::remove_file(path).map_err(|error| AppError::InternalUnexpected {
+                    message: format!(
                         "failed to delete persisted auth state {}: {error}",
                         path.display()
-                    ))
+                    ),
                 })?;
             }
             Ok(())
         }
         Some(value) => {
             if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).map_err(|error| {
-                    AppError::internal(format!(
+                std::fs::create_dir_all(parent).map_err(|error| AppError::InternalUnexpected {
+                    message: format!(
                         "failed to create auth state dir {}: {error}",
                         parent.display()
-                    ))
+                    ),
                 })?;
             }
-            let serialized = serde_json::to_vec_pretty(value).map_err(|error| {
-                AppError::internal(format!(
-                    "failed to serialize persisted auth state {}: {error}",
-                    path.display()
-                ))
-            })?;
+            let serialized =
+                serde_json::to_vec_pretty(value).map_err(|error| AppError::InternalUnexpected {
+                    message: format!(
+                        "failed to serialize persisted auth state {}: {error}",
+                        path.display()
+                    ),
+                })?;
             let temp_path = build_temp_auth_state_path(path);
             std::fs::write(&temp_path, serialized).map_err(|error| {
-                AppError::internal(format!(
-                    "failed to write temp auth state {}: {error}",
-                    temp_path.display()
-                ))
+                AppError::InternalUnexpected {
+                    message: format!(
+                        "failed to write temp auth state {}: {error}",
+                        temp_path.display()
+                    ),
+                }
             })?;
-            std::fs::rename(&temp_path, path).map_err(|error| {
-                AppError::internal(format!(
-                    "failed to persist auth state {}: {error}",
-                    path.display()
-                ))
+            std::fs::rename(&temp_path, path).map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to persist auth state {}: {error}", path.display()),
             })?;
             Ok(())
         }

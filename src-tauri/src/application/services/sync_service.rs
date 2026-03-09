@@ -301,7 +301,9 @@ impl SyncService {
         let cache = self
             .sync_metrics_cache
             .lock()
-            .map_err(|_| AppError::internal("failed to lock sync metrics cache"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock sync metrics cache".to_string(),
+            })?;
 
         let summary = cache
             .get(&account_id)
@@ -335,7 +337,10 @@ impl SyncService {
     ) -> AppResult<Vec<SyncCipher>> {
         require_non_empty(&account_id, "account_id")?;
         if limit == 0 {
-            return Err(AppError::validation("limit must be greater than 0"));
+            return Err(AppError::ValidationFieldError {
+                field: "limit".to_string(),
+                message: "must be greater than 0".to_string(),
+            });
         }
         self.vault_repository
             .list_live_ciphers(&account_id, offset, limit)
@@ -394,10 +399,12 @@ impl SyncService {
         require_non_empty(&base_url, "base_url")?;
         require_non_empty(&access_token, "access_token")?;
 
-        let mut poll_workers = self
-            .poll_workers
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock sync poll workers"))?;
+        let mut poll_workers =
+            self.poll_workers
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock sync poll workers".to_string(),
+                })?;
 
         if let Some(handle) = poll_workers.remove(&account_id) {
             handle.abort();
@@ -474,15 +481,18 @@ impl SyncService {
     }
 
     fn acquire_running_slot(&self, account_id: &str) -> AppResult<()> {
-        let mut running_accounts = self
-            .running_accounts
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock running sync accounts"))?;
+        let mut running_accounts =
+            self.running_accounts
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock running sync accounts".to_string(),
+                })?;
 
         if running_accounts.contains(account_id) {
-            return Err(AppError::validation(format!(
-                "sync is already running for account_id={account_id}"
-            )));
+            return Err(AppError::ValidationFieldError {
+                field: "account_id".to_string(),
+                message: format!("sync is already running for account_id={account_id}"),
+            });
         }
 
         running_accounts.insert(account_id.to_string());
@@ -494,10 +504,12 @@ impl SyncService {
             return Ok(());
         }
 
-        let mut recent_triggers = self
-            .recent_triggers
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock recent sync triggers"))?;
+        let mut recent_triggers =
+            self.recent_triggers
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock recent sync triggers".to_string(),
+                })?;
         let now = Instant::now();
 
         if let Some(last_trigger) = recent_triggers.get(account_id) {
@@ -506,10 +518,13 @@ impl SyncService {
                 .map(|duration| duration.as_millis() as u64)
                 .unwrap_or(0);
             if elapsed_ms < self.sync_policy.debounce_ms {
-                return Err(AppError::validation(format!(
-                    "sync trigger is debounced for account_id={account_id} (debounce_ms={})",
-                    self.sync_policy.debounce_ms
-                )));
+                return Err(AppError::ValidationFieldError {
+                    field: "account_id".to_string(),
+                    message: format!(
+                        "sync trigger is debounced for account_id={account_id} (debounce_ms={})",
+                        self.sync_policy.debounce_ms
+                    ),
+                });
             }
         }
 
@@ -588,10 +603,12 @@ impl SyncService {
     }
 
     fn stop_revision_polling(&self, account_id: &str) -> AppResult<()> {
-        let mut poll_workers = self
-            .poll_workers
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock sync poll workers"))?;
+        let mut poll_workers =
+            self.poll_workers
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock sync poll workers".to_string(),
+                })?;
         if let Some(handle) = poll_workers.remove(account_id) {
             handle.abort();
             log::info!(
@@ -640,7 +657,9 @@ impl SyncService {
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
-        return Err(AppError::validation(format!("{field} cannot be empty")));
+        return Err(AppError::ValidationRequired {
+            field: field.to_string(),
+        });
     }
     Ok(())
 }

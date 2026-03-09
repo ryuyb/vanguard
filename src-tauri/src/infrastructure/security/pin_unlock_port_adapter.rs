@@ -22,9 +22,10 @@ impl KeychainPinUnlockPort {
     fn normalize_account_id(account_id: &str) -> AppResult<String> {
         let trimmed = account_id.trim();
         if trimmed.is_empty() {
-            return Err(AppError::validation(
-                "account_id is empty, cannot use pin unlock",
-            ));
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "account_id is empty, cannot use pin unlock".to_string(),
+            });
         }
         Ok(String::from(trimmed))
     }
@@ -34,10 +35,12 @@ impl KeychainPinUnlockPort {
         account_id: &str,
         envelope: &PinProtectedUserKeyEnvelope,
     ) -> AppResult<()> {
-        let mut store = self
-            .ephemeral_envelopes
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock pin ephemeral envelope store"))?;
+        let mut store =
+            self.ephemeral_envelopes
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock pin ephemeral envelope store".to_string(),
+                })?;
         store.insert(String::from(account_id), envelope.clone());
         Ok(())
     }
@@ -46,25 +49,35 @@ impl KeychainPinUnlockPort {
         let store = self
             .ephemeral_envelopes
             .lock()
-            .map_err(|_| AppError::internal("failed to lock pin ephemeral envelope store"))?;
-        store.get(account_id).cloned().ok_or_else(|| {
-            AppError::validation("ephemeral pin unlock is not configured for this account")
-        })
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock pin ephemeral envelope store".to_string(),
+            })?;
+        store
+            .get(account_id)
+            .cloned()
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "ephemeral pin unlock is not configured for this account".to_string(),
+            })
     }
 
     fn has_ephemeral(&self, account_id: &str) -> AppResult<bool> {
         let store = self
             .ephemeral_envelopes
             .lock()
-            .map_err(|_| AppError::internal("failed to lock pin ephemeral envelope store"))?;
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to lock pin ephemeral envelope store".to_string(),
+            })?;
         Ok(store.contains_key(account_id))
     }
 
     fn delete_ephemeral(&self, account_id: &str) -> AppResult<()> {
-        let mut store = self
-            .ephemeral_envelopes
-            .lock()
-            .map_err(|_| AppError::internal("failed to lock pin ephemeral envelope store"))?;
+        let mut store =
+            self.ephemeral_envelopes
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock pin ephemeral envelope store".to_string(),
+                })?;
         store.remove(account_id);
         Ok(())
     }
@@ -90,9 +103,10 @@ impl PinUnlockPort for KeychainPinUnlockPort {
                 &pin_store::PersistentPinEnvelope::new(account_id.clone(), envelope.clone()),
             ),
             PinLockType::Ephemeral => self.save_ephemeral(&account_id, envelope),
-            PinLockType::Disabled => Err(AppError::validation(
-                "cannot save pin envelope when pin lock type is disabled",
-            )),
+            PinLockType::Disabled => Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cannot save pin envelope when pin lock type is disabled".to_string(),
+            }),
         }
     }
 
@@ -108,9 +122,10 @@ impl PinUnlockPort for KeychainPinUnlockPort {
                 pin_store::load_persistent_pin_envelope(&account_id).map(|payload| payload.envelope)
             }
             PinLockType::Ephemeral => self.load_ephemeral(&account_id),
-            PinLockType::Disabled => Err(AppError::validation(
-                "cannot load pin envelope when pin lock type is disabled",
-            )),
+            PinLockType::Disabled => Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "cannot load pin envelope when pin lock type is disabled".to_string(),
+            }),
         }
     }
 

@@ -67,14 +67,15 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .await
             .map_err(map_vaultwarden_error)?;
 
-        let master_password_hash =
-            derive_master_password_hash(&command.username, &command.password, &prelogin).map_err(
-                |error| {
-                    AppError::validation(format!(
-                        "unable to derive master password hash from prelogin params: {error}"
-                    ))
-                },
-            )?;
+        let master_password_hash = derive_master_password_hash(
+            &command.username,
+            &command.password,
+            &prelogin,
+        )
+        .map_err(|error| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("unable to derive master password hash from prelogin params: {error}"),
+        })?;
 
         let request = PasswordLoginRequest {
             client_id: self.client.client_id().to_string(),
@@ -152,10 +153,11 @@ impl RemoteVaultPort for VaultwardenRemotePort {
 
             Some(
                 derive_master_password_hash(email, plaintext_password, &prelogin).map_err(
-                    |error| {
-                        AppError::validation(format!(
+                    |error| AppError::ValidationFieldError {
+                        field: "unknown".to_string(),
+                        message: format!(
                             "unable to derive master password hash for send-email-login: {error}"
-                        ))
+                        ),
                     },
                 )?,
             )
@@ -345,19 +347,24 @@ fn is_two_factor_required(error: &TokenErrorResponse) -> bool {
 
 fn map_vaultwarden_error(error: VaultwardenError) -> AppError {
     match error {
-        VaultwardenError::MissingBaseUrl => AppError::validation("base_url cannot be empty"),
-        VaultwardenError::InvalidEndpoint(message) => AppError::validation(message),
-        VaultwardenError::Transport(message) => AppError::remote(message),
-        VaultwardenError::Decode(message) => AppError::remote(message),
+        VaultwardenError::MissingBaseUrl => AppError::ValidationRequired {
+            field: "base_url".to_string(),
+        },
+        VaultwardenError::InvalidEndpoint(message) => AppError::ValidationFieldError {
+            field: "endpoint".to_string(),
+            message: message.to_string(),
+        },
+        VaultwardenError::Transport(message) => AppError::NetworkRemoteError { status: 0, message },
+        VaultwardenError::Decode(message) => AppError::NetworkRemoteError { status: 0, message },
         VaultwardenError::ApiError {
             status, message, ..
-        } => AppError::remote_status(status, message),
+        } => AppError::NetworkRemoteError { status, message },
         VaultwardenError::TokenRejected { status, error } => {
             let error = *error;
             let message =
                 first_non_empty(vec![error.error_description, error.error, error.message])
                     .unwrap_or_else(|| String::from("token rejected"));
-            AppError::remote_status(status, message)
+            AppError::NetworkRemoteError { status, message }
         }
     }
 }

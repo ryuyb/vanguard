@@ -40,7 +40,9 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     vaultwarden_config.allow_invalid_certs = config.allow_invalid_certs;
 
     let client = VaultwardenClient::new(vaultwarden_config).map_err(|error| {
-        AppError::internal(format!("failed to create vaultwarden client: {error}"))
+        AppError::InternalUnexpected {
+            message: format!("failed to create vaultwarden client: {error}"),
+        }
     })?;
 
     let remote_vault: Arc<dyn RemoteVaultPort> = Arc::new(VaultwardenRemotePort::new(client));
@@ -102,16 +104,19 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
 }
 
 fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::path::PathBuf> {
-    let app_data_dir = manager
-        .path()
-        .app_data_dir()
-        .map_err(|error| AppError::internal(format!("failed to resolve app data dir: {error}")))?;
+    let app_data_dir =
+        manager
+            .path()
+            .app_data_dir()
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to resolve app data dir: {error}"),
+            })?;
     let sqlite_dir = app_data_dir.join("vault-repositories");
-    std::fs::create_dir_all(&sqlite_dir).map_err(|error| {
-        AppError::internal(format!(
+    std::fs::create_dir_all(&sqlite_dir).map_err(|error| AppError::InternalUnexpected {
+        message: format!(
             "failed to create app data dir {}: {error}",
             sqlite_dir.display()
-        ))
+        ),
     })?;
     Ok(sqlite_dir)
 }
@@ -119,15 +124,18 @@ fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::
 fn resolve_auth_state_path<R: Runtime, M: Manager<R>>(
     manager: &M,
 ) -> AppResult<std::path::PathBuf> {
-    let app_data_dir = manager
-        .path()
-        .app_data_dir()
-        .map_err(|error| AppError::internal(format!("failed to resolve app data dir: {error}")))?;
-    std::fs::create_dir_all(&app_data_dir).map_err(|error| {
-        AppError::internal(format!(
+    let app_data_dir =
+        manager
+            .path()
+            .app_data_dir()
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to resolve app data dir: {error}"),
+            })?;
+    std::fs::create_dir_all(&app_data_dir).map_err(|error| AppError::InternalUnexpected {
+        message: format!(
             "failed to create app data dir {}: {error}",
             app_data_dir.display()
-        ))
+        ),
     })?;
     Ok(app_data_dir.join("auth-state.json"))
 }
