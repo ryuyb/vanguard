@@ -1,0 +1,129 @@
+import { useCallback, useState } from "react";
+import type { CipherIconLoadState } from "@/features/vault/types";
+
+export type IconStateMap = Record<string, CipherIconLoadState>;
+
+export function useIconState() {
+  const [iconLoadStates, setIconLoadStates] = useState<IconStateMap>({});
+  const [visibleCipherIds, setVisibleCipherIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const updateIconLoadState = useCallback(
+    (cipherId: string, state: CipherIconLoadState) => {
+      setIconLoadStates((previous) => {
+        if (previous[cipherId] === state) {
+          return previous;
+        }
+        return {
+          ...previous,
+          [cipherId]: state,
+        };
+      });
+    },
+    [],
+  );
+
+  const setIconLoading = useCallback(
+    (cipherId: string) => {
+      updateIconLoadState(cipherId, "loading");
+    },
+    [updateIconLoadState],
+  );
+
+  const setIconLoaded = useCallback(
+    (cipherId: string) => {
+      updateIconLoadState(cipherId, "loaded");
+    },
+    [updateIconLoadState],
+  );
+
+  const setIconFallback = useCallback(
+    (cipherId: string) => {
+      updateIconLoadState(cipherId, "fallback");
+    },
+    [updateIconLoadState],
+  );
+
+  const setCipherVisible = useCallback((cipherId: string, visible: boolean) => {
+    setVisibleCipherIds((previous) => {
+      if (visible && previous.has(cipherId)) {
+        return previous;
+      }
+      if (!visible && !previous.has(cipherId)) {
+        return previous;
+      }
+      const next = new Set(previous);
+      if (visible) {
+        next.add(cipherId);
+      } else {
+        next.delete(cipherId);
+      }
+      return next;
+    });
+  }, []);
+
+  const cleanupStaleStates = useCallback((activeCipherIds: string[]) => {
+    const activeCipherIdSet = new Set(activeCipherIds);
+
+    setVisibleCipherIds((previous) => {
+      const next = new Set<string>();
+      for (const cipherId of previous) {
+        if (activeCipherIdSet.has(cipherId)) {
+          next.add(cipherId);
+        }
+      }
+      return next.size === previous.size ? previous : next;
+    });
+
+    setIconLoadStates((previous) => {
+      const next: IconStateMap = {};
+      let hasChanges = false;
+
+      for (const cipherId of activeCipherIds) {
+        next[cipherId] = previous[cipherId] ?? "idle";
+      }
+
+      const previousKeys = Object.keys(previous);
+      if (previousKeys.length !== activeCipherIds.length) {
+        hasChanges = true;
+      } else {
+        for (const key of previousKeys) {
+          if (!activeCipherIdSet.has(key)) {
+            hasChanges = true;
+            break;
+          }
+        }
+      }
+
+      return hasChanges ? next : previous;
+    });
+  }, []);
+
+  const getIconLoadState = useCallback(
+    (cipherId: string): CipherIconLoadState => {
+      return iconLoadStates[cipherId] ?? "idle";
+    },
+    [iconLoadStates],
+  );
+
+  const isVisible = useCallback(
+    (cipherId: string): boolean => {
+      return visibleCipherIds.has(cipherId);
+    },
+    [visibleCipherIds],
+  );
+
+  return {
+    iconLoadStates,
+    visibleCipherIds,
+    updateIconLoadState,
+    setIconLoading,
+    setIconLoaded,
+    setIconFallback,
+    setCipherVisible,
+    cleanupStaleStates,
+    getIconLoadState,
+    isVisible,
+  };
+}

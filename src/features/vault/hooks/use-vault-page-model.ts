@@ -14,12 +14,13 @@ import { useCipherDetailSelection } from "@/features/vault/hooks/use-cipher-deta
 import { useExpandedFolderKeys } from "@/features/vault/hooks/use-expanded-folder-keys";
 import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers";
 import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
+import { useIconState } from "@/features/vault/hooks/use-icon-state";
 import { useInlineSearchFocus } from "@/features/vault/hooks/use-inline-search-focus";
 import type {
-  CipherIconLoadState,
   CipherSortBy,
   CipherSortDirection,
   CipherTypeFilter,
+  CipherWithIcon,
   VaultPageState,
 } from "@/features/vault/types";
 import {
@@ -63,12 +64,16 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );
-  const [_visibleCipherIds, setVisibleCipherIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [_cipherIconLoadState, setCipherIconLoadState] = useState<
-    Record<string, CipherIconLoadState>
-  >({});
+
+  const {
+    setIconLoading,
+    setIconLoaded,
+    setIconFallback,
+    setCipherVisible,
+    cleanupStaleStates,
+    getIconLoadState,
+  } = useIconState();
+
   const {
     cipherDetailError,
     isCipherDetailLoading,
@@ -203,11 +208,11 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     viewData,
   });
 
-  const ciphersWithIcons = useMemo(
+  const ciphersWithIcons = useMemo<CipherWithIcon[]>(
     () =>
       filteredCiphers.map((cipher) => {
         const iconUrl = getCipherIconUrl(cipher, iconServer);
-        const iconLoadState = _cipherIconLoadState[cipher.id] ?? "idle";
+        const iconLoadState = getIconLoadState(cipher.id);
         const shouldLoadIcon =
           iconUrl != null &&
           (iconLoadState === "loading" ||
@@ -221,7 +226,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
           shouldLoadIcon,
         };
       }),
-    [_cipherIconLoadState, filteredCiphers, iconServer],
+    [filteredCiphers, getIconLoadState, iconServer],
   );
 
   const filteredCipherIds = useMemo(
@@ -229,95 +234,35 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     [filteredCiphers],
   );
 
+  // Clean up icon state when cipher list changes
   useEffect(() => {
-    setVisibleCipherIds((previous) => {
-      const activeCipherIdSet = new Set(filteredCipherIds);
-      const next = new Set<string>();
-      for (const cipherId of previous) {
-        if (activeCipherIdSet.has(cipherId)) {
-          next.add(cipherId);
-        }
-      }
-
-      if (next.size !== previous.size) {
-        return next;
-      }
-      for (const cipherId of previous) {
-        if (!next.has(cipherId)) {
-          return next;
-        }
-      }
-      return previous;
-    });
-
-    setCipherIconLoadState((previous) => {
-      const next: Record<string, CipherIconLoadState> = {};
-      for (const cipherId of filteredCipherIds) {
-        next[cipherId] = previous[cipherId] ?? "idle";
-      }
-
-      const previousKeys = Object.keys(previous);
-      const nextKeys = Object.keys(next);
-      if (previousKeys.length !== nextKeys.length) {
-        return next;
-      }
-      for (const key of nextKeys) {
-        if (previous[key] !== next[key]) {
-          return next;
-        }
-      }
-      return previous;
-    });
-  }, [filteredCipherIds]);
+    cleanupStaleStates(filteredCipherIds);
+  }, [cleanupStaleStates, filteredCipherIds]);
 
   const setCipherRowVisible = useCallback(
     (cipherId: string, visible: boolean) => {
-      setVisibleCipherIds((previous) => {
-        if (visible && previous.has(cipherId)) {
-          return previous;
-        }
-        if (!visible && !previous.has(cipherId)) {
-          return previous;
-        }
-        const next = new Set(previous);
-        if (visible) {
-          next.add(cipherId);
-        } else {
-          next.delete(cipherId);
-        }
-        return next;
-      });
+      setCipherVisible(cipherId, visible);
 
-      if (!visible) {
-        return;
+      if (visible && getIconLoadState(cipherId) === "idle") {
+        setIconLoading(cipherId);
       }
-
-      setCipherIconLoadState((previous) => {
-        if (previous[cipherId] && previous[cipherId] !== "idle") {
-          return previous;
-        }
-        return {
-          ...previous,
-          [cipherId]: "loading",
-        };
-      });
     },
-    [],
+    [getIconLoadState, setCipherVisible, setIconLoading],
   );
 
-  const markCipherIconLoaded = useCallback((cipherId: string) => {
-    setCipherIconLoadState((previous) => ({
-      ...previous,
-      [cipherId]: "loaded",
-    }));
-  }, []);
+  const markCipherIconLoaded = useCallback(
+    (cipherId: string) => {
+      setIconLoaded(cipherId);
+    },
+    [setIconLoaded],
+  );
 
-  const markCipherIconFallback = useCallback((cipherId: string) => {
-    setCipherIconLoadState((previous) => ({
-      ...previous,
-      [cipherId]: "fallback",
-    }));
-  }, []);
+  const markCipherIconFallback = useCallback(
+    (cipherId: string) => {
+      setIconFallback(cipherId);
+    },
+    [setIconFallback],
+  );
 
   useClearSelectionWhenMissing(filteredCiphers.map((cipher) => cipher.id));
 

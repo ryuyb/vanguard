@@ -1,3 +1,5 @@
+import type { VaultCipherItemDto } from "@/bindings";
+
 export type VaultPageState = "loading" | "ready" | "error";
 
 export type CipherIconLoadState = "idle" | "loading" | "loaded" | "fallback";
@@ -25,4 +27,10 @@ export type FolderTreeNodeDraft = {
   label: string;
   folderId: string | null;
   childrenMap: Map<string, FolderTreeNodeDraft>;
+};
+
+export type CipherWithIcon = VaultCipherItemDto & {
+  readonly iconUrl: string | null;
+  readonly iconLoadState: CipherIconLoadState;
+  readonly shouldLoadIcon: boolean;
 };
