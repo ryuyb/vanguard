@@ -50,6 +50,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     useState<CipherSortDirection>("desc");
   const [userEmail, setUserEmail] = useState("未登录");
   const [userBaseUrl, setUserBaseUrl] = useState("未知服务");
+  const [iconServer, setIconServer] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -100,6 +101,11 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
       setUserEmail(restore.data.email ?? "未登录");
       setUserBaseUrl(restore.data.baseUrl ?? "未知服务");
+
+      const iconServerResult = await commands.vaultGetIconServer();
+      if (iconServerResult.status === "ok") {
+        setIconServer(iconServerResult.data);
+      }
 
       const result = await commands.vaultGetViewData();
 
@@ -200,7 +206,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const ciphersWithIcons = useMemo(
     () =>
       filteredCiphers.map((cipher) => {
-        const iconUrl = getCipherIconUrl(cipher);
+        const iconUrl = getCipherIconUrl(cipher, iconServer);
         const iconLoadState = _cipherIconLoadState[cipher.id] ?? "idle";
         const shouldLoadIcon =
           iconUrl != null &&
@@ -215,7 +221,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
           shouldLoadIcon,
         };
       }),
-    [_cipherIconLoadState, filteredCiphers],
+    [_cipherIconLoadState, filteredCiphers, iconServer],
   );
 
   const filteredCipherIds = useMemo(
@@ -388,6 +394,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
+    iconServer,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -435,6 +442,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount: Map<string, number>;
     folderTree: ReturnType<typeof buildFolderTree>;
     headerSearchQuery: string;
+    iconServer: string | null;
     inlineSearchInputRef: typeof inlineSearchInputRef;
     isCipherDetailLoading: boolean;
     isHeaderActionBusy: boolean;

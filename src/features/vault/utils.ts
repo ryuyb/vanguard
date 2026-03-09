@@ -237,12 +237,21 @@ function normalizeIconHost(hostname: string): string | null {
   return normalized;
 }
 
-export function toCipherIconUrl(uri: string | null | undefined): string | null {
+export function toCipherIconUrl(
+  uri: string | null | undefined,
+  iconServer?: string | null,
+): string | null {
   const host = toCipherIconHost(uri);
   if (!host) {
     return null;
   }
-  return `https://icons.bitwarden.net/${host}/icon.png`;
+  const server = iconServer ?? "https://icons.bitwarden.net";
+
+  // bitwarden.net uses direct path, custom servers use /icons/ prefix
+  if (server.includes("icons.bitwarden.net")) {
+    return `${server}/${host}/icon.png`;
+  }
+  return `${server}/icons/${host}/icon.png`;
 }
 
 export function toCipherIconAlt(name: string | null | undefined): string {
@@ -257,6 +266,7 @@ export function getCipherIconUrl(
         uri?: string | null;
         uris?: Array<{ uri: string | null } | string | null> | null;
       }),
+  iconServer?: string | null,
 ): string | null {
-  return toCipherIconUrl(getCipherPrimaryUri(cipher));
+  return toCipherIconUrl(getCipherPrimaryUri(cipher), iconServer);
 }

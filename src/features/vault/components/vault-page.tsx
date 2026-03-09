@@ -109,6 +109,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
+    iconServer,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -620,7 +621,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
-                            iconUrl={getCipherIconUrl(selectedCipherDetail)}
+                            iconUrl={getCipherIconUrl(
+                              selectedCipherDetail,
+                              iconServer,
+                            )}
                           />
                         </div>
                       )}

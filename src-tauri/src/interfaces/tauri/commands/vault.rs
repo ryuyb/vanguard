@@ -361,6 +361,38 @@ pub async fn vault_get_cipher_totp_code(
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_get_icon_server(state: State<'_, AppState>) -> Result<String, String> {
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("vault_get_icon_server", error))?;
+
+    let base_url = match session {
+        Some(session) => session.base_url,
+        None => {
+            let context = state
+                .persisted_auth_context()
+                .map_err(|error| log_command_error("vault_get_icon_server", error))?
+                .ok_or_else(|| {
+                    log_command_error(
+                        "vault_get_icon_server",
+                        AppError::validation("no authenticated session or persisted context found"),
+                    )
+                })?;
+            context.base_url
+        }
+    };
+
+    let normalized_url = base_url.trim().to_lowercase();
+
+    if normalized_url.contains("bitwarden.com") || normalized_url.contains("bitwarden.eu") {
+        Ok(String::from("https://icons.bitwarden.net"))
+    } else {
+        Ok(base_url)
+    }
+}
+
 impl From<&VaultUserKey> for VaultUserKeyMaterial {
     fn from(user_key: &VaultUserKey) -> Self {
         Self {

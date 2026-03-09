@@ -39,7 +39,8 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_get_view_data,
             interfaces::tauri::commands::vault::vault_get_cipher_detail,
             interfaces::tauri::commands::vault::vault_copy_cipher_field,
-            interfaces::tauri::commands::vault::vault_get_cipher_totp_code
+            interfaces::tauri::commands::vault::vault_get_cipher_totp_code,
+            interfaces::tauri::commands::vault::vault_get_icon_server
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,
