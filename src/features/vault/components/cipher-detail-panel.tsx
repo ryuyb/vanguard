@@ -82,13 +82,15 @@ function DetailField({
 type CipherDetailPanelProps = {
   cipher: VaultCipherDetailDto;
   iconUrl?: string | null;
+  iconServer?: string | null;
 };
 
 export function CipherDetailPanel({
   cipher,
   iconUrl: iconUrlProp,
+  iconServer,
 }: CipherDetailPanelProps) {
-  const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher);
+  const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher, iconServer);
   const username = firstNonEmptyText(
     cipher.login?.username,
     cipher.data?.username,

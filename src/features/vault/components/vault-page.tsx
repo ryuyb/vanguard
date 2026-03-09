@@ -53,6 +53,11 @@ type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
 };
 
+const ICON_OBSERVER_CONFIG = {
+  rootMargin: "120px 0px",
+  threshold: 0.01,
+} as const;
+
 function CipherRowObserver({
   children,
   cipherId,
@@ -63,6 +68,11 @@ function CipherRowObserver({
   onVisibilityChange: (cipherId: string, visible: boolean) => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const callbackRef = useRef(onVisibilityChange);
+
+  useEffect(() => {
+    callbackRef.current = onVisibilityChange;
+  }, [onVisibilityChange]);
 
   useEffect(() => {
     const node = ref.current;
@@ -71,18 +81,12 @@ function CipherRowObserver({
     }
 
     let rafId = 0;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        window.cancelAnimationFrame(rafId);
-        rafId = window.requestAnimationFrame(() => {
-          onVisibilityChange(cipherId, entry?.isIntersecting === true);
-        });
-      },
-      {
-        rootMargin: "120px 0px",
-        threshold: 0.01,
-      },
-    );
+    const observer = new IntersectionObserver(([entry]) => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => {
+        callbackRef.current(cipherId, entry?.isIntersecting === true);
+      });
+    }, ICON_OBSERVER_CONFIG);
 
     observer.observe(node);
 
@@ -90,7 +94,7 @@ function CipherRowObserver({
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
     };
-  }, [cipherId, onVisibilityChange]);
+  }, [cipherId]);
 
   return <div ref={ref}>{children}</div>;
 }
@@ -621,6 +625,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
+                            iconServer={iconServer}
                             iconUrl={getCipherIconUrl(
                               selectedCipherDetail,
                               iconServer,
