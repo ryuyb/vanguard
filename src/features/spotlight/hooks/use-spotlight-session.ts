@@ -65,7 +65,10 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
         return;
       }
 
-      const ciphers = viewData.data.ciphers.map(toCipherItem);
+      const iconServer = viewData.data.iconServer;
+      const ciphers = viewData.data.ciphers.map((cipher) =>
+        toCipherItem(cipher, iconServer),
+      );
       setVaultItems(ciphers);
     } catch (error) {
       errorHandler.handle(error);

@@ -8,6 +8,11 @@ import type {
   DetailAction,
   SpotlightItem,
 } from "@/features/spotlight/types";
+import {
+  CipherIcon,
+  toCipherTypeIcon,
+} from "@/features/vault/components/cipher-icon";
+import { toCipherIconAlt } from "@/features/vault/utils";
 import { cn } from "@/lib/utils";
 
 type SpotlightResultsPanelProps = {
@@ -50,10 +55,24 @@ export function SpotlightResultsPanel({
         </div>
       ) : detailItem ? (
         <section className="px-2.5 pt-3 pb-2.5" aria-label="Cipher detail">
-          <p className="text-base leading-tight font-semibold text-slate-900">
-            {detailItem.title}
-          </p>
-          <p className="mt-1 text-xs text-slate-600">{detailItem.subtitle}</p>
+          <div className="flex items-start gap-3">
+            <CipherIcon
+              alt={toCipherIconAlt(detailItem.title)}
+              iconUrl={detailItem.iconUrl}
+              className="size-10"
+              loadState={detailItem.iconUrl ? "loading" : "fallback"}
+            >
+              {toCipherTypeIcon(detailItem.type)}
+            </CipherIcon>
+            <div className="flex-1 min-w-0">
+              <p className="text-base leading-tight font-semibold text-slate-900">
+                {detailItem.title}
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {detailItem.subtitle}
+              </p>
+            </div>
+          </div>
           <div className="mt-3 grid gap-2" role="listbox">
             {detailActions.map((action, index) => (
               <div
@@ -94,9 +113,21 @@ export function SpotlightResultsPanel({
                   "animate-in fade-in-0 duration-150 bg-blue-800/20 data-[selected=true]:bg-blue-800/20",
               )}
             >
-              <div>
-                <p className="text-sm text-slate-900">{item.title}</p>
-                <p className="mt-0.5 text-xs text-slate-600">{item.subtitle}</p>
+              <div className="flex items-center gap-3">
+                <CipherIcon
+                  alt={toCipherIconAlt(item.title)}
+                  iconUrl={item.iconUrl}
+                  className="size-8"
+                  loadState={item.iconUrl ? "loading" : "fallback"}
+                >
+                  {toCipherTypeIcon(item.type)}
+                </CipherIcon>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-900">{item.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-600">
+                    {item.subtitle}
+                  </p>
+                </div>
               </div>
             </CommandItem>
           ))}

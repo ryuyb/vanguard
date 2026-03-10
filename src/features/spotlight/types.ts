@@ -4,6 +4,8 @@ export type SpotlightItem = {
   title: string;
   subtitle: string;
   searchText: string;
+  type: number;
+  iconUrl: string | null;
 };
 
 export type CopyField = "username" | "password" | "totp";

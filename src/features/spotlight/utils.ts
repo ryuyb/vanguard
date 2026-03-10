@@ -1,7 +1,11 @@
 import type { VaultCipherItemDto } from "@/bindings";
 import type { SpotlightItem } from "@/features/spotlight/types";
+import { getCipherIconUrl } from "@/features/vault/utils";
 
-export function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
+export function toCipherItem(
+  cipher: VaultCipherItemDto,
+  iconServer?: string | null,
+): SpotlightItem {
   const rawName = cipher.name?.trim() ?? "";
   const rawUsername = cipher.username?.trim() ?? "";
   const title = rawName || "Untitled Cipher";
@@ -12,5 +16,7 @@ export function toCipherItem(cipher: VaultCipherItemDto): SpotlightItem {
     title,
     subtitle,
     searchText: `${rawName} ${rawUsername}`.toLowerCase(),
+    type: cipher.type,
+    iconUrl: getCipherIconUrl(cipher, iconServer),
   };
 }
