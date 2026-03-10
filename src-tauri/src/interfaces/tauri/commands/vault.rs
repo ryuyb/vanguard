@@ -453,6 +453,15 @@ impl From<VaultCopyFieldDto> for VaultCopyField {
             VaultCopyFieldDto::Username => VaultCopyField::Username,
             VaultCopyFieldDto::Password => VaultCopyField::Password,
             VaultCopyFieldDto::Totp => VaultCopyField::Totp,
+            VaultCopyFieldDto::Notes => VaultCopyField::Notes,
+            VaultCopyFieldDto::CustomField { index } => VaultCopyField::CustomField { index },
+            VaultCopyFieldDto::Uri { index } => VaultCopyField::Uri { index },
+            VaultCopyFieldDto::CardNumber => VaultCopyField::CardNumber,
+            VaultCopyFieldDto::CardCode => VaultCopyField::CardCode,
+            VaultCopyFieldDto::Email => VaultCopyField::Email,
+            VaultCopyFieldDto::Phone => VaultCopyField::Phone,
+            VaultCopyFieldDto::SshPrivateKey => VaultCopyField::SshPrivateKey,
+            VaultCopyFieldDto::SshPublicKey => VaultCopyField::SshPublicKey,
         }
     }
 }

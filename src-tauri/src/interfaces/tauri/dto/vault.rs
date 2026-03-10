@@ -21,6 +21,17 @@ pub enum VaultCopyFieldDto {
     Username,
     Password,
     Totp,
+    Notes,
+    #[serde(rename_all = "camelCase")]
+    CustomField { index: usize },
+    #[serde(rename_all = "camelCase")]
+    Uri { index: usize },
+    CardNumber,
+    CardCode,
+    Email,
+    Phone,
+    SshPrivateKey,
+    SshPublicKey,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]

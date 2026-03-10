@@ -16,6 +16,15 @@ pub enum VaultCopyField {
     Username,
     Password,
     Totp,
+    Notes,
+    CustomField { index: usize },
+    Uri { index: usize },
+    CardNumber,
+    CardCode,
+    Email,
+    Phone,
+    SshPrivateKey,
+    SshPublicKey,
 }
 
 #[derive(Debug, Clone)]

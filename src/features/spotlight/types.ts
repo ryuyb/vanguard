@@ -8,7 +8,19 @@ export type SpotlightItem = {
   iconUrl: string | null;
 };
 
-export type CopyField = "username" | "password" | "totp";
+export type CopyField =
+  | "username"
+  | "password"
+  | "totp"
+  | "notes"
+  | { customField: { index: number } }
+  | { uri: { index: number } }
+  | "cardNumber"
+  | "cardCode"
+  | "email"
+  | "phone"
+  | "sshPrivateKey"
+  | "sshPublicKey";
 
 export type DetailAction = {
   label: string;

@@ -17,6 +17,8 @@ import {
   getCipherIconUrl,
   toCipherIconAlt,
 } from "@/features/vault/utils";
+import { useCipherFieldCopy } from "@/features/vault/hooks";
+import { cn } from "@/lib/utils";
 
 const CUSTOM_FIELD_TYPE_TEXT = 0;
 const CUSTOM_FIELD_TYPE_HIDDEN = 1;
@@ -48,30 +50,42 @@ function toDateFromTimestamp(value: number | null | undefined): Date | null {
   return new Date(value);
 }
 
+type DetailFieldProps = {
+  label: string;
+  value?: string | null | undefined;
+  children?: ReactNode;
+  contentClassName?: string;
+  onCopy?: () => void;
+};
+
 function DetailField({
   label,
   value,
   children,
   contentClassName,
-}: {
-  label: string;
-  value?: string | null | undefined;
-  children?: ReactNode;
-  contentClassName?: string;
-}) {
+  onCopy,
+}: DetailFieldProps) {
   if (!value && !children) {
     return null;
   }
   return (
-    <div className="min-w-0 w-full rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-xs">
-      <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-        {label}
+    <div
+      className="group relative min-w-0 w-full rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-xs"
+      onClick={onCopy}
+      role={onCopy ? "button" : undefined}
+      tabIndex={onCopy ? 0 : undefined}
+      style={{ cursor: onCopy ? "pointer" : "default" }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+          {label}
+        </div>
       </div>
       <div
-        className={[
-          "mt-1 min-w-0 text-sm font-medium text-slate-900",
-          contentClassName ?? "break-all",
-        ].join(" ")}
+        className={cn(
+          "mt-1.5 break-words text-[13px] leading-relaxed text-slate-900",
+          contentClassName
+        )}
       >
         {children ?? value}
       </div>
@@ -90,6 +104,7 @@ export function CipherDetailPanel({
   iconUrl: iconUrlProp,
   iconServer,
 }: CipherDetailPanelProps) {
+  const { copyField, copiedField } = useCipherFieldCopy(cipher.id);
   const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher, iconServer);
   const username = firstNonEmptyText(
     cipher.login?.username,
@@ -330,10 +345,19 @@ export function CipherDetailPanel({
 
       <CardContent className="min-w-0 space-y-3 pt-4">
         <div className="flex flex-col gap-2">
-          <DetailField label="Username" value={username} />
+          {username && (
+            <DetailField
+              label="Username"
+              value={username}
+              onCopy={() => copyField("username")}
+            />
+          )}
           <DetailField label="Org" value={organizationId} />
           {hasOneTimePassword && (
-            <DetailField label="One-time password">
+            <DetailField
+              label="One-time password"
+              onCopy={() => copyField("totp")}
+            >
               <span className="font-mono tracking-wide">
                 {oneTimePasswordDisplay}
               </span>
@@ -345,7 +369,10 @@ export function CipherDetailPanel({
         </div>
 
         {password && (
-          <DetailField label="Password">
+          <DetailField
+            label="Password"
+            onCopy={() => copyField("password")}
+          >
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="min-w-0 break-all font-mono text-[13px] text-slate-900">
                 {isPasswordVisible ? password : "••••••••••••"}
@@ -354,7 +381,10 @@ export function CipherDetailPanel({
                 type="button"
                 variant="outline"
                 className="size-7 shrink-0 rounded-full p-0"
-                onClick={() => setIsPasswordVisible((visible) => !visible)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPasswordVisible((visible) => !visible);
+                }}
                 aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
                 title={isPasswordVisible ? "隐藏密码" : "显示密码"}
               >
@@ -371,11 +401,15 @@ export function CipherDetailPanel({
         {uniqueUris.length > 0 && (
           <DetailField label="URIs" contentClassName="overflow-hidden">
             <div className="min-w-0 w-full space-y-1 overflow-hidden">
-              {uniqueUris.map((uri) => (
+              {uniqueUris.map((uri, index) => (
                 <div
                   key={uri}
                   title={uri}
-                  className="block min-w-0 w-full truncate text-slate-900"
+                  className="block min-w-0 w-full truncate text-slate-900 cursor-pointer hover:text-slate-700"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyField({ uri: index });
+                  }}
                 >
                   {uri}
                 </div>
@@ -393,7 +427,12 @@ export function CipherDetailPanel({
                 <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
                   Notes
                 </div>
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3">
+                <div
+                  className="group relative rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 cursor-pointer"
+                  onClick={() => copyField("notes")}
+                  role="button"
+                  tabIndex={0}
+                >
                   <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
                     {notes}
                   </pre>
@@ -407,7 +446,7 @@ export function CipherDetailPanel({
                   Custom fields
                 </div>
                 <div className="space-y-2">
-                  {customFields.map((field) => {
+                  {customFields.map((field, index) => {
                     const isHiddenType =
                       field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
                     const isRevealed = revealedCustomFieldKeys.has(field.key);
@@ -426,14 +465,26 @@ export function CipherDetailPanel({
                       : isBooleanType
                         ? booleanValue
                         : field.value;
+                    const canCopy =
+                      field.fieldType === CUSTOM_FIELD_TYPE_TEXT ||
+                      field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
 
                     return (
                       <div
                         key={field.key}
-                        className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5"
+                        className={`group relative rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 ${canCopy ? "cursor-pointer" : ""}`}
+                        onClick={
+                          canCopy
+                            ? () => copyField({ customField: index })
+                            : undefined
+                        }
+                        role={canCopy ? "button" : undefined}
+                        tabIndex={canCopy ? 0 : undefined}
                       >
-                        <div className="text-[11px] font-medium tracking-wide text-slate-500">
-                          {field.name}
+                        <div className="flex items-center justify-between">
+                          <div className="text-[11px] font-medium tracking-wide text-slate-500">
+                            {field.name}
+                          </div>
                         </div>
                         <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
                           <div className="min-w-0 break-all text-sm font-medium text-slate-900">
@@ -444,7 +495,8 @@ export function CipherDetailPanel({
                               type="button"
                               variant="outline"
                               className="size-7 shrink-0 rounded-full p-0"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setRevealedCustomFieldKeys((previous) => {
                                   const next = new Set(previous);
                                   if (next.has(field.key)) {

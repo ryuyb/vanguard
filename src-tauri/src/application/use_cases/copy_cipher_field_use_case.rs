@@ -152,6 +152,103 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
             let snapshot = generate_current_totp(&raw_totp, current_unix_seconds()?)?;
             Ok(snapshot.code)
         }
+        VaultCopyField::Notes => cipher
+            .notes
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: notes".to_string(),
+            }),
+        VaultCopyField::CustomField { index } => cipher
+            .fields
+            .get(index)
+            .and_then(|f| f.value.clone())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!("custom field at index {} is empty or not found", index),
+            }),
+        VaultCopyField::Uri { index } => pick_first_non_empty(&[
+            cipher
+                .login
+                .as_ref()
+                .and_then(|login| login.uris.get(index))
+                .and_then(|uri| uri.uri.clone()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|data| data.uris.get(index))
+                .and_then(|uri| uri.uri.clone()),
+        ])
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("uri at index {} is empty or not found", index),
+        }),
+        VaultCopyField::CardNumber => cipher
+            .card
+            .as_ref()
+            .and_then(|card| card.number.clone())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: card number".to_string(),
+            }),
+        VaultCopyField::CardCode => cipher
+            .card
+            .as_ref()
+            .and_then(|card| card.code.clone())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: card code".to_string(),
+            }),
+        VaultCopyField::Email => pick_first_non_empty(&[
+            cipher
+                .identity
+                .as_ref()
+                .and_then(|identity| identity.email.clone()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|data| data.email.clone()),
+        ])
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "requested field is empty: email".to_string(),
+        }),
+        VaultCopyField::Phone => pick_first_non_empty(&[
+            cipher
+                .identity
+                .as_ref()
+                .and_then(|identity| identity.phone.clone()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|data| data.phone.clone()),
+        ])
+        .ok_or_else(|| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "requested field is empty: phone".to_string(),
+        }),
+        VaultCopyField::SshPrivateKey => cipher
+            .ssh_key
+            .as_ref()
+            .and_then(|ssh| ssh.private_key.clone())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: ssh private key".to_string(),
+            }),
+        VaultCopyField::SshPublicKey => cipher
+            .ssh_key
+            .as_ref()
+            .and_then(|ssh| ssh.public_key.clone())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "requested field is empty: ssh public key".to_string(),
+            }),
     }
 }
 
