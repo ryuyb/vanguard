@@ -208,10 +208,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
                 .identity
                 .as_ref()
                 .and_then(|identity| identity.email.clone()),
-            cipher
-                .data
-                .as_ref()
-                .and_then(|data| data.email.clone()),
+            cipher.data.as_ref().and_then(|data| data.email.clone()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -222,10 +219,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
                 .identity
                 .as_ref()
                 .and_then(|identity| identity.phone.clone()),
-            cipher
-                .data
-                .as_ref()
-                .and_then(|data| data.phone.clone()),
+            cipher.data.as_ref().and_then(|data| data.phone.clone()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),

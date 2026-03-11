@@ -23,9 +23,13 @@ pub enum VaultCopyFieldDto {
     Totp,
     Notes,
     #[serde(rename_all = "camelCase")]
-    CustomField { index: usize },
+    CustomField {
+        index: usize,
+    },
     #[serde(rename_all = "camelCase")]
-    Uri { index: usize },
+    Uri {
+        index: usize,
+    },
     CardNumber,
     CardCode,
     Email,
