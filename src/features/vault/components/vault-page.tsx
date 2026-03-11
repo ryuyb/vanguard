@@ -148,10 +148,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   } = useVaultPageModel({ navigateTo });
 
   return (
-    <main className="flex h-dvh flex-col bg-[radial-gradient(circle_at_12%_8%,hsl(212_95%_96%),transparent_36%),radial-gradient(circle_at_92%_92%,hsl(215_95%_97%),transparent_40%),linear-gradient(145deg,hsl(216_55%_98%),hsl(0_0%_100%))]">
+    <main className="flex h-dvh flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <header
         data-tauri-drag-region
-        className="w-full border-b border-slate-200/80 bg-slate-100/95 px-4 py-1 shadow-sm backdrop-blur-sm md:px-8 md:py-1.5"
+        className="w-full border-b border-slate-200/60 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-md md:px-8 md:py-2.5"
       >
         <div data-tauri-drag-region className="mx-auto w-full max-w-7xl">
           <div
@@ -162,14 +162,14 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               data-tauri-drag-region
               className="relative w-full md:max-w-105 md:justify-self-center"
             >
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
               <Input
                 ref={searchInputRef}
                 type="search"
                 placeholder="搜索名称、ID..."
                 value={headerSearchQuery}
                 onChange={(event) => setHeaderSearchQuery(event.target.value)}
-                className="h-8 pl-9 text-sm"
+                className="h-9 pl-9 text-sm border-slate-200 bg-slate-50/50 focus:bg-white transition-colors"
               />
             </div>
 
@@ -179,9 +179,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-auto w-full justify-start gap-2 rounded-lg border border-transparent px-2 py-1 transition-colors hover:border-slate-300 hover:bg-slate-200/70 data-[state=open]:border-slate-300 data-[state=open]:bg-slate-200/70 md:w-fit"
+                    className="h-auto w-full justify-start gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:border-slate-200 hover:bg-slate-50 data-[state=open]:border-slate-200 data-[state=open]:bg-slate-50 md:w-fit"
                   >
-                    <div className="flex size-9 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
+                    <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-semibold text-white shadow-sm">
                       {avatarText === "??" ? (
                         <UserRound className="size-4" />
                       ) : (
@@ -251,15 +251,15 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         </div>
       </header>
 
-      <section className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4">
+      <section className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-4">
         {pageState === "loading" && (
-          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-slate-700 shadow-sm">
+          <div className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm border border-slate-200">
             正在加载 vault 数据...
           </div>
         )}
 
         {pageState === "error" && (
-          <div className="rounded-xl bg-white/85 px-4 py-3 text-sm text-red-700 shadow-sm">
+          <div className="rounded-xl bg-white px-4 py-3 text-sm text-red-700 shadow-sm border border-red-200">
             {errorText || "读取 vault 数据失败。"}
           </div>
         )}
@@ -267,28 +267,34 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         {pageState === "ready" && viewData && (
           <ResizablePanelGroup
             orientation="horizontal"
-            className="min-h-0 flex-1"
+            className="min-h-0 flex-1 rounded-xl overflow-hidden shadow-lg"
           >
-            <ResizablePanel defaultSize={22} minSize={16}>
-              <aside className="h-full min-h-0 border border-slate-300/35 bg-slate-300/30 shadow-sm backdrop-blur-md">
+            <ResizablePanel defaultSize={20} minSize={16}>
+              <aside className="h-full min-h-0 bg-white border-r border-slate-200">
                 <ScrollArea className="h-full">
-                  <div className="space-y-2 p-2">
+                  <div className="space-y-1 p-3">
                     <button
                       type="button"
                       onClick={() => setSelectedMenuId(ALL_ITEMS_ID)}
                       className={[
-                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
                         selectedMenuId === ALL_ITEMS_ID
-                          ? "bg-sky-100/90 font-medium text-sky-800"
-                          : "text-slate-700 hover:bg-slate-100",
+                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-2">
-                          <Archive className="size-4 text-slate-500" />
+                        <span className="inline-flex items-center gap-2.5">
+                          <Archive className={[
+                            "size-4",
+                            selectedMenuId === ALL_ITEMS_ID ? "text-blue-600" : "text-slate-400"
+                          ].join(" ")} />
                           All items
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className={[
+                          "text-xs font-semibold",
+                          selectedMenuId === ALL_ITEMS_ID ? "text-blue-600" : "text-slate-400"
+                        ].join(" ")}>
                           {
                             (viewData.ciphers ?? []).filter(
                               (cipher) => cipher.deletedDate == null,
@@ -302,18 +308,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       type="button"
                       onClick={() => setSelectedMenuId(FAVORITES_ID)}
                       className={[
-                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
                         selectedMenuId === FAVORITES_ID
-                          ? "bg-sky-100/90 font-medium text-sky-800"
-                          : "text-slate-700 hover:bg-slate-100",
+                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-2">
-                          <Star className="size-4 text-slate-500" />
+                        <span className="inline-flex items-center gap-2.5">
+                          <Star className={[
+                            "size-4",
+                            selectedMenuId === FAVORITES_ID ? "text-blue-600" : "text-slate-400"
+                          ].join(" ")} />
                           Favorites
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className={[
+                          "text-xs font-semibold",
+                          selectedMenuId === FAVORITES_ID ? "text-blue-600" : "text-slate-400"
+                        ].join(" ")}>
                           {favoriteCipherCount}
                         </span>
                       </div>
@@ -323,18 +335,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       type="button"
                       onClick={() => setSelectedMenuId(TRASH_ID)}
                       className={[
-                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                        "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
                         selectedMenuId === TRASH_ID
-                          ? "bg-sky-100/90 font-medium text-sky-800"
-                          : "text-slate-700 hover:bg-slate-100",
+                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-2">
-                          <Trash2 className="size-4 text-slate-500" />
+                        <span className="inline-flex items-center gap-2.5">
+                          <Trash2 className={[
+                            "size-4",
+                            selectedMenuId === TRASH_ID ? "text-blue-600" : "text-slate-400"
+                          ].join(" ")} />
                           Trash
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className={[
+                          "text-xs font-semibold",
+                          selectedMenuId === TRASH_ID ? "text-blue-600" : "text-slate-400"
+                        ].join(" ")}>
                           {trashCipherCount}
                         </span>
                       </div>
@@ -359,11 +377,11 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               </aside>
             </ResizablePanel>
 
-            <ResizableHandle withHandle className="bg-slate-300/60" />
+            <ResizableHandle withHandle className="bg-slate-200" />
 
-            <ResizablePanel defaultSize={39} minSize={22}>
-              <section className="flex h-full min-h-0 flex-col bg-white/80 shadow-sm">
-                <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
+            <ResizablePanel defaultSize={40} minSize={24}>
+              <section className="flex h-full min-h-0 flex-col bg-slate-50/50 border-r border-slate-200">
+                <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
                   <div className="relative h-8 min-w-0 flex-1">
                     <div className="absolute inset-y-0 left-0 flex items-center">
                       <DropdownMenu>
@@ -371,12 +389,12 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <Button
                             type="button"
                             variant="ghost"
-                            className="h-8 justify-start gap-1 rounded-md px-2 text-xs font-medium text-slate-700 hover:bg-slate-200/70 data-[state=open]:bg-slate-200/70"
+                            className="h-8 justify-start gap-1 rounded-md px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[state=open]:bg-slate-100"
                             aria-label="筛选类型"
                             title="筛选类型"
                           >
                             <span>{toTypeFilterLabel(typeFilter)}</span>
-                            <ChevronDown className="size-3.5 text-slate-500" />
+                            <ChevronDown className="size-3.5 text-slate-400" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-44">
@@ -432,7 +450,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                               }
                             }}
                             placeholder={`在 ${selectedMenuName} 中查找`}
-                            className="h-8 bg-white text-xs"
+                            className="h-8 bg-white text-xs border-slate-200"
                           />
                         </motion.div>
                       )}
@@ -554,7 +572,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                 </div>
 
                 <ScrollArea className="min-h-0 flex-1">
-                  <div className="space-y-1 px-2 pb-2">
+                  <div className="space-y-1.5 px-3 py-2">
                     {filteredCiphers.map(
                       (cipher: (typeof filteredCiphers)[number]) => (
                         <CipherRowObserver
@@ -581,7 +599,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       ),
                     )}
                     {filteredCiphers.length === 0 && (
-                      <div className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                      <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600">
                         当前筛选下没有 cipher。
                       </div>
                     )}
@@ -590,17 +608,17 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               </section>
             </ResizablePanel>
 
-            <ResizableHandle withHandle className="bg-slate-300/60" />
+            <ResizableHandle withHandle className="bg-slate-200" />
 
-            <ResizablePanel defaultSize={39} minSize={24}>
-              <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white/80 shadow-sm">
+            <ResizablePanel defaultSize={40} minSize={26}>
+              <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white">
                 <ScrollArea className="h-full min-w-0 [&>[data-slot=scroll-area-viewport]]:min-w-0 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:h-full [&>[data-slot=scroll-area-viewport]>div]:min-w-0 [&>[data-slot=scroll-area-viewport]>div]:w-full">
                   <div className="flex h-full min-w-0 w-full flex-col p-3">
                     {!selectedCipherId && <div className="min-h-80" />}
 
                     {selectedCipherId && isCipherDetailLoading && (
-                      <div className="flex items-center gap-2 text-sm text-slate-700">
-                        <LoaderCircle className="size-4 animate-spin" />
+                      <div className="flex items-center gap-2 text-sm text-slate-700 bg-white rounded-lg border border-slate-200 px-3 py-2">
+                        <LoaderCircle className="size-4 animate-spin text-blue-600" />
                         正在加载 cipher 详情...
                       </div>
                     )}
@@ -608,7 +626,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     {selectedCipherId &&
                       !isCipherDetailLoading &&
                       cipherDetailError && (
-                        <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
                           {cipherDetailError}
                         </div>
                       )}

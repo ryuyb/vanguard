@@ -69,14 +69,17 @@ export function FolderTreeMenuItem({
               }
             }}
             className={[
-              "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
+              "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium transition-all",
               isSelected
-                ? "bg-sky-100/90 font-medium text-sky-800"
-                : "text-slate-700 hover:bg-slate-100",
+                ? "bg-blue-50 text-blue-700 shadow-sm"
+                : "text-slate-700 hover:bg-slate-50",
             ].join(" ")}
           >
             <span className="truncate">{node.label}</span>
-            <span className="text-xs text-slate-500">{count}</span>
+            <span className={[
+              "text-xs font-semibold",
+              isSelected ? "text-blue-600" : "text-slate-400"
+            ].join(" ")}>{count}</span>
           </button>
         </div>
 

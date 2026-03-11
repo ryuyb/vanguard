@@ -24,6 +24,61 @@ const CUSTOM_FIELD_TYPE_TEXT = 0;
 const CUSTOM_FIELD_TYPE_HIDDEN = 1;
 const CUSTOM_FIELD_TYPE_BOOLEAN = 2;
 
+// TOTP 倒计时圆环组件
+function TotpCountdownRing({
+  remaining,
+  total = 30,
+}: {
+  remaining: number;
+  total?: number;
+}) {
+  const percentage = (remaining / total) * 100;
+  const circumference = 2 * Math.PI * 6; // 半径为 6
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+  // 根据剩余时间计算颜色：绿色 -> 黄色 -> 红色
+  const getColor = () => {
+    if (percentage > 50) return "#10b981"; // green-500
+    if (percentage > 20) return "#f59e0b"; // amber-500
+    return "#ef4444"; // red-500
+  };
+
+  return (
+    <div className="relative inline-flex items-center gap-1.5">
+      <svg width="16" height="16" className="transform -rotate-90">
+        {/* 背景圆环 */}
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth="3"
+        />
+        {/* 进度圆环 */}
+        <circle
+          cx="8"
+          cy="8"
+          r="6"
+          fill="none"
+          stroke={getColor()}
+          strokeWidth="3"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-linear"
+        />
+      </svg>
+      <span
+        className="text-xs font-semibold tabular-nums"
+        style={{ color: getColor() }}
+      >
+        {remaining}
+      </span>
+    </div>
+  );
+}
+
 function toDate(value: string | null | undefined): Date | null {
   if (!value) {
     return null;
@@ -70,20 +125,20 @@ function DetailField({
   }
   return (
     <div
-      className="group relative min-w-0 w-full rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-xs"
+      className="group relative min-w-0 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all"
       onClick={onCopy}
       role={onCopy ? "button" : undefined}
       tabIndex={onCopy ? 0 : undefined}
       style={{ cursor: onCopy ? "pointer" : "default" }}
     >
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+        <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
           {label}
         </div>
       </div>
       <div
         className={cn(
-          "mt-1.5 break-words text-[13px] leading-relaxed text-slate-900",
+          "mt-2 break-words text-sm leading-relaxed text-slate-900 font-medium",
           contentClassName
         )}
       >
@@ -104,7 +159,7 @@ export function CipherDetailPanel({
   iconUrl: iconUrlProp,
   iconServer,
 }: CipherDetailPanelProps) {
-  const { copyField, copiedField } = useCipherFieldCopy(cipher.id);
+  const { copyField } = useCipherFieldCopy(cipher.id);
   const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher, iconServer);
   const username = firstNonEmptyText(
     cipher.login?.username,
@@ -323,12 +378,12 @@ export function CipherDetailPanel({
           : null;
 
   return (
-    <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-slate-200/80 bg-white/90 py-0 shadow-sm">
-      <CardHeader className="gap-2 border-b border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-sky-50/50 px-6 py-3">
-        <div className="flex min-h-9 items-center gap-3">
+    <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-none bg-white py-0 shadow-none">
+      <CardHeader className="gap-2 border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-6 py-4">
+        <div className="flex min-h-9 items-center gap-3.5">
           <CipherIcon
             alt={toCipherIconAlt(cipher.name)}
-            className="size-10 bg-white/90 text-slate-500"
+            className="size-11 bg-white border border-slate-200 text-slate-500 shadow-sm"
             iconUrl={iconUrl}
             isVisible={Boolean(iconUrl)}
             loadState={iconUrl ? "loading" : "fallback"}
@@ -336,67 +391,111 @@ export function CipherDetailPanel({
             {toCipherTypeIcon(cipher.type)}
           </CipherIcon>
           <div className="min-w-0 flex-1">
-            <h2 className="m-0 truncate leading-none text-lg font-semibold text-slate-900">
+            <h2 className="m-0 truncate leading-tight text-xl font-bold text-slate-900">
               {cipher.name ?? "Untitled cipher"}
             </h2>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="min-w-0 space-y-3 pt-4">
-        <div className="flex flex-col gap-2">
-          {username && (
-            <DetailField
-              label="Username"
-              value={username}
-              onCopy={() => copyField("username")}
-            />
-          )}
-          <DetailField label="Org" value={organizationId} />
-          {hasOneTimePassword && (
-            <DetailField
-              label="One-time password"
-              onCopy={() => copyField("totp")}
-            >
-              <span className="font-mono tracking-wide">
-                {oneTimePasswordDisplay}
-              </span>
-            </DetailField>
-          )}
-          {hasPasskey && (
-            <DetailField label="Passkey" value={passkeyDetailValue} />
-          )}
-        </div>
-
-        {password && (
-          <DetailField
-            label="Password"
-            onCopy={() => copyField("password")}
-          >
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <div className="min-w-0 break-all font-mono text-[13px] text-slate-900">
-                {isPasswordVisible ? password : "••••••••••••"}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="size-7 shrink-0 rounded-full p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsPasswordVisible((visible) => !visible);
-                }}
-                aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
-                title={isPasswordVisible ? "隐藏密码" : "显示密码"}
+      <CardContent className="min-w-0 space-y-3 pt-5">
+        {/* 主要凭证区块 - 类似 1Password 的统一卡片 */}
+        {(username || password || hasOneTimePassword || hasPasskey) && (
+          <div className="rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-200">
+            {username && (
+              <div
+                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors first:rounded-t-lg"
+                onClick={() => copyField("username")}
+                role="button"
+                tabIndex={0}
               >
-                {isPasswordVisible ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </Button>
-            </div>
-          </DetailField>
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                  Username
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-900">
+                  {username}
+                </div>
+              </div>
+            )}
+
+            {password && (
+              <div
+                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => copyField("password")}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                  Password
+                </div>
+                <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                  <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
+                    {isPasswordVisible ? password : "••••••••••••"}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="size-8 shrink-0 rounded-full p-0 hover:bg-slate-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPasswordVisible((visible) => !visible);
+                    }}
+                    aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
+                    title={isPasswordVisible ? "隐藏密码" : "显示密码"}
+                  >
+                    {isPasswordVisible ? (
+                      <EyeOff className="size-4 text-slate-600" />
+                    ) : (
+                      <Eye className="size-4 text-slate-600" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {hasOneTimePassword && (
+              <div
+                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => copyField("totp")}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                  One-time password
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="font-mono text-sm font-bold text-slate-900 tracking-wider">
+                    {oneTimePasswordCode ? (
+                      <>
+                        {oneTimePasswordCode.slice(0, 3)}
+                        <span className="mx-0.5">·</span>
+                        {oneTimePasswordCode.slice(3)}
+                      </>
+                    ) : (
+                      oneTimePasswordFailed ? "Unavailable" : "Loading..."
+                    )}
+                  </div>
+                  {oneTimePasswordRemaining != null && oneTimePasswordCode && (
+                    <TotpCountdownRing remaining={oneTimePasswordRemaining} total={30} />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {hasPasskey && (
+              <div className="group px-3.5 py-3 hover:bg-slate-50 transition-colors last:rounded-b-lg">
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                  Passkey
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-900">
+                  {passkeyDetailValue}
+                </div>
+              </div>
+            )}
+          </div>
         )}
+
+        <DetailField label="Org" value={organizationId} />
 
         {uniqueUris.length > 0 && (
           <DetailField label="URIs" contentClassName="overflow-hidden">
@@ -424,11 +523,11 @@ export function CipherDetailPanel({
           <div className="space-y-3">
             {notes && (
               <div className="space-y-2">
-                <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   Notes
                 </div>
                 <div
-                  className="group relative rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 cursor-pointer"
+                  className="group relative rounded-lg border border-slate-200 bg-slate-50 p-3.5 cursor-pointer hover:shadow-md transition-all"
                   onClick={() => copyField("notes")}
                   role="button"
                   tabIndex={0}
@@ -442,10 +541,10 @@ export function CipherDetailPanel({
 
             {customFields.length > 0 && (
               <div className="space-y-2">
-                <div className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   Custom fields
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {customFields.map((field, index) => {
                     const isHiddenType =
                       field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
@@ -472,7 +571,7 @@ export function CipherDetailPanel({
                     return (
                       <div
                         key={field.key}
-                        className={`group relative rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 ${canCopy ? "cursor-pointer" : ""}`}
+                        className={`group relative rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all ${canCopy ? "cursor-pointer" : ""}`}
                         onClick={
                           canCopy
                             ? () => copyField({ customField: index })
@@ -482,11 +581,11 @@ export function CipherDetailPanel({
                         tabIndex={canCopy ? 0 : undefined}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="text-[11px] font-medium tracking-wide text-slate-500">
+                          <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                             {field.name}
                           </div>
                         </div>
-                        <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
+                        <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
                           <div className="min-w-0 break-all text-sm font-medium text-slate-900">
                             {displayValue}
                           </div>
@@ -494,7 +593,7 @@ export function CipherDetailPanel({
                             <Button
                               type="button"
                               variant="outline"
-                              className="size-7 shrink-0 rounded-full p-0"
+                              className="size-8 shrink-0 rounded-full p-0 border-slate-300 hover:bg-slate-100"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setRevealedCustomFieldKeys((previous) => {
@@ -513,9 +612,9 @@ export function CipherDetailPanel({
                               title={isRevealed ? "隐藏字段值" : "显示字段值"}
                             >
                               {isRevealed ? (
-                                <EyeOff className="size-4" />
+                                <EyeOff className="size-4 text-slate-600" />
                               ) : (
-                                <Eye className="size-4" />
+                                <Eye className="size-4 text-slate-600" />
                               )}
                             </Button>
                           )}
@@ -530,19 +629,19 @@ export function CipherDetailPanel({
         </CardContent>
       )}
 
-      <CardContent className="min-w-0 pt-3">
+      <CardContent className="min-w-0 pt-4">
         <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-left transition-colors hover:bg-slate-100/80"
+              className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition-all hover:bg-slate-100 hover:shadow-md"
             >
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-semibold text-slate-700">
                 最后编辑 {lastEditedAt}
               </span>
               <ChevronDown
                 className={[
-                  "size-4 text-slate-500 transition-transform",
+                  "size-4 text-slate-400 transition-transform",
                   isTimelineOpen ? "rotate-180" : "",
                 ].join(" ")}
               />
@@ -551,15 +650,15 @@ export function CipherDetailPanel({
 
           <CollapsibleContent className="pt-3">
             {timelineEvents.length > 0 ? (
-              <ol className="relative ml-1 space-y-3 border-l border-slate-200 pl-4">
+              <ol className="relative ml-1 space-y-3 border-l-2 border-blue-200 pl-5">
                 {timelineEvents.map((event) => (
                   <li
                     key={`${event.label}-${event.date.toISOString()}`}
                     className="relative"
                   >
-                    <span className="absolute -left-5.25 top-1.5 size-2 rounded-full bg-slate-400" />
-                    <div className="text-xs text-slate-500">{event.label}</div>
-                    <div className="text-sm font-medium text-slate-900">
+                    <span className="absolute -left-6.5 top-1.5 size-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
+                    <div className="text-xs font-medium text-slate-500">{event.label}</div>
+                    <div className="text-sm font-semibold text-slate-900">
                       {event.date.toLocaleString()}
                     </div>
                   </li>

@@ -32,16 +32,19 @@ export function CipherRow({
       type="button"
       onClick={onClick}
       className={[
-        "w-full rounded-lg px-3 py-2 text-left transition-colors",
+        "w-full rounded-lg px-3 py-2.5 text-left transition-all border",
         selected
-          ? "bg-sky-100/85 text-sky-900"
-          : "bg-slate-50/80 text-slate-800 hover:bg-slate-100",
+          ? "bg-blue-50 border-blue-200 text-blue-900 shadow-sm"
+          : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300",
       ].join(" ")}
     >
       <div className="flex items-center gap-3 min-w-0">
         <CipherIcon
           alt={toCipherIconAlt(cipher.name)}
-          className="bg-white/90 text-slate-500"
+          className={[
+            "bg-white text-slate-500 border",
+            selected ? "border-blue-200" : "border-slate-200"
+          ].join(" ")}
           iconUrl={cipher.iconUrl ?? null}
           isVisible={shouldLoadIcon}
           loadState={shouldLoadIcon ? iconLoadState : "idle"}
@@ -51,10 +54,10 @@ export function CipherRow({
           {toCipherTypeIcon(cipher.type)}
         </CipherIcon>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">
+          <div className="truncate text-sm font-semibold">
             {cipher.name ?? "Untitled cipher"}
           </div>
-          <div className="mt-1 truncate text-xs text-slate-600">
+          <div className="mt-1 truncate text-xs text-slate-500">
             {cipher.username ?? ""}
           </div>
         </div>
