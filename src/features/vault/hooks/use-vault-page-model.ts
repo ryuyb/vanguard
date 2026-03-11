@@ -373,6 +373,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     isLoggingOut,
     isRefreshing,
     loadCipherDetail,
+    loadVaultData,
     lockLabel,
     logoutLabel,
     markCipherIconFallback,

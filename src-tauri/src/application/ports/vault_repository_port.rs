@@ -114,4 +114,6 @@ pub trait VaultRepositoryPort: Send + Sync {
     ) -> AppResult<()>;
 
     async fn load_snapshot_meta(&self, account_id: &str) -> AppResult<Option<VaultSnapshotMeta>>;
+
+    async fn delete_account_database(&self, account_id: &str) -> AppResult<()>;
 }

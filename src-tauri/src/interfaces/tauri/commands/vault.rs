@@ -104,6 +104,8 @@ pub async fn vault_unlock(
     state: State<'_, AppState>,
     request: VaultUnlockRequestDto,
 ) -> Result<(), ErrorPayload> {
+    let method = request.method.clone();
+
     build_unlock_use_case(&state)
         .execute(
             &*state,
@@ -113,6 +115,27 @@ pub async fn vault_unlock(
         )
         .await
         .map_err(|error| log_command_error("vault_unlock", &error))?;
+
+    // 如果使用主密码解锁，恢复 auth_session
+    if let crate::interfaces::tauri::dto::vault::VaultUnlockMethodDto::MasterPassword { password } = method {
+        if let Err(error) = crate::interfaces::tauri::session::restore_auth_session_with_master_password(&state, &password).await {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "vault_unlock succeeded but failed to restore auth session: [{}] {}",
+                error.code(),
+                error.log_message()
+            );
+        }
+    } else {
+        // PIN 或生物识别解锁时，检查 auth_session 是否存在
+        // 如果不存在（例如应用重启后），需要用户使用主密码重新解锁
+        if state.auth_session().map_err(|error| log_command_error("vault_unlock", &error))?.is_none() {
+            log::warn!(
+                target: "vanguard::tauri::vault",
+                "vault unlocked with PIN/biometric but auth session is missing, API calls will fail until master password unlock"
+            );
+        }
+    }
 
     Ok(())
 }

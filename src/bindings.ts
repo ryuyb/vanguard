@@ -53,6 +53,30 @@ async desktopOpenMainWindow() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async createFolder(request: CreateFolderRequest) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_folder", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async renameFolder(request: RenameFolderRequest) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_folder", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteFolder(request: DeleteFolderRequest) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_folder", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultSyncNow(request: SyncNowRequestDto) : Promise<Result<SyncStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_sync_now", { request }) };
@@ -230,6 +254,8 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+export type CreateFolderRequest = { name: string }
+export type DeleteFolderRequest = { folderId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
 export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
@@ -237,6 +263,7 @@ export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
+export type RenameFolderRequest = { folderId: string; newName: string }
 export type RestoreAuthStateRequestDto = Record<string, never>
 export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"

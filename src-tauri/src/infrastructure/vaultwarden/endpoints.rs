@@ -39,6 +39,10 @@ impl VaultwardenEndpoints {
         format!("{}/api/folders/{}", normalize_base(base_url), folder_id)
     }
 
+    pub fn folders(base_url: &str) -> String {
+        format!("{}/api/folders", normalize_base(base_url))
+    }
+
     pub fn send(base_url: &str, send_id: &str) -> String {
         format!("{}/api/sends/{}", normalize_base(base_url), send_id)
     }

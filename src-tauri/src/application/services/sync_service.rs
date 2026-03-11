@@ -51,6 +51,10 @@ impl SyncService {
         }
     }
 
+    pub fn vault_repository(&self) -> Arc<dyn VaultRepositoryPort> {
+        Arc::clone(&self.vault_repository)
+    }
+
     pub async fn sync_now(&self, command: SyncVaultCommand) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         let account_id = command.account_id.clone();

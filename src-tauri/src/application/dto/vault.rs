@@ -1,4 +1,5 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::application::dto::sync::SyncMetricsSummary;
 use crate::domain::sync::SyncContext;
@@ -169,6 +170,25 @@ pub struct VaultCipherDetail {
     pub identity: Option<VaultCipherIdentityDetail>,
     pub ssh_key: Option<VaultCipherSshKeyDetail>,
     pub attachments: Vec<VaultAttachmentDetail>,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFolderRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RenameFolderRequest {
+    pub folder_id: String,
+    pub new_name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteFolderRequest {
+    pub folder_id: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

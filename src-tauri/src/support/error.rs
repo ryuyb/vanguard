@@ -30,11 +30,17 @@ pub enum AppError {
     VaultSyncConflict { cipher_id: String },
     VaultLocked,
     VaultCorrupted,
+    VaultFolderNotFound { folder_id: String },
+    VaultFolderNameConflict { name: String },
 
     // === 验证错误 ===
     ValidationFieldError { field: String, message: String },
     ValidationFormatError { format: String, value: String },
     ValidationRequired { field: String },
+
+    // === 请求错误 ===
+    BadRequest { message: String },
+    NotFound { resource: String, id: String },
 
     // === 网络错误 ===
     NetworkConnectionFailed,
@@ -76,11 +82,17 @@ impl AppError {
             Self::VaultSyncConflict { .. } => "VAULT_SYNC_CONFLICT",
             Self::VaultLocked => "VAULT_LOCKED",
             Self::VaultCorrupted => "VAULT_CORRUPTED",
+            Self::VaultFolderNotFound { .. } => "VAULT_FOLDER_NOT_FOUND",
+            Self::VaultFolderNameConflict { .. } => "VAULT_FOLDER_NAME_CONFLICT",
 
             // 验证
             Self::ValidationFieldError { .. } => "VALIDATION_FIELD_ERROR",
             Self::ValidationFormatError { .. } => "VALIDATION_FORMAT_ERROR",
             Self::ValidationRequired { .. } => "VALIDATION_REQUIRED",
+
+            // 请求
+            Self::BadRequest { .. } => "BAD_REQUEST",
+            Self::NotFound { .. } => "NOT_FOUND",
 
             // 网络
             Self::NetworkConnectionFailed => "NETWORK_CONNECTION_FAILED",
@@ -131,6 +143,8 @@ impl AppError {
             }
             Self::VaultLocked => "Vault is locked".to_string(),
             Self::VaultCorrupted => "Vault data is corrupted".to_string(),
+            Self::VaultFolderNotFound { folder_id } => format!("Folder not found: {}", folder_id),
+            Self::VaultFolderNameConflict { name } => format!("Folder name already exists: {}", name),
 
             // 验证
             Self::ValidationFieldError { field, message } => {
@@ -140,6 +154,10 @@ impl AppError {
                 format!("Invalid format for {}: {}", format, value)
             }
             Self::ValidationRequired { field } => format!("Required field missing: {}", field),
+
+            // 请求
+            Self::BadRequest { message } => format!("Bad request: {}", message),
+            Self::NotFound { resource, id } => format!("{} not found: {}", resource, id),
 
             // 网络
             Self::NetworkConnectionFailed => "Network connection failed".to_string(),
@@ -231,6 +249,19 @@ impl AppError {
             })),
             Self::StoragePermissionDenied { path } => Some(serde_json::json!({
                 "path": path,
+            })),
+            Self::VaultFolderNotFound { folder_id } => Some(serde_json::json!({
+                "folderId": folder_id,
+            })),
+            Self::VaultFolderNameConflict { name } => Some(serde_json::json!({
+                "name": name,
+            })),
+            Self::BadRequest { message } => Some(serde_json::json!({
+                "message": message,
+            })),
+            Self::NotFound { resource, id } => Some(serde_json::json!({
+                "resource": resource,
+                "id": id,
             })),
             _ => None,
         }

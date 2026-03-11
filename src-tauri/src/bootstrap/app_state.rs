@@ -20,6 +20,7 @@ use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
 };
+use crate::infrastructure::vaultwarden::VaultwardenClient;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -74,6 +75,7 @@ pub struct AppState {
     auth_service: Arc<AuthService>,
     sync_service: Arc<SyncService>,
     realtime_sync_service: Arc<RealtimeSyncService>,
+    vaultwarden_client: VaultwardenClient,
     master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
     pin_unlock_port: Arc<dyn PinUnlockPort>,
     biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
@@ -93,6 +95,7 @@ impl AppState {
         auth_service: Arc<AuthService>,
         sync_service: Arc<SyncService>,
         realtime_sync_service: Arc<RealtimeSyncService>,
+        vaultwarden_client: VaultwardenClient,
         master_password_unlock_data_port: Arc<dyn MasterPasswordUnlockDataPort>,
         pin_unlock_port: Arc<dyn PinUnlockPort>,
         biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
@@ -118,6 +121,7 @@ impl AppState {
             auth_service,
             sync_service,
             realtime_sync_service,
+            vaultwarden_client,
             master_password_unlock_data_port,
             pin_unlock_port,
             biometric_unlock_port,
@@ -130,6 +134,10 @@ impl AppState {
             persisted_auth_state: Arc::new(Mutex::new(persisted_auth_state)),
             auth_wrap_runtime: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn vaultwarden_client(&self) -> &VaultwardenClient {
+        &self.vaultwarden_client
     }
 
     pub fn auth_service(&self) -> Arc<AuthService> {

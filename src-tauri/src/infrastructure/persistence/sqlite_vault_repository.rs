@@ -450,94 +450,6 @@ impl SqliteVaultRepository {
         Ok(())
     }
 
-    fn copy_live_to_staging(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
-        tx.execute(
-            r#"
-            INSERT INTO staging_profile (account_id, payload_json)
-            SELECT account_id, payload_json
-            FROM live_profile
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live profile to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_folders (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM live_folders
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live folders to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_collections (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM live_collections
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live collections to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_policies (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM live_policies
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live policies to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_ciphers (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM live_ciphers
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live ciphers to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_sends (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM live_sends
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live sends to staging: {error}"),
-        })?;
-        tx.execute(
-            r#"
-            INSERT INTO staging_meta (account_id, domains_json, user_decryption_json)
-            SELECT account_id, domains_json, user_decryption_json
-            FROM live_meta
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to copy live meta to staging: {error}"),
-        })?;
-        Ok(())
-    }
-
     fn clear_live_snapshot(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
         tx.execute(
             "DELETE FROM live_profile WHERE account_id = ?1",
@@ -919,7 +831,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             })?;
 
             Self::clear_staging_snapshot(&tx, account_id)?;
-            Self::copy_live_to_staging(&tx, account_id)?;
+            // 不再从 live 复制到 staging，让 staging 保持空白
+            // 这样 upsert 时只会包含服务器返回的最新数据
+            // Self::copy_live_to_staging(&tx, account_id)?;
 
             tx.commit().map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to commit begin sync transaction: {error}"),
@@ -1624,6 +1538,43 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 .transpose()
         })
         .await
+    }
+
+    async fn delete_account_database(&self, account_id: &str) -> AppResult<()> {
+        let account_id = account_id.to_string();
+        let db_path = self.db_path_for_account(&account_id);
+
+        {
+            let mut connections = self
+                .connections
+                .lock()
+                .map_err(|_| AppError::InternalUnexpected {
+                    message: "failed to lock sqlite connections cache".into(),
+                })?;
+            connections.remove(&account_id);
+        }
+
+        tokio::task::spawn_blocking(move || {
+            if db_path.exists() {
+                std::fs::remove_file(&db_path).map_err(|error| AppError::InternalUnexpected {
+                    message: format!(
+                        "failed to delete database file {}: {error}",
+                        db_path.display()
+                    ),
+                })?;
+                log::info!(
+                    target: "vanguard::persistence",
+                    "deleted database file for account_id={}: {}",
+                    account_id,
+                    db_path.display()
+                );
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|error| AppError::InternalUnexpected {
+            message: format!("database deletion task join error: {error}"),
+        })?
     }
 }
 

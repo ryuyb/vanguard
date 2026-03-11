@@ -427,6 +427,131 @@ impl VaultwardenClient {
         }
     }
 
+    pub async fn create_folder(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        name: String,
+    ) -> VaultwardenResult<SyncFolder> {
+        let endpoint = format!("{}/api/folders", Self::validated_base_url(base_url)?);
+
+        let request_body = serde_json::json!({
+            "name": name
+        });
+
+        let response = self
+            .http_client
+            .post(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        log::info!(
+            target: "vanguard::vaultwarden",
+            "create_folder response status={} body={}",
+            status,
+            body
+        );
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str::<SyncFolder>(&body)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid folder response: {error}")))
+    }
+
+    pub async fn update_folder(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        folder_id: &str,
+        name: String,
+    ) -> VaultwardenResult<SyncFolder> {
+        let endpoint = self.folder_endpoint(base_url, folder_id)?;
+
+        let request_body = serde_json::json!({
+            "name": name
+        });
+
+        let response = self
+            .http_client
+            .put(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        log::info!(
+            target: "vanguard::vaultwarden",
+            "update_folder response folder_id={} status={} body={}",
+            folder_id,
+            status,
+            body
+        );
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str::<SyncFolder>(&body)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid folder response: {error}")))
+    }
+
+    pub async fn delete_folder(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        folder_id: &str,
+    ) -> VaultwardenResult<()> {
+        let endpoint = self.folder_endpoint(base_url, folder_id)?;
+
+        let response = self
+            .http_client
+            .delete(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+
+        log::info!(
+            target: "vanguard::vaultwarden",
+            "delete_folder response folder_id={} status={}",
+            folder_id,
+            status
+        );
+
+        if !(200..300).contains(&status) {
+            let body = response
+                .text()
+                .await
+                .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+            return Err(Self::api_error(status, body));
+        }
+
+        Ok(())
+    }
+
     pub async fn get_send(
         &self,
         base_url: &str,

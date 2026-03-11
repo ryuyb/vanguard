@@ -1,14 +1,16 @@
 use aes::Aes256;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
 use base64::Engine;
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
+use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use hmac::{Hmac, Mac};
+use rand::RngExt;
 use sha2::Sha256;
 
 use crate::application::dto::vault::VaultUserKeyMaterial;
 use crate::support::error::AppError;
 
 type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
+type Aes256CbcEncryptor = cbc::Encryptor<Aes256>;
 type HmacSha256 = Hmac<Sha256>;
 
 pub fn decrypt_optional_field(
@@ -245,4 +247,77 @@ fn decrypt_aes_cbc(iv: &[u8], ciphertext: &[u8], enc_key: &[u8]) -> Result<Vec<u
             message: "ciphertext decryption failed".to_string(),
         })?;
     Ok(plaintext.to_vec())
+}
+
+/// Encrypts a string using AES-256-CBC with HMAC-SHA256 (encryption type 2)
+/// Returns a CipherString in the format: "2.iv|ciphertext|mac"
+pub fn encrypt_cipher_string(plaintext: &str, key: &VaultUserKeyMaterial) -> Result<String, AppError> {
+    encrypt_cipher_bytes(plaintext.as_bytes(), key)
+}
+
+/// Encrypts bytes using AES-256-CBC with HMAC-SHA256 (encryption type 2)
+/// Returns a CipherString in the format: "2.iv|ciphertext|mac"
+pub fn encrypt_cipher_bytes(plaintext: &[u8], key: &VaultUserKeyMaterial) -> Result<String, AppError> {
+    // Generate random IV (16 bytes for AES-256-CBC)
+    let mut iv = [0u8; 16];
+    rand::rng().fill(&mut iv);
+
+    // Encrypt with AES-256-CBC
+    let ciphertext = encrypt_aes_cbc(&iv, plaintext, &key.enc_key)?;
+
+    // Calculate HMAC if mac_key is available (type 2)
+    if let Some(mac_key) = &key.mac_key {
+        let mac = calculate_mac(&iv, &ciphertext, mac_key)?;
+
+        // Format: "2.iv|ciphertext|mac"
+        Ok(format!(
+            "2.{}|{}|{}",
+            STANDARD.encode(&iv),
+            STANDARD.encode(&ciphertext),
+            STANDARD.encode(&mac)
+        ))
+    } else {
+        // Format: "0.iv|ciphertext" (type 0, no MAC)
+        Ok(format!(
+            "0.{}|{}",
+            STANDARD.encode(&iv),
+            STANDARD.encode(&ciphertext)
+        ))
+    }
+}
+
+fn encrypt_aes_cbc(iv: &[u8], plaintext: &[u8], enc_key: &[u8]) -> Result<Vec<u8>, AppError> {
+    let encryptor = Aes256CbcEncryptor::new_from_slices(enc_key, iv).map_err(|error| {
+        AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("invalid aes key/iv: {error}"),
+        }
+    })?;
+
+    let mut buffer = plaintext.to_vec();
+    // Add padding space
+    let block_size = 16;
+    let padding_len = block_size - (buffer.len() % block_size);
+    buffer.resize(buffer.len() + padding_len, 0);
+
+    let ciphertext = encryptor
+        .encrypt_padded_mut::<Pkcs7>(&mut buffer, plaintext.len())
+        .map_err(|_| AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "plaintext encryption failed".to_string(),
+        })?;
+
+    Ok(ciphertext.to_vec())
+}
+
+fn calculate_mac(iv: &[u8], ciphertext: &[u8], mac_key: &[u8]) -> Result<Vec<u8>, AppError> {
+    let mut signer = HmacSha256::new_from_slice(mac_key).map_err(|error| {
+        AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: format!("invalid mac key: {error}"),
+        }
+    })?;
+    signer.update(iv);
+    signer.update(ciphertext);
+    Ok(signer.finalize().into_bytes().to_vec())
 }

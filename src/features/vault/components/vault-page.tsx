@@ -2,6 +2,7 @@ import {
   Archive,
   ArrowUpDown,
   ChevronDown,
+  FolderPlus,
   LoaderCircle,
   Lock,
   LogOut,
@@ -46,9 +47,13 @@ import {
   toTypeFilterLabel,
   VaultSettingsDialog,
 } from "@/features/vault";
+import { FolderDialog } from "@/features/vault/components/folder-dialog";
+import { DeleteFolderDialog } from "@/features/vault/components/delete-folder-dialog";
+import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import { useVaultPageModel } from "@/features/vault/hooks";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
 import { getCipherIconUrl } from "@/features/vault/utils";
+import { toast } from "@/lib/toast";
 
 type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
@@ -98,6 +103,14 @@ function CipherRowObserver({
 export function VaultPage({ navigateTo }: VaultPageProps) {
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
+  // 文件夹操作状态
+  const [folderDialogMode, setFolderDialogMode] = useState<"create" | "rename">("create");
+  const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedFolderName, setSelectedFolderName] = useState("");
+  const [parentFolderName, setParentFolderName] = useState<string | null>(null);
+
   const {
     avatarText,
     cipherDetailError,
@@ -117,6 +130,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     isLocking,
     isLoggingOut,
     loadCipherDetail,
+    loadVaultData,
     lockLabel,
     logoutLabel,
     markCipherIconFallback,
@@ -146,6 +160,100 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     userEmail,
     viewData,
   } = useVaultPageModel({ navigateTo });
+
+  const folderActions = useFolderActions({
+    onSuccess: () => {
+      void loadVaultData();
+    },
+  });
+
+  // 文件夹操作处理函数
+  const handleCreateFolder = () => {
+    setFolderDialogMode("create");
+    setSelectedFolderName("");
+    setParentFolderName(null);
+    setIsFolderDialogOpen(true);
+  };
+
+  const handleCreateSubFolder = (parentPath: string) => {
+    setFolderDialogMode("create");
+    setSelectedFolderName("");
+    setParentFolderName(parentPath);
+    setIsFolderDialogOpen(true);
+  };
+
+  const handleRenameFolder = (folderId: string, currentName: string) => {
+    setFolderDialogMode("rename");
+    setSelectedFolderId(folderId);
+    setSelectedFolderName(currentName);
+    setParentFolderName(null);
+    setIsFolderDialogOpen(true);
+  };
+
+  const handleDeleteFolder = (folderId: string, folderName: string) => {
+    setSelectedFolderId(folderId);
+    setSelectedFolderName(folderName);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleFolderDialogConfirm = (name: string) => {
+    if (folderDialogMode === "create") {
+      // 如果有父文件夹,创建子文件夹(通过名称前缀)
+      const fullName = parentFolderName ? `${parentFolderName}/${name}` : name;
+      folderActions.createFolder.mutate(fullName, {
+        onSuccess: () => {
+          setIsFolderDialogOpen(false);
+          toast.success("创建成功", {
+            description: `文件夹 "${name}" 已创建`,
+          });
+        },
+        onError: (error) => {
+          toast.error("创建失败", {
+            description: error instanceof Error ? error.message : "创建文件夹时发生错误",
+          });
+        },
+      });
+    } else if (folderDialogMode === "rename" && selectedFolderId) {
+      folderActions.renameFolder.mutate(
+        { folderId: selectedFolderId, newName: name },
+        {
+          onSuccess: () => {
+            setIsFolderDialogOpen(false);
+            toast.success("重命名成功", {
+              description: `文件夹已重命名为 "${name}"`,
+            });
+          },
+          onError: (error) => {
+            toast.error("重命名失败", {
+              description: error instanceof Error ? error.message : "重命名文件夹时发生错误",
+            });
+          },
+        }
+      );
+    }
+  };
+
+  const handleDeleteDialogConfirm = () => {
+    if (selectedFolderId) {
+      folderActions.deleteFolder.mutate(selectedFolderId, {
+        onSuccess: () => {
+          setIsDeleteDialogOpen(false);
+          toast.success("删除成功", {
+            description: `文件夹 "${selectedFolderName}" 已删除`,
+          });
+          // 如果删除的是当前选中的文件夹,切换到 All Items
+          if (selectedMenuId === selectedFolderId) {
+            setSelectedMenuId(ALL_ITEMS_ID);
+          }
+        },
+        onError: (error) => {
+          toast.error("删除失败", {
+            description: error instanceof Error ? error.message : "删除文件夹时发生错误",
+          });
+        },
+      });
+    }
+  };
 
   return (
     <main className="flex h-dvh flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -382,6 +490,22 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       </div>
                     </button>
 
+                    <div className="mt-4 mb-2 flex items-center justify-between px-3">
+                      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        文件夹
+                      </h3>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCreateFolder}
+                        className="h-6 px-2 text-xs"
+                      >
+                        <FolderPlus className="size-3.5" />
+                        新建
+                      </Button>
+                    </div>
+
                     <div className="space-y-1">
                       {folderTree.map((node) => (
                         <FolderTreeMenuItem
@@ -393,6 +517,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           folderCipherCount={folderCipherCount}
                           onFolderSelect={setSelectedMenuId}
                           onOpenChange={onFolderTreeOpenChange}
+                          onRenameFolder={handleRenameFolder}
+                          onDeleteFolder={handleDeleteFolder}
+                          onCreateSubFolder={handleCreateSubFolder}
                         />
                       ))}
                     </div>
@@ -682,6 +809,28 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       <VaultSettingsDialog
         open={isSettingsDialogOpen}
         onOpenChange={setIsSettingsDialogOpen}
+      />
+
+      <FolderDialog
+        open={isFolderDialogOpen}
+        mode={folderDialogMode}
+        initialName={selectedFolderName}
+        parentFolderName={parentFolderName}
+        onOpenChange={setIsFolderDialogOpen}
+        onConfirm={handleFolderDialogConfirm}
+        isLoading={
+          folderDialogMode === "create"
+            ? folderActions.createFolder.isLoading
+            : folderActions.renameFolder.isLoading
+        }
+      />
+
+      <DeleteFolderDialog
+        open={isDeleteDialogOpen}
+        folderName={selectedFolderName}
+        onOpenChange={setIsDeleteDialogOpen}
+        onConfirm={handleDeleteDialogConfirm}
+        isLoading={folderActions.deleteFolder.isLoading}
       />
     </main>
   );

@@ -243,6 +243,22 @@ pub async fn auth_logout(
                 error.log_message()
             );
         }
+
+        // Delete account database
+        if let Err(error) = state
+            .sync_service()
+            .vault_repository()
+            .delete_account_database(&account_id)
+            .await
+        {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "auth_logout failed to delete database account_id={}: [{}] {}",
+                account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
     }
 
     state
