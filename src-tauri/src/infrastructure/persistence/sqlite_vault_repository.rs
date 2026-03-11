@@ -160,81 +160,61 @@ impl SqliteVaultRepository {
                 );
 
                 CREATE TABLE IF NOT EXISTS live_profile (
-                    account_id TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
                     payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_folders (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_collections (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_policies (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_ciphers (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_sends (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS live_meta (
-                    account_id TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
                     domains_json TEXT,
                     user_decryption_json TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS staging_profile (
-                    account_id TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
                     payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_folders (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_collections (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_policies (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_ciphers (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_sends (
-                    account_id TEXT NOT NULL,
-                    id TEXT NOT NULL,
-                    payload_json TEXT NOT NULL,
-                    PRIMARY KEY (account_id, id)
+                    id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS staging_meta (
-                    account_id TEXT PRIMARY KEY,
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
                     domains_json TEXT,
                     user_decryption_json TEXT
                 );
@@ -397,193 +377,116 @@ impl SqliteVaultRepository {
         Ok(())
     }
 
-    fn clear_staging_snapshot(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
-        tx.execute(
-            "DELETE FROM staging_profile WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging profile: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_folders WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging folders: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_collections WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging collections: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_policies WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging policies: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_ciphers WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging ciphers: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_sends WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging sends: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM staging_meta WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear staging meta: {error}"),
-        })?;
+    fn clear_staging_snapshot(tx: &Transaction<'_>, _account_id: &str) -> AppResult<()> {
+        tx.execute("DELETE FROM staging_profile", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging profile: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_folders", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging folders: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_collections", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging collections: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_policies", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging policies: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_ciphers", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging ciphers: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_sends", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging sends: {error}"),
+            })?;
+        tx.execute("DELETE FROM staging_meta", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear staging meta: {error}"),
+            })?;
         Ok(())
     }
 
-    fn clear_live_snapshot(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
-        tx.execute(
-            "DELETE FROM live_profile WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live profile: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_folders WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live folders: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_collections WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live collections: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_policies WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live policies: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_ciphers WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live ciphers: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_sends WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live sends: {error}"),
-        })?;
-        tx.execute(
-            "DELETE FROM live_meta WHERE account_id = ?1",
-            params![account_id],
-        )
-        .map_err(|error| AppError::InternalUnexpected {
-            message: format!("failed to clear live meta: {error}"),
-        })?;
+    fn clear_live_snapshot(tx: &Transaction<'_>, _account_id: &str) -> AppResult<()> {
+        tx.execute("DELETE FROM live_profile", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live profile: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_folders", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live folders: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_collections", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live collections: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_policies", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live policies: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_ciphers", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live ciphers: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_sends", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live sends: {error}"),
+            })?;
+        tx.execute("DELETE FROM live_meta", params![])
+            .map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to clear live meta: {error}"),
+            })?;
         Ok(())
     }
 
-    fn copy_staging_to_live(tx: &Transaction<'_>, account_id: &str) -> AppResult<()> {
+    fn copy_staging_to_live(tx: &Transaction<'_>, _account_id: &str) -> AppResult<()> {
         tx.execute(
-            r#"
-            INSERT INTO live_profile (account_id, payload_json)
-            SELECT account_id, payload_json
-            FROM staging_profile
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_profile (id, payload_json) SELECT id, payload_json FROM staging_profile",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging profile to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_folders (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM staging_folders
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_folders (id, payload_json) SELECT id, payload_json FROM staging_folders",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging folders to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_collections (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM staging_collections
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_collections (id, payload_json) SELECT id, payload_json FROM staging_collections",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging collections to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_policies (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM staging_policies
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_policies (id, payload_json) SELECT id, payload_json FROM staging_policies",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging policies to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_ciphers (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM staging_ciphers
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_ciphers (id, payload_json) SELECT id, payload_json FROM staging_ciphers",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging ciphers to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_sends (account_id, id, payload_json)
-            SELECT account_id, id, payload_json
-            FROM staging_sends
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_sends (id, payload_json) SELECT id, payload_json FROM staging_sends",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging sends to live: {error}"),
         })?;
         tx.execute(
-            r#"
-            INSERT INTO live_meta (account_id, domains_json, user_decryption_json)
-            SELECT account_id, domains_json, user_decryption_json
-            FROM staging_meta
-            WHERE account_id = ?1
-            "#,
-            params![account_id],
+            "INSERT INTO live_meta (id, domains_json, user_decryption_json) SELECT id, domains_json, user_decryption_json FROM staging_meta",
+            params![],
         )
         .map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to copy staging meta to live: {error}"),
@@ -894,11 +797,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             let payload_json = Self::to_json(&profile, "sync profile")?;
             tx.execute(
                 r#"
-                INSERT INTO staging_profile (account_id, payload_json)
-                VALUES (?1, ?2)
-                ON CONFLICT(account_id) DO UPDATE SET payload_json = excluded.payload_json
+                INSERT INTO staging_profile (id, payload_json)
+                VALUES (1, ?1)
+                ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                 "#,
-                params![account_id, payload_json],
+                params![payload_json],
             )
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to upsert staging profile: {error}"),
@@ -919,9 +822,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 let mut statement = tx
                     .prepare(
                         r#"
-                        INSERT INTO staging_folders (account_id, id, payload_json)
-                        VALUES (?1, ?2, ?3)
-                        ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                        INSERT INTO staging_folders (id, payload_json)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
                     .map_err(|error| {
@@ -930,7 +833,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 for folder in folders {
                     let payload_json = Self::to_json(&folder, "sync folder")?;
                     statement
-                        .execute(params![account_id, folder.id, payload_json])
+                        .execute(params![folder.id, payload_json])
                         .map_err(|error| {
                             AppError::InternalUnexpected { message: format!("failed to upsert staging folder: {error}") }
                         })?;
@@ -945,16 +848,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn upsert_folder_live(&self, account_id: &str, folder: SyncFolder) -> AppResult<()> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let payload_json = Self::to_json(&folder, "live sync folder")?;
             connection
                 .execute(
                     r#"
-                    INSERT INTO live_folders (account_id, id, payload_json)
-                    VALUES (?1, ?2, ?3)
-                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    INSERT INTO live_folders (id, payload_json)
+                    VALUES (?1, ?2)
+                    ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                     "#,
-                    params![account_id, folder.id, payload_json],
+                    params![folder.id, payload_json],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to upsert live folder: {error}"),
@@ -966,11 +869,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
 
     async fn delete_folder_live(&self, account_id: &str, folder_id: &str) -> AppResult<()> {
         let folder_id = folder_id.to_string();
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             connection
                 .execute(
-                    "DELETE FROM live_folders WHERE account_id = ?1 AND id = ?2",
-                    params![account_id, folder_id],
+                    "DELETE FROM live_folders WHERE id = ?1",
+                    params![folder_id],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live folder: {error}"),
@@ -981,11 +884,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn count_live_folders(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
                 .query_row(
-                    "SELECT COUNT(1) FROM live_folders WHERE account_id = ?1",
-                    params![account_id],
+                    "SELECT COUNT(1) FROM live_folders",
+                    params![],
                     |row| row.get::<_, i64>(0),
                 )
                 .map_err(|error| AppError::InternalUnexpected {
@@ -997,13 +900,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn list_live_folders(&self, account_id: &str) -> AppResult<Vec<SyncFolder>> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let mut statement = connection
                 .prepare(
                     r#"
                     SELECT payload_json
                     FROM live_folders
-                    WHERE account_id = ?1
                     ORDER BY id ASC
                     "#,
                 )
@@ -1011,7 +913,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     message: format!("failed to prepare list live folders statement: {error}"),
                 })?;
 
-            let mut rows = statement.query(params![account_id]).map_err(|error| {
+            let mut rows = statement.query(params![]).map_err(|error| {
                 AppError::InternalUnexpected {
                     message: format!("failed to query live folders: {error}"),
                 }
@@ -1045,9 +947,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 let mut statement = tx
                     .prepare(
                         r#"
-                        INSERT INTO staging_collections (account_id, id, payload_json)
-                        VALUES (?1, ?2, ?3)
-                        ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                        INSERT INTO staging_collections (id, payload_json)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
                     .map_err(|error| {
@@ -1058,7 +960,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 for collection in collections {
                     let payload_json = Self::to_json(&collection, "sync collection")?;
                     statement
-                        .execute(params![account_id, collection.id, payload_json])
+                        .execute(params![collection.id, payload_json])
                         .map_err(|error| {
                             AppError::InternalUnexpected { message: format!(
                                 "failed to upsert staging collection: {error}"
@@ -1084,9 +986,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 let mut statement = tx
                     .prepare(
                         r#"
-                        INSERT INTO staging_policies (account_id, id, payload_json)
-                        VALUES (?1, ?2, ?3)
-                        ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                        INSERT INTO staging_policies (id, payload_json)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
                     .map_err(|error| {
@@ -1095,7 +997,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 for policy in policies {
                     let payload_json = Self::to_json(&policy, "sync policy")?;
                     statement
-                        .execute(params![account_id, policy.id, payload_json])
+                        .execute(params![policy.id, payload_json])
                         .map_err(|error| {
                             AppError::InternalUnexpected { message: format!("failed to upsert staging policy: {error}") }
                         })?;
@@ -1117,9 +1019,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 let mut statement = tx
                     .prepare(
                         r#"
-                        INSERT INTO staging_ciphers (account_id, id, payload_json)
-                        VALUES (?1, ?2, ?3)
-                        ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                        INSERT INTO staging_ciphers (id, payload_json)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
                     .map_err(|error| {
@@ -1129,7 +1031,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     let sanitized = sanitize_cipher_for_persistence(cipher);
                     let payload_json = Self::to_json(&sanitized, "sync cipher")?;
                     statement
-                        .execute(params![account_id, sanitized.id, payload_json])
+                        .execute(params![sanitized.id, payload_json])
                         .map_err(|error| {
                             AppError::InternalUnexpected { message: format!("failed to upsert staging cipher: {error}") }
                         })?;
@@ -1144,17 +1046,17 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn upsert_cipher_live(&self, account_id: &str, cipher: SyncCipher) -> AppResult<()> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let sanitized = sanitize_cipher_for_persistence(cipher);
             let payload_json = Self::to_json(&sanitized, "live sync cipher")?;
             connection
                 .execute(
                     r#"
-                    INSERT INTO live_ciphers (account_id, id, payload_json)
-                    VALUES (?1, ?2, ?3)
-                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    INSERT INTO live_ciphers (id, payload_json)
+                    VALUES (?1, ?2)
+                    ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                     "#,
-                    params![account_id, sanitized.id, payload_json],
+                    params![sanitized.id, payload_json],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to upsert live cipher: {error}"),
@@ -1166,11 +1068,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
 
     async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()> {
         let cipher_id = cipher_id.to_string();
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             connection
                 .execute(
-                    "DELETE FROM live_ciphers WHERE account_id = ?1 AND id = ?2",
-                    params![account_id, cipher_id],
+                    "DELETE FROM live_ciphers WHERE id = ?1",
+                    params![cipher_id],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live cipher: {error}"),
@@ -1181,11 +1083,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
                 .query_row(
-                    "SELECT COUNT(1) FROM live_ciphers WHERE account_id = ?1",
-                    params![account_id],
+                    "SELECT COUNT(1) FROM live_ciphers",
+                    params![],
                     |row| row.get::<_, i64>(0),
                 )
                 .map_err(|error| AppError::InternalUnexpected {
@@ -1202,17 +1104,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         cipher_id: &str,
     ) -> AppResult<Option<SyncCipher>> {
         let cipher_id = cipher_id.to_string();
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let payload_json: Option<String> = connection
                 .query_row(
                     r#"
                     SELECT payload_json
                     FROM live_ciphers
-                    WHERE account_id = ?1
-                      AND id = ?2
+                    WHERE id = ?1
                     LIMIT 1
                     "#,
-                    params![account_id, cipher_id],
+                    params![cipher_id],
                     |row| row.get(0),
                 )
                 .optional()
@@ -1233,15 +1134,14 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         offset: u32,
         limit: u32,
     ) -> AppResult<Vec<SyncCipher>> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let mut statement = connection
                 .prepare(
                     r#"
                     SELECT payload_json
                     FROM live_ciphers
-                    WHERE account_id = ?1
                     ORDER BY id ASC
-                    LIMIT ?2 OFFSET ?3
+                    LIMIT ?1 OFFSET ?2
                     "#,
                 )
                 .map_err(|error| AppError::InternalUnexpected {
@@ -1249,7 +1149,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 })?;
 
             let mut rows = statement
-                .query(params![account_id, i64::from(limit), i64::from(offset)])
+                .query(params![i64::from(limit), i64::from(offset)])
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to query live ciphers: {error}"),
                 })?;
@@ -1278,9 +1178,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 let mut statement = tx
                     .prepare(
                         r#"
-                        INSERT INTO staging_sends (account_id, id, payload_json)
-                        VALUES (?1, ?2, ?3)
-                        ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                        INSERT INTO staging_sends (id, payload_json)
+                        VALUES (?1, ?2)
+                        ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
                     .map_err(|error| {
@@ -1289,7 +1189,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 for send in sends {
                     let payload_json = Self::to_json(&send, "sync send")?;
                     statement
-                        .execute(params![account_id, send.id, payload_json])
+                        .execute(params![send.id, payload_json])
                         .map_err(|error| {
                             AppError::InternalUnexpected { message: format!("failed to upsert staging send: {error}") }
                         })?;
@@ -1304,16 +1204,16 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn upsert_send_live(&self, account_id: &str, send: SyncSend) -> AppResult<()> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let payload_json = Self::to_json(&send, "live sync send")?;
             connection
                 .execute(
                     r#"
-                    INSERT INTO live_sends (account_id, id, payload_json)
-                    VALUES (?1, ?2, ?3)
-                    ON CONFLICT(account_id, id) DO UPDATE SET payload_json = excluded.payload_json
+                    INSERT INTO live_sends (id, payload_json)
+                    VALUES (?1, ?2)
+                    ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                     "#,
-                    params![account_id, send.id, payload_json],
+                    params![send.id, payload_json],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to upsert live send: {error}"),
@@ -1325,11 +1225,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
 
     async fn delete_send_live(&self, account_id: &str, send_id: &str) -> AppResult<()> {
         let send_id = send_id.to_string();
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             connection
                 .execute(
-                    "DELETE FROM live_sends WHERE account_id = ?1 AND id = ?2",
-                    params![account_id, send_id],
+                    "DELETE FROM live_sends WHERE id = ?1",
+                    params![send_id],
                 )
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live send: {error}"),
@@ -1340,11 +1240,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     }
 
     async fn count_live_sends(&self, account_id: &str) -> AppResult<u32> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
                 .query_row(
-                    "SELECT COUNT(1) FROM live_sends WHERE account_id = ?1",
-                    params![account_id],
+                    "SELECT COUNT(1) FROM live_sends",
+                    params![],
                     |row| row.get::<_, i64>(0),
                 )
                 .map_err(|error| AppError::InternalUnexpected {
@@ -1365,11 +1265,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             Self::ensure_active_transaction(&tx, account_id)?;
             tx.execute(
                 r#"
-                INSERT INTO staging_meta (account_id, domains_json, user_decryption_json)
-                VALUES (?1, NULL, NULL)
-                ON CONFLICT(account_id) DO NOTHING
+                INSERT INTO staging_meta (id, domains_json, user_decryption_json)
+                VALUES (1, NULL, NULL)
+                ON CONFLICT(id) DO NOTHING
                 "#,
-                params![account_id],
+                params![],
             )
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to ensure staging meta row for domains: {error}"),
@@ -1380,8 +1280,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 .map(|value| Self::to_json(value, "sync domains"))
                 .transpose()?;
             tx.execute(
-                "UPDATE staging_meta SET domains_json = ?2 WHERE account_id = ?1",
-                params![account_id, domains_json],
+                "UPDATE staging_meta SET domains_json = ?1 WHERE id = 1",
+                params![domains_json],
             )
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to upsert staging domains: {error}"),
@@ -1405,11 +1305,11 @@ impl VaultRepositoryPort for SqliteVaultRepository {
             Self::ensure_active_transaction(&tx, account_id)?;
             tx.execute(
                 r#"
-                INSERT INTO staging_meta (account_id, domains_json, user_decryption_json)
-                VALUES (?1, NULL, NULL)
-                ON CONFLICT(account_id) DO NOTHING
+                INSERT INTO staging_meta (id, domains_json, user_decryption_json)
+                VALUES (1, NULL, NULL)
+                ON CONFLICT(id) DO NOTHING
                 "#,
-                params![account_id],
+                params![],
             )
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to ensure staging meta row for user decryption: {error}"),
@@ -1420,8 +1320,8 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                 .map(|value| Self::to_json(value, "sync user decryption"))
                 .transpose()?;
             tx.execute(
-                "UPDATE staging_meta SET user_decryption_json = ?2 WHERE account_id = ?1",
-                params![account_id, user_decryption_json],
+                "UPDATE staging_meta SET user_decryption_json = ?1 WHERE id = 1",
+                params![user_decryption_json],
             )
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to upsert staging user decryption: {error}"),
@@ -1439,15 +1339,15 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         &self,
         account_id: &str,
     ) -> AppResult<Option<SyncUserDecryption>> {
-        self.with_account_connection(account_id, move |connection, account_id| {
+        self.with_account_connection(account_id, move |connection, _account_id| {
             let payload = connection
                 .query_row(
                     r#"
                     SELECT user_decryption_json
                     FROM live_meta
-                    WHERE account_id = ?1
+                    WHERE id = 1
                     "#,
-                    params![account_id],
+                    params![],
                     |row| row.get::<_, Option<String>>(0),
                 )
                 .optional()
