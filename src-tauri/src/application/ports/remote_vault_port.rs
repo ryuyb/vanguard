@@ -38,6 +38,8 @@ pub trait RemoteVaultPort: Send + Sync {
         folder_id: String,
     ) -> AppResult<SyncFolder>;
 
+    async fn get_folders(&self, command: SyncVaultCommand) -> AppResult<Vec<SyncFolder>>;
+
     async fn get_send(&self, command: SyncVaultCommand, send_id: String) -> AppResult<SyncSend>;
 
     async fn get_revision_date(&self, query: RevisionDateQuery) -> AppResult<i64>;

@@ -4,7 +4,7 @@ use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
     PasswordLoginRequest, PreloginRequest, PreloginResponse, RefreshTokenRequest,
     RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder, SyncResponse, SyncSend,
-    TokenErrorResponse, TokenRequest, TokenResponse, VerifyEmailTokenRequest,
+    TokenErrorResponse, TokenRequest, TokenResponse, VerifyEmailTokenRequest, GetFoldersResponse,
 };
 use std::time::Duration;
 
@@ -372,6 +372,55 @@ impl VaultwardenClient {
                 );
                 Err(VaultwardenError::Decode(format!(
                     "invalid cipher response: {error}"
+                )))
+            }
+        }
+    }
+
+    pub async fn get_folders(
+        &self,
+        base_url: &str,
+        access_token: &str,
+    ) -> VaultwardenResult<Vec<SyncFolder>> {
+        let endpoint = format!("{}/api/folders", Self::validated_base_url(base_url)?);
+
+        let response = self
+            .http_client
+            .get(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        match serde_json::from_str::<GetFoldersResponse>(&body) {
+            Ok(parsed) => Ok(parsed.data),
+            Err(error) => {
+                let line = error.line();
+                let column = error.column();
+                let snippet = json_error_snippet_redacted(&body, line, column, 220);
+                log::error!(
+                    target: "vanguard::vaultwarden",
+                    "folders decode failed endpoint={} status={} body_len={} line={} column={} snippet={}",
+                    endpoint,
+                    status,
+                    body.len(),
+                    line,
+                    column,
+                    snippet
+                );
+                Err(VaultwardenError::Decode(format!(
+                    "invalid folders response: {error}"
                 )))
             }
         }

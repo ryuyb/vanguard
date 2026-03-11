@@ -355,6 +355,14 @@ pub struct UpdateFolderRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct GetFoldersResponse {
+    pub data: Vec<SyncFolder>,
+    pub object: String,
+    pub continuation_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncCollection {
     pub id: String,
     pub organization_id: Option<String>,

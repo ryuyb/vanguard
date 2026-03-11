@@ -237,6 +237,15 @@ impl RemoteVaultPort for VaultwardenRemotePort {
         Ok(map_sync_folder(response))
     }
 
+    async fn get_folders(&self, command: SyncVaultCommand) -> AppResult<Vec<SyncFolder>> {
+        let response = self
+            .client
+            .get_folders(&command.base_url, &command.access_token)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(response.into_iter().map(map_sync_folder).collect())
+    }
+
     async fn get_send(&self, command: SyncVaultCommand, send_id: String) -> AppResult<SyncSend> {
         let response = self
             .client
