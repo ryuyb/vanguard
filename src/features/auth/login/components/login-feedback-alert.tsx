@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { AlertCircle, ShieldCheck } from "lucide-react";
 import type { LoginFeedback } from "@/features/auth/login/types";
 
 type LoginFeedbackAlertProps = {
@@ -10,23 +10,49 @@ export function LoginFeedbackAlert({ feedback }: LoginFeedbackAlertProps) {
     return null;
   }
 
+  const config = {
+    error: {
+      icon: AlertCircle,
+      title: "登录失败",
+      borderColor: "border-red-200/60",
+      bgColor: "bg-red-50/50",
+      iconColor: "text-red-600",
+      titleColor: "text-red-900",
+      textColor: "text-red-800",
+    },
+    success: {
+      icon: ShieldCheck,
+      title: "登录成功",
+      borderColor: "border-emerald-200/60",
+      bgColor: "bg-emerald-50/50",
+      iconColor: "text-emerald-600",
+      titleColor: "text-emerald-900",
+      textColor: "text-emerald-800",
+    },
+    twoFactor: {
+      icon: ShieldCheck,
+      title: "需要二步验证",
+      borderColor: "border-blue-200/60",
+      bgColor: "bg-blue-50/50",
+      iconColor: "text-blue-600",
+      titleColor: "text-blue-900",
+      textColor: "text-blue-800",
+    },
+  }[feedback.kind];
+
+  const Icon = config.icon;
+
   return (
     <div
-      className={[
-        "rounded-lg border px-3 py-2 text-sm",
-        feedback.kind === "error" && "border-red-200 bg-red-50 text-red-700",
-        feedback.kind === "success" &&
-          "border-emerald-200 bg-emerald-50 text-emerald-700",
-        feedback.kind === "twoFactor" &&
-          "border-amber-200 bg-amber-50 text-amber-700",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      className={`rounded-xl border ${config.borderColor} ${config.bgColor} px-4 py-3.5 text-sm`}
     >
-      {feedback.kind === "twoFactor" && (
-        <ShieldCheck className="mr-1 inline size-4" />
-      )}
-      {feedback.text}
+      <div className="flex items-start gap-3">
+        <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${config.iconColor}`} />
+        <div className="flex-1">
+          <p className={`font-medium ${config.titleColor}`}>{config.title}</p>
+          <p className={`mt-1 ${config.textColor}`}>{feedback.text}</p>
+        </div>
+      </div>
     </div>
   );
 }

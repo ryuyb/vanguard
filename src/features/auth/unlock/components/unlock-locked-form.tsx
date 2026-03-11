@@ -80,19 +80,27 @@ export function UnlockLockedForm({
   const isPinMode = unlockMethod === "pin";
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-        <div>登录邮箱：{restoreState?.email ?? "unknown"}</div>
-        <div>服务地址：{restoreState?.baseUrl ?? "unknown"}</div>
+    <div className="space-y-6">
+      <div className="space-y-2 rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-slate-500">账户</span>
+          <span className="text-slate-700">{restoreState?.email ?? "unknown"}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-medium text-slate-500">服务器</span>
+          <span className="text-slate-700">{restoreState?.baseUrl ?? "unknown"}</span>
+        </div>
       </div>
 
       <form className="space-y-5" onSubmit={isPinMode ? onPinUnlock : onSubmit}>
         {isPinMode ? (
-          <div className="space-y-2">
-            <Label htmlFor="unlock-pin">PIN</Label>
+          <div className="space-y-2.5">
+            <Label htmlFor="unlock-pin" className="text-sm font-medium text-slate-700">
+              PIN 码
+            </Label>
             <InputGroup>
               <InputGroupAddon>
-                <KeyRound className="text-slate-500" />
+                <KeyRound className="h-5 w-5 text-slate-400" />
               </InputGroupAddon>
               <InputGroupInput
                 id="unlock-pin"
@@ -103,15 +111,18 @@ export function UnlockLockedForm({
                 value={pin}
                 onChange={(event) => onPinChange(event.target.value)}
                 disabled={isActionBlocked}
+                className="h-12 text-base"
               />
             </InputGroup>
           </div>
         ) : (
-          <div className="space-y-2">
-            <Label htmlFor="unlock-master-password">Master Password</Label>
+          <div className="space-y-2.5">
+            <Label htmlFor="unlock-master-password" className="text-sm font-medium text-slate-700">
+              主密码
+            </Label>
             <InputGroup>
               <InputGroupAddon>
-                <KeyRound className="text-slate-500" />
+                <KeyRound className="h-5 w-5 text-slate-400" />
               </InputGroupAddon>
               <InputGroupInput
                 id="unlock-master-password"
@@ -121,27 +132,22 @@ export function UnlockLockedForm({
                 value={masterPassword}
                 onChange={(event) => onMasterPasswordChange(event.target.value)}
                 disabled={isActionBlocked}
+                className="h-12 text-base"
               />
               <InputGroupAddon align="inline-end" className="px-1.5">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="text-slate-500 hover:text-slate-900"
+                  className="text-slate-400 hover:text-slate-700 transition-colors"
                   onClick={onToggleShowPassword}
                   disabled={isActionBlocked}
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
-                  {showPassword ? <EyeOff /> : <Eye />}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </Button>
               </InputGroupAddon>
             </InputGroup>
-          </div>
-        )}
-
-        {isPinMode && !pinEnabled && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            当前账号未启用 PIN 解锁，请切换到 master password 解锁。
           </div>
         )}
 
@@ -150,19 +156,19 @@ export function UnlockLockedForm({
         <Button
           type="submit"
           size="lg"
-          className="w-full"
+          className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
           disabled={isPinMode ? !canPinUnlock : !canUnlock}
         >
           {(isPinMode ? isPinUnlocking : isUnlocking) && (
-            <LoaderCircle className="animate-spin" />
+            <LoaderCircle className="h-5 w-5 animate-spin" />
           )}
           {isPinMode
             ? isPinUnlocking
-              ? "正在使用 PIN 解锁..."
+              ? "正在解锁..."
               : "使用 PIN 解锁"
             : isUnlocking
               ? "正在解锁..."
-              : "解锁密码库"}
+              : "解锁"}
         </Button>
       </form>
 
@@ -170,11 +176,11 @@ export function UnlockLockedForm({
         <Button
           type="button"
           variant="ghost"
-          className="w-full"
+          className="w-full text-sm text-slate-600 hover:text-slate-900 transition-colors"
           disabled={isActionBlocked}
           onClick={isPinMode ? onShowMasterPasswordUnlock : onShowPinUnlock}
         >
-          {isPinMode ? "改用 Master Password 解锁" : "改用 PIN 解锁"}
+          {isPinMode ? "改用主密码解锁" : "改用 PIN 解锁"}
         </Button>
       )}
 
@@ -183,38 +189,42 @@ export function UnlockLockedForm({
           type="button"
           variant="outline"
           size="lg"
-          className="w-full"
+          className="h-12 w-full border-slate-300 text-base font-medium hover:bg-slate-50 transition-colors"
           onClick={onBiometricUnlock}
           disabled={isActionBlocked}
         >
           {isBiometricUnlocking ? (
-            <LoaderCircle className="animate-spin" />
+            <LoaderCircle className="h-5 w-5 animate-spin" />
           ) : (
-            <Fingerprint />
+            <Fingerprint className="h-5 w-5" />
           )}
           {isBiometricUnlocking
-            ? "正在等待生物识别验证..."
-            : "使用生物识别解锁"}
+            ? "正在验证..."
+            : "使用生物识别"}
         </Button>
       )}
 
       {biometricSupported && biometricEnabled && !canBiometricUnlock && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          生物识别
-          已启用，但当前设备还没有可用于解锁的本地同步数据，请先完成一次同步并用密码解锁。
+        <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">生物识别不可用</p>
+          <p className="mt-1 text-amber-800">
+            当前设备还没有可用于解锁的本地数据，请先用密码解锁并完成同步。
+          </p>
         </div>
       )}
 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        disabled={isActionBlocked}
-        onClick={onLogout}
-      >
-        {isLoggingOut ? <LoaderCircle className="animate-spin" /> : <LogOut />}
-        {isLoggingOut ? "正在登出..." : "登出"}
-      </Button>
+      <div className="pt-2 border-t border-slate-200">
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-sm text-slate-600 hover:text-red-600 transition-colors"
+          disabled={isActionBlocked}
+          onClick={onLogout}
+        >
+          {isLoggingOut ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          {isLoggingOut ? "正在登出..." : "登出账户"}
+        </Button>
+      </div>
     </div>
   );
 }

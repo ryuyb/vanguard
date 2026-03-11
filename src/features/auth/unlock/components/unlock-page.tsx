@@ -1,13 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { LoaderCircle } from "lucide-react";
+import { KeyRound, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  UnlockHero,
-  UnlockLockedForm,
-} from "@/features/auth/unlock/components";
+import { UnlockLockedForm } from "@/features/auth/unlock/components";
 import { useUnlockFlow } from "@/features/auth/unlock/hooks";
 
 type UnlockPageProps = {
@@ -72,38 +68,45 @@ export function UnlockPage({
   ]);
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_90%_15%,hsl(210_85%_95%),transparent_40%),radial-gradient(circle_at_12%_85%,hsl(216_90%_97%),transparent_45%),linear-gradient(160deg,hsl(210_50%_98%),hsl(0_0%_100%))] p-6 md:p-10">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
       <div
         data-tauri-drag-region
         className="absolute inset-x-0 top-0 z-20 h-6"
       />
-      <div className="absolute -top-20 left-1/2 h-56 w-56 -translate-x-1/2 rounded-full bg-blue-300/15 blur-3xl" />
 
-      <section className="relative mx-auto grid w-full max-w-5xl gap-8 md:min-h-[calc(100dvh-5rem)] md:grid-cols-[0.9fr_1.1fr] md:items-center">
-        <UnlockHero />
-
-        <Card className="border-white/80 bg-white/90 shadow-xl backdrop-blur-sm">
-          <CardHeader className="space-y-2">
-            <Badge variant="secondary" className="w-fit">
-              Session Unlock
-            </Badge>
-            <CardTitle className="text-2xl font-semibold">解锁 Vault</CardTitle>
+      <section className="relative mx-auto w-full max-w-md">
+        <Card className="border-slate-200/60 bg-white shadow-2xl shadow-slate-900/5">
+          <CardHeader className="space-y-4 pb-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-lg shadow-blue-600/25">
+              <KeyRound className="h-8 w-8 text-white" strokeWidth={2.5} />
+            </div>
+            <div className="space-y-1 text-center">
+              <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
+                解锁 Vanguard
+              </CardTitle>
+              <p className="text-sm text-slate-600">
+                输入凭据以访问你的密码库
+              </p>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-8">
             {isRestoring && (
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <LoaderCircle className="animate-spin" />
-                正在检查当前会话状态...
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-sm text-slate-700">
+                <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" />
+                <span>正在检查会话状态...</span>
               </div>
             )}
 
             {!isRestoring && restoreState?.status === "needsLogin" && (
               <div className="space-y-4">
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  当前没有可解锁的已登录会话，请先登录。
+                <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3.5 text-sm text-amber-900">
+                  <p className="font-medium">需要登录</p>
+                  <p className="mt-1 text-amber-800">
+                    当前没有可解锁的会话，请先登录。
+                  </p>
                 </div>
-                <Button asChild className="w-full">
-                  <Link to="/">前往登录页</Link>
+                <Button asChild className="w-full" size="lg">
+                  <Link to="/">前往登录</Link>
                 </Button>
               </div>
             )}
@@ -111,9 +114,9 @@ export function UnlockPage({
             {!isRestoring &&
               restoreState?.status !== "needsLogin" &&
               isVaultUnlocked && (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <LoaderCircle className="animate-spin" />
-                  当前 Vault 已解锁，正在跳转...
+                <div className="flex items-center justify-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-6 text-sm text-emerald-700">
+                  <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
+                  <span>密码库已解锁，正在跳转...</span>
                 </div>
               )}
 

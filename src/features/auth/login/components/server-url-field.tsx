@@ -33,14 +33,16 @@ export function ServerUrlField({
   onCustomBaseUrlChange,
 }: ServerUrlFieldProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor="base-url">服务地址</Label>
+    <div className="space-y-2.5">
+      <Label htmlFor="base-url" className="text-sm font-medium text-slate-700">
+        服务器地址
+      </Label>
       <Select
         value={serverUrlOption}
         onValueChange={onServerUrlOptionChange}
         disabled={isSubmitting}
       >
-        <SelectTrigger id="base-url" className="w-full bg-white">
+        <SelectTrigger id="base-url" className="h-12 w-full bg-white">
           <SelectValue placeholder="选择服务地址" />
         </SelectTrigger>
         <SelectContent>
@@ -56,7 +58,7 @@ export function ServerUrlField({
       {serverUrlOption === CUSTOM_SERVER_URL_OPTION && (
         <InputGroup>
           <InputGroupAddon>
-            <Globe className="text-slate-500" />
+            <Globe className="h-5 w-5 text-slate-400" />
           </InputGroupAddon>
           <InputGroupInput
             id="base-url-custom"
@@ -66,6 +68,7 @@ export function ServerUrlField({
             value={customBaseUrl}
             onChange={(event) => onCustomBaseUrlChange(event.target.value)}
             disabled={isSubmitting}
+            className="h-12 text-base"
           />
         </InputGroup>
       )}

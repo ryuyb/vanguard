@@ -1,4 +1,4 @@
-import { Lock, ShieldCheck } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { UnlockFeedback } from "@/features/auth/unlock/types";
 
 type UnlockFeedbackAlertProps = {
@@ -10,22 +10,20 @@ export function UnlockFeedbackAlert({ feedback }: UnlockFeedbackAlertProps) {
     return null;
   }
 
-  return (
-    <div
-      className={[
-        "rounded-lg border px-3 py-2 text-sm",
-        feedback.kind === "error" && "border-red-200 bg-red-50 text-red-700",
-        feedback.kind === "success" &&
-          "border-emerald-200 bg-emerald-50 text-emerald-700",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      {feedback.kind === "success" && (
-        <ShieldCheck className="mr-1 inline size-4" />
-      )}
-      {feedback.kind === "error" && <Lock className="mr-1 inline size-4" />}
-      {feedback.text}
-    </div>
-  );
+  // 只处理错误状态，成功状态会立即跳转不会显示
+  if (feedback.kind === "error") {
+    return (
+      <div className="rounded-xl border border-red-200/60 bg-red-50/50 px-4 py-3.5 text-sm">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+          <div className="flex-1">
+            <p className="font-medium text-red-900">验证失败</p>
+            <p className="mt-1 text-red-800">{feedback.text}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -1,17 +1,14 @@
-import { LoaderCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { KeyRound, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
   LoginCredentialsFields,
   LoginFeedbackAlert,
-  LoginHero,
   ServerUrlField,
   TwoFactorSection,
 } from "@/features/auth/login/components";
@@ -48,35 +45,33 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
   });
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_15%_15%,hsl(219_100%_97%),transparent_45%),radial-gradient(circle_at_85%_8%,hsl(210_100%_96%),transparent_40%),linear-gradient(130deg,hsl(220_46%_98%),hsl(0_0%_100%))] p-6 md:p-10">
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
       <div
         data-tauri-drag-region
         className="absolute inset-x-0 top-0 z-20 h-6"
       />
-      <div className="absolute -top-24 -right-16 h-64 w-64 rounded-full bg-sky-300/15 blur-3xl" />
-      <div className="absolute -bottom-28 -left-10 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
 
-      <section className="relative mx-auto grid w-full max-w-6xl gap-8 md:min-h-[calc(100dvh-5rem)] md:grid-cols-[1.2fr_0.8fr] md:items-center">
-        <LoginHero />
-
-        <Card className="border-white/70 bg-white/90 shadow-xl backdrop-blur-sm">
-          <CardHeader className="space-y-2">
-            <Badge variant="secondary" className="w-fit">
-              登录
-            </Badge>
-            <CardTitle className="text-2xl font-semibold">
-              登录你的 Vaultwarden 账号
-            </CardTitle>
-            <CardDescription>
-              支持二步验证，登录后会自动准备密码库
-            </CardDescription>
+      <section className="relative mx-auto w-full max-w-md">
+        <Card className="border-slate-200/60 bg-white shadow-2xl shadow-slate-900/5">
+          <CardHeader className="space-y-4 pb-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 shadow-lg shadow-blue-600/25">
+              <KeyRound className="h-8 w-8 text-white" strokeWidth={2.5} />
+            </div>
+            <div className="space-y-1 text-center">
+              <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
+                登录 Vanguard
+              </CardTitle>
+              <p className="text-sm text-slate-600">
+                输入凭据以访问你的密码库
+              </p>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-8">
             <form className="space-y-5" onSubmit={onSubmit}>
               {isRestoringSession && (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <LoaderCircle className="animate-spin" />
-                  正在检查上次会话...
+                <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-sm text-slate-700">
+                  <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" />
+                  <span>正在检查会话...</span>
                 </div>
               )}
 
@@ -113,15 +108,15 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full"
+                className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
                 disabled={!canSubmit}
               >
-                {isSubmitting && <LoaderCircle className="animate-spin" />}
+                {isSubmitting && <LoaderCircle className="h-5 w-5 animate-spin" />}
                 {isSubmitting
                   ? submitProgressText || "正在登录..."
                   : twoFactorState
                     ? "验证后继续"
-                    : "登录并进入密码库"}
+                    : "登录"}
               </Button>
             </form>
           </CardContent>
