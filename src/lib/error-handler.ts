@@ -4,9 +4,9 @@
  * 负责拦截所有 API 错误响应,解析错误代码,并触发相应的处理逻辑
  */
 
-import { getErrorMessage } from './error-messages';
-import { error as logError, debug as logDebug } from '@tauri-apps/plugin-log';
-import { toast } from './toast';
+import { debug as logDebug, error as logError } from "@tauri-apps/plugin-log";
+import { getErrorMessage } from "./error-messages";
+import { toast } from "./toast";
 
 /**
  * 标准化错误响应接口
@@ -25,7 +25,7 @@ export interface ErrorResponse {
   timestamp: number;
 
   /** 严重程度 */
-  severity: 'info' | 'warning' | 'error' | 'fatal';
+  severity: "info" | "warning" | "error" | "fatal";
 }
 
 /**
@@ -75,7 +75,7 @@ export class ErrorHandler {
     }
 
     // 情况 2: Tauri 返回的 JSON 字符串
-    if (typeof error === 'string') {
+    if (typeof error === "string") {
       try {
         const parsed = JSON.parse(error);
         if (this.isErrorResponse(parsed)) {
@@ -87,25 +87,25 @@ export class ErrorHandler {
     }
 
     // 情况 3: 包含 ErrorResponse 的对象
-    if (error && typeof error === 'object') {
+    if (error && typeof error === "object") {
       const obj = error as Record<string, unknown>;
-      if (obj.code && typeof obj.code === 'string') {
+      if (obj.code && typeof obj.code === "string") {
         return {
           code: obj.code,
-          message: (obj.message as string) || 'Unknown error',
+          message: (obj.message as string) || "Unknown error",
           details: obj.details as Record<string, unknown> | undefined,
           timestamp: (obj.timestamp as number) || Date.now() / 1000,
-          severity: (obj.severity as ErrorResponse['severity']) || 'error',
+          severity: (obj.severity as ErrorResponse["severity"]) || "error",
         };
       }
     }
 
     // 情况 4: 降级处理 - 返回 UNKNOWN_ERROR
     return {
-      code: 'UNKNOWN_ERROR',
+      code: "UNKNOWN_ERROR",
       message: error instanceof Error ? error.message : String(error),
       timestamp: Date.now() / 1000,
-      severity: 'error',
+      severity: "error",
     };
   }
 
@@ -113,16 +113,16 @@ export class ErrorHandler {
    * 检查对象是否为有效的 ErrorResponse
    */
   private isErrorResponse(obj: unknown): obj is ErrorResponse {
-    if (!obj || typeof obj !== 'object') return false;
+    if (!obj || typeof obj !== "object") return false;
     const err = obj as Record<string, unknown>;
     return (
-      typeof err.code === 'string' &&
-      typeof err.message === 'string' &&
-      typeof err.timestamp === 'number' &&
-      (err.severity === 'info' ||
-        err.severity === 'warning' ||
-        err.severity === 'error' ||
-        err.severity === 'fatal')
+      typeof err.code === "string" &&
+      typeof err.message === "string" &&
+      typeof err.timestamp === "number" &&
+      (err.severity === "info" ||
+        err.severity === "warning" ||
+        err.severity === "error" ||
+        err.severity === "fatal")
     );
   }
 
@@ -158,12 +158,15 @@ export class ErrorHandler {
    */
   private handleSpecialError(response: ErrorResponse): boolean {
     // 处理 token 过期 - 自动跳转到登录页
-    if (response.code === 'AUTH_TOKEN_EXPIRED' || response.code === 'AUTH_TOKEN_INVALID') {
+    if (
+      response.code === "AUTH_TOKEN_EXPIRED" ||
+      response.code === "AUTH_TOKEN_INVALID"
+    ) {
       // 清理本地会话数据
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem("auth_token");
 
       // 跳转到登录页
-      window.location.href = '/auth/login';
+      window.location.href = "/auth/login";
 
       return true; // 已处理,不显示 Toast
     }
@@ -180,43 +183,43 @@ export class ErrorHandler {
 
     // 记录错误日志
     void logError(
-      `[ErrorHandler] ${response.severity.toUpperCase()} - ${errorMessage.title}: ${errorMessage.description || response.message} (code: ${response.code})`
+      `[ErrorHandler] ${response.severity.toUpperCase()} - ${errorMessage.title}: ${errorMessage.description || response.message} (code: ${response.code})`,
     );
 
     // 根据严重程度显示不同类型的 Toast
     switch (response.severity) {
-      case 'info':
+      case "info":
         toast.info(errorMessage.title, {
           description: errorMessage.description,
           action: errorMessage.action
             ? {
-                label: errorMessage.actionLabel || '操作',
+                label: errorMessage.actionLabel || "操作",
                 onClick: errorMessage.action,
               }
             : undefined,
         });
         break;
 
-      case 'warning':
+      case "warning":
         toast.warning(errorMessage.title, {
           description: errorMessage.description,
           action: errorMessage.action
             ? {
-                label: errorMessage.actionLabel || '操作',
+                label: errorMessage.actionLabel || "操作",
                 onClick: errorMessage.action,
               }
             : undefined,
         });
         break;
 
-      case 'error':
-      case 'fatal':
+      case "error":
+      case "fatal":
         toast.error(errorMessage.title, {
           description: errorMessage.description,
-          duration: response.severity === 'fatal' ? 10000 : 5000, // 致命错误显示更久
+          duration: response.severity === "fatal" ? 10000 : 5000, // 致命错误显示更久
           action: errorMessage.action
             ? {
-                label: errorMessage.actionLabel || '操作',
+                label: errorMessage.actionLabel || "操作",
                 onClick: errorMessage.action,
               }
             : undefined,

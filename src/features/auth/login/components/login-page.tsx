@@ -1,11 +1,6 @@
 import { KeyRound, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   LoginCredentialsFields,
   LoginFeedbackAlert,
@@ -61,9 +56,7 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
               <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
                 登录 Vanguard
               </CardTitle>
-              <p className="text-sm text-slate-600">
-                输入凭据以访问你的密码库
-              </p>
+              <p className="text-sm text-slate-600">输入凭据以访问你的密码库</p>
             </div>
           </CardHeader>
           <CardContent className="pb-8">
@@ -111,7 +104,9 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
                 className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
                 disabled={!canSubmit}
               >
-                {isSubmitting && <LoaderCircle className="h-5 w-5 animate-spin" />}
+                {isSubmitting && (
+                  <LoaderCircle className="h-5 w-5 animate-spin" />
+                )}
                 {isSubmitting
                   ? submitProgressText || "正在登录..."
                   : twoFactorState

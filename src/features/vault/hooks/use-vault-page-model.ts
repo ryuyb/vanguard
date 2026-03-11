@@ -31,8 +31,8 @@ import {
   sortFolders,
   toAvatarText,
 } from "@/features/vault/utils";
-import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
 import { errorHandler } from "@/lib/error-handler";
+import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
 
 export type VaultPageNavigationTarget = SessionRoute;
 

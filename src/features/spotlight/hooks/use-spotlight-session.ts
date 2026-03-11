@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { commands } from "@/bindings";
 import type { SpotlightItem } from "@/features/spotlight/types";
 import { toCipherItem } from "@/features/spotlight/utils";
-import { resolveSessionRoute } from "@/lib/route-session";
 import { errorHandler } from "@/lib/error-handler";
+import { resolveSessionRoute } from "@/lib/route-session";
 
 type UseSpotlightSessionResult = {
   hideSpotlight: () => Promise<void>;
@@ -66,7 +66,8 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
       }
 
       const iconServerResult = await commands.vaultGetIconServer();
-      const iconServer = iconServerResult.status === "ok" ? iconServerResult.data : null;
+      const iconServer =
+        iconServerResult.status === "ok" ? iconServerResult.data : null;
       const ciphers = viewData.data.ciphers.map((cipher) =>
         toCipherItem(cipher, iconServer),
       );

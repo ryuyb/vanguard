@@ -12,12 +12,12 @@ import {
   CipherIcon,
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
+import { useCipherFieldCopy } from "@/features/vault/hooks";
 import {
   firstNonEmptyText,
   getCipherIconUrl,
   toCipherIconAlt,
 } from "@/features/vault/utils";
-import { useCipherFieldCopy } from "@/features/vault/hooks";
 import { cn } from "@/lib/utils";
 
 const CUSTOM_FIELD_TYPE_TEXT = 0;
@@ -45,7 +45,13 @@ function TotpCountdownRing({
 
   return (
     <div className="relative inline-flex items-center gap-1.5">
-      <svg width="16" height="16" className="transform -rotate-90">
+      <svg
+        width="16"
+        height="16"
+        className="transform -rotate-90"
+        aria-label="TOTP 倒计时"
+      >
+        <title>TOTP 倒计时进度</title>
         {/* 背景圆环 */}
         <circle
           cx="8"
@@ -123,13 +129,11 @@ function DetailField({
   if (!value && !children) {
     return null;
   }
-  return (
-    <div
-      className="group relative min-w-0 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all"
+  return onCopy ? (
+    <button
+      type="button"
+      className="group relative min-w-0 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all text-left"
       onClick={onCopy}
-      role={onCopy ? "button" : undefined}
-      tabIndex={onCopy ? 0 : undefined}
-      style={{ cursor: onCopy ? "pointer" : "default" }}
     >
       <div className="flex items-center justify-between">
         <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
@@ -139,7 +143,23 @@ function DetailField({
       <div
         className={cn(
           "mt-2 break-words text-sm leading-relaxed text-slate-900 font-medium",
-          contentClassName
+          contentClassName,
+        )}
+      >
+        {children ?? value}
+      </div>
+    </button>
+  ) : (
+    <div className="group relative min-w-0 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+          {label}
+        </div>
+      </div>
+      <div
+        className={cn(
+          "mt-2 break-words text-sm leading-relaxed text-slate-900 font-medium",
+          contentClassName,
         )}
       >
         {children ?? value}
@@ -394,11 +414,10 @@ export function CipherDetailPanel({
         {(username || password || hasOneTimePassword || hasPasskey) && (
           <div className="rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-200">
             {username && (
-              <div
-                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors first:rounded-t-lg"
+              <button
+                type="button"
+                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors first:rounded-t-lg"
                 onClick={() => copyField("username")}
-                role="button"
-                tabIndex={0}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   Username
@@ -406,15 +425,14 @@ export function CipherDetailPanel({
                 <div className="mt-2 text-sm font-medium text-slate-900">
                   {username}
                 </div>
-              </div>
+              </button>
             )}
 
             {password && (
-              <div
-                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+              <button
+                type="button"
+                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
                 onClick={() => copyField("password")}
-                role="button"
-                tabIndex={0}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   Password
@@ -441,15 +459,14 @@ export function CipherDetailPanel({
                     )}
                   </Button>
                 </div>
-              </div>
+              </button>
             )}
 
             {hasOneTimePassword && (
-              <div
-                className="group px-3.5 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+              <button
+                type="button"
+                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
                 onClick={() => copyField("totp")}
-                role="button"
-                tabIndex={0}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   One-time password
@@ -462,15 +479,20 @@ export function CipherDetailPanel({
                         <span className="mx-0.5">·</span>
                         {oneTimePasswordCode.slice(3)}
                       </>
+                    ) : oneTimePasswordFailed ? (
+                      "Unavailable"
                     ) : (
-                      oneTimePasswordFailed ? "Unavailable" : "Loading..."
+                      "Loading..."
                     )}
                   </div>
                   {oneTimePasswordRemaining != null && oneTimePasswordCode && (
-                    <TotpCountdownRing remaining={oneTimePasswordRemaining} total={30} />
+                    <TotpCountdownRing
+                      remaining={oneTimePasswordRemaining}
+                      total={30}
+                    />
                   )}
                 </div>
-              </div>
+              </button>
             )}
 
             {hasPasskey && (
@@ -492,17 +514,18 @@ export function CipherDetailPanel({
           <DetailField label="URIs" contentClassName="overflow-hidden">
             <div className="min-w-0 w-full space-y-1 overflow-hidden">
               {uniqueUris.map((uri, index) => (
-                <div
+                <button
+                  type="button"
                   key={uri}
                   title={uri}
-                  className="block min-w-0 w-full truncate text-slate-900 cursor-pointer hover:text-slate-700"
+                  className="block min-w-0 w-full truncate text-left text-slate-900 hover:text-slate-700"
                   onClick={(e) => {
                     e.stopPropagation();
                     copyField({ uri: index });
                   }}
                 >
                   {uri}
-                </div>
+                </button>
               ))}
             </div>
           </DetailField>
@@ -517,16 +540,15 @@ export function CipherDetailPanel({
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                   Notes
                 </div>
-                <div
-                  className="group relative rounded-lg border border-slate-200 bg-slate-50 p-3.5 cursor-pointer hover:shadow-md transition-all"
+                <button
+                  type="button"
+                  className="group relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-left hover:shadow-md transition-all"
                   onClick={() => copyField("notes")}
-                  role="button"
-                  tabIndex={0}
                 >
                   <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
                     {notes}
                   </pre>
-                </div>
+                </button>
               </div>
             )}
 
@@ -559,17 +581,12 @@ export function CipherDetailPanel({
                       field.fieldType === CUSTOM_FIELD_TYPE_TEXT ||
                       field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
 
-                    return (
-                      <div
+                    return canCopy ? (
+                      <button
+                        type="button"
                         key={field.key}
-                        className={`group relative rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all ${canCopy ? "cursor-pointer" : ""}`}
-                        onClick={
-                          canCopy
-                            ? () => copyField({ customField: index })
-                            : undefined
-                        }
-                        role={canCopy ? "button" : undefined}
-                        tabIndex={canCopy ? 0 : undefined}
+                        className="group relative w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all text-left"
+                        onClick={() => copyField({ customField: index })}
                       >
                         <div className="flex items-center justify-between">
                           <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
@@ -610,6 +627,22 @@ export function CipherDetailPanel({
                             </Button>
                           )}
                         </div>
+                      </button>
+                    ) : (
+                      <div
+                        key={field.key}
+                        className="group relative rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                            {field.name}
+                          </div>
+                        </div>
+                        <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                          <div className="min-w-0 break-all text-sm font-medium text-slate-900">
+                            {displayValue}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -648,7 +681,9 @@ export function CipherDetailPanel({
                     className="relative"
                   >
                     <span className="absolute -left-6.5 top-1.5 size-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
-                    <div className="text-xs font-medium text-slate-500">{event.label}</div>
+                    <div className="text-xs font-medium text-slate-500">
+                      {event.label}
+                    </div>
                     <div className="text-sm font-semibold text-slate-900">
                       {event.date.toLocaleString()}
                     </div>

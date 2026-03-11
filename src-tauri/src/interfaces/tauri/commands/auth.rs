@@ -231,7 +231,10 @@ pub async fn auth_logout(
         }
 
         // Clear biometric unlock data
-        if let Err(error) = state.biometric_unlock_port().delete_unlock_bundle(&account_id) {
+        if let Err(error) = state
+            .biometric_unlock_port()
+            .delete_unlock_bundle(&account_id)
+        {
             log::warn!(
                 target: "vanguard::tauri::auth",
                 "auth_logout failed to clear biometric unlock account_id={}: [{}] {}",

@@ -285,16 +285,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-2.5">
-                          <Archive className={[
-                            "size-4",
-                            selectedMenuId === ALL_ITEMS_ID ? "text-blue-600" : "text-slate-400"
-                          ].join(" ")} />
+                          <Archive
+                            className={[
+                              "size-4",
+                              selectedMenuId === ALL_ITEMS_ID
+                                ? "text-blue-600"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          />
                           All items
                         </span>
-                        <span className={[
-                          "text-xs font-semibold",
-                          selectedMenuId === ALL_ITEMS_ID ? "text-blue-600" : "text-slate-400"
-                        ].join(" ")}>
+                        <span
+                          className={[
+                            "text-xs font-semibold",
+                            selectedMenuId === ALL_ITEMS_ID
+                              ? "text-blue-600"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
                           {
                             (viewData.ciphers ?? []).filter(
                               (cipher) => cipher.deletedDate == null,
@@ -316,16 +324,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-2.5">
-                          <Star className={[
-                            "size-4",
-                            selectedMenuId === FAVORITES_ID ? "text-blue-600" : "text-slate-400"
-                          ].join(" ")} />
+                          <Star
+                            className={[
+                              "size-4",
+                              selectedMenuId === FAVORITES_ID
+                                ? "text-blue-600"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          />
                           Favorites
                         </span>
-                        <span className={[
-                          "text-xs font-semibold",
-                          selectedMenuId === FAVORITES_ID ? "text-blue-600" : "text-slate-400"
-                        ].join(" ")}>
+                        <span
+                          className={[
+                            "text-xs font-semibold",
+                            selectedMenuId === FAVORITES_ID
+                              ? "text-blue-600"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
                           {favoriteCipherCount}
                         </span>
                       </div>
@@ -343,16 +359,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-2.5">
-                          <Trash2 className={[
-                            "size-4",
-                            selectedMenuId === TRASH_ID ? "text-blue-600" : "text-slate-400"
-                          ].join(" ")} />
+                          <Trash2
+                            className={[
+                              "size-4",
+                              selectedMenuId === TRASH_ID
+                                ? "text-blue-600"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          />
                           Trash
                         </span>
-                        <span className={[
-                          "text-xs font-semibold",
-                          selectedMenuId === TRASH_ID ? "text-blue-600" : "text-slate-400"
-                        ].join(" ")}>
+                        <span
+                          className={[
+                            "text-xs font-semibold",
+                            selectedMenuId === TRASH_ID
+                              ? "text-blue-600"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
                           {trashCipherCount}
                         </span>
                       </div>

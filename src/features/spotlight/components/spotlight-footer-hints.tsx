@@ -33,7 +33,9 @@ export function SpotlightFooterHints({
           </>
         )}
         <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
-          <Kbd className="bg-slate-200 text-slate-700">{detailItem ? "←" : "→"}</Kbd>
+          <Kbd className="bg-slate-200 text-slate-700">
+            {detailItem ? "←" : "→"}
+          </Kbd>
           {detailItem ? "返回结果" : "更多操作"}
         </span>
         {detailItem ? (

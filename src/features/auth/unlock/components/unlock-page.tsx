@@ -84,9 +84,7 @@ export function UnlockPage({
               <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
                 解锁 Vanguard
               </CardTitle>
-              <p className="text-sm text-slate-600">
-                输入凭据以访问你的密码库
-              </p>
+              <p className="text-sm text-slate-600">输入凭据以访问你的密码库</p>
             </div>
           </CardHeader>
           <CardContent className="pb-8">

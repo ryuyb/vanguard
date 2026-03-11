@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { errorHandler } from "@/lib/error-handler";
-import { toast } from "sonner";
 
 type CopyableField =
   | "username"

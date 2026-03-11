@@ -50,7 +50,10 @@ export function LoginCredentialsFields({
       </div>
 
       <div className="space-y-2.5">
-        <Label htmlFor="master-password" className="text-sm font-medium text-slate-700">
+        <Label
+          htmlFor="master-password"
+          className="text-sm font-medium text-slate-700"
+        >
           主密码
         </Label>
         <InputGroup>
@@ -77,7 +80,11 @@ export function LoginCredentialsFields({
               disabled={isSubmitting}
               aria-label={showPassword ? "隐藏密码" : "显示密码"}
             >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
             </Button>
           </InputGroupAddon>
         </InputGroup>

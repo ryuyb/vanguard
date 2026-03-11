@@ -76,10 +76,14 @@ export function FolderTreeMenuItem({
             ].join(" ")}
           >
             <span className="truncate">{node.label}</span>
-            <span className={[
-              "text-xs font-semibold",
-              isSelected ? "text-blue-600" : "text-slate-400"
-            ].join(" ")}>{count}</span>
+            <span
+              className={[
+                "text-xs font-semibold",
+                isSelected ? "text-blue-600" : "text-slate-400",
+              ].join(" ")}
+            >
+              {count}
+            </span>
           </button>
         </div>
 

@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { commands, type RestoreAuthStateResponseDto } from "@/bindings";
 import type { UnlockFeedback } from "@/features/auth/unlock/types";
+import { errorHandler } from "@/lib/error-handler";
 import { loadUnlockCapabilities } from "./load-unlock-capabilities";
 import {
   unlockWithBiometric,
@@ -12,7 +13,6 @@ import {
   createDefaultUnlockCapabilities,
   type UnlockMethod,
 } from "./unlock-capabilities";
-import { errorHandler } from "@/lib/error-handler";
 
 type UseUnlockFlowParams = {
   navigateToHome: () => Promise<void>;

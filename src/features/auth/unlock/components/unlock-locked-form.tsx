@@ -84,18 +84,25 @@ export function UnlockLockedForm({
       <div className="space-y-2 rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-slate-500">账户</span>
-          <span className="text-slate-700">{restoreState?.email ?? "unknown"}</span>
+          <span className="text-slate-700">
+            {restoreState?.email ?? "unknown"}
+          </span>
         </div>
         <div className="flex items-center justify-between text-xs">
           <span className="font-medium text-slate-500">服务器</span>
-          <span className="text-slate-700">{restoreState?.baseUrl ?? "unknown"}</span>
+          <span className="text-slate-700">
+            {restoreState?.baseUrl ?? "unknown"}
+          </span>
         </div>
       </div>
 
       <form className="space-y-5" onSubmit={isPinMode ? onPinUnlock : onSubmit}>
         {isPinMode ? (
           <div className="space-y-2.5">
-            <Label htmlFor="unlock-pin" className="text-sm font-medium text-slate-700">
+            <Label
+              htmlFor="unlock-pin"
+              className="text-sm font-medium text-slate-700"
+            >
               PIN 码
             </Label>
             <InputGroup>
@@ -117,7 +124,10 @@ export function UnlockLockedForm({
           </div>
         ) : (
           <div className="space-y-2.5">
-            <Label htmlFor="unlock-master-password" className="text-sm font-medium text-slate-700">
+            <Label
+              htmlFor="unlock-master-password"
+              className="text-sm font-medium text-slate-700"
+            >
               主密码
             </Label>
             <InputGroup>
@@ -144,7 +154,11 @@ export function UnlockLockedForm({
                   disabled={isActionBlocked}
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </Button>
               </InputGroupAddon>
             </InputGroup>
@@ -198,9 +212,7 @@ export function UnlockLockedForm({
           ) : (
             <Fingerprint className="h-5 w-5" />
           )}
-          {isBiometricUnlocking
-            ? "正在验证..."
-            : "使用生物识别"}
+          {isBiometricUnlocking ? "正在验证..." : "使用生物识别"}
         </Button>
       )}
 
@@ -221,7 +233,11 @@ export function UnlockLockedForm({
           disabled={isActionBlocked}
           onClick={onLogout}
         >
-          {isLoggingOut ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+          {isLoggingOut ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4" />
+          )}
           {isLoggingOut ? "正在登出..." : "登出账户"}
         </Button>
       </div>

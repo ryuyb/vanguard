@@ -126,7 +126,9 @@ export function SpotlightResultsPanel({
                   {toCipherTypeIcon(item.type)}
                 </CipherIcon>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {item.title}
+                  </p>
                   <p className="mt-0.5 text-xs text-slate-600">
                     {item.subtitle}
                   </p>

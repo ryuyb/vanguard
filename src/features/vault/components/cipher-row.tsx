@@ -43,7 +43,7 @@ export function CipherRow({
           alt={toCipherIconAlt(cipher.name)}
           className={[
             "bg-white text-slate-500 border",
-            selected ? "border-blue-200" : "border-slate-200"
+            selected ? "border-blue-200" : "border-slate-200",
           ].join(" ")}
           iconUrl={cipher.iconUrl ?? null}
           isVisible={shouldLoadIcon}
