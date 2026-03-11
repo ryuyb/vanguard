@@ -76,40 +76,42 @@ function SpotlightApp() {
       initial={{ opacity: 0, y: 8, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className="grid h-full w-full place-items-center overflow-hidden bg-white/[0.004] px-4 py-6 sm:px-8 sm:py-10 md:px-16 md:py-12"
+      className="flex h-full w-full items-start justify-center overflow-hidden bg-transparent px-4 pt-20 sm:px-8 sm:pt-24 md:px-16 md:pt-28"
     >
       <Card
         id="spotlight-card"
-        className="block w-full max-w-180 gap-0 rounded-4xl border border-white/40 bg-linear-to-b from-[rgba(250,251,255,0.82)] to-[rgba(243,246,252,0.74)] p-3.5 pb-0 text-slate-900 ring-0 shadow-[0_36px_70px_rgba(15,23,42,0.36),inset_0_1px_0_rgba(255,255,255,0.42)] backdrop-blur-[20px] backdrop-saturate-[1.8]"
+        className="block w-full max-w-180 gap-0 overflow-hidden rounded-2xl border border-slate-200/40 bg-slate-100 p-0 text-slate-900 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.4),0_10px_30px_-5px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.08)]"
       >
-        <Command
-          className="rounded-none! bg-transparent p-0! text-inherit"
-          shouldFilter={false}
-          loop
-        >
-          <div>
-            <SpotlightSearchInput
-              query={query}
-              onQueryChange={setQuery}
-              onKeyDown={onCommandInputKeyDown}
+        <div className="bg-slate-200/60 p-4">
+          <Command
+            className="rounded-none! bg-transparent p-0! text-inherit"
+            shouldFilter={false}
+            loop
+          >
+            <div>
+              <SpotlightSearchInput
+                query={query}
+                onQueryChange={setQuery}
+                onKeyDown={onCommandInputKeyDown}
+              />
+            </div>
+            <SpotlightResultsPanel
+              shouldShowResults={shouldShowResults}
+              isLoadingVault={isLoadingVault}
+              hasQuery={hasQuery}
+              detailItem={detailItem}
+              detailActions={detailActions}
+              detailActionIndex={detailActionIndex}
+              copiedDetailField={copiedDetailField}
+              visibleItems={visibleItems}
+              copiedItemId={copiedItemId}
             />
-          </div>
-          <SpotlightResultsPanel
-            shouldShowResults={shouldShowResults}
-            isLoadingVault={isLoadingVault}
-            hasQuery={hasQuery}
-            detailItem={detailItem}
-            detailActions={detailActions}
-            detailActionIndex={detailActionIndex}
-            copiedDetailField={copiedDetailField}
-            visibleItems={visibleItems}
-            copiedItemId={copiedItemId}
-          />
-        </Command>
+          </Command>
+        </div>
 
-        <Separator className="mt-2.5 bg-slate-400/30" />
+        <Separator className="bg-slate-300/60" />
 
-        <CardFooter className="mt-0 flex min-h-9 flex-wrap items-center gap-2.5 px-1 pb-0">
+        <CardFooter className="flex min-h-9 flex-wrap items-center gap-2.5 bg-slate-50 px-4 py-3">
           <SpotlightFooterHints
             hasVisibleResults={hasVisibleResults}
             detailItem={detailItem}

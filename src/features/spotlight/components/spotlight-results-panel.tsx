@@ -43,7 +43,7 @@ export function SpotlightResultsPanel({
   }
 
   return (
-    <ScrollArea className="mt-2.5 h-68">
+    <ScrollArea className="mt-3 h-68">
       {isLoadingVault && hasQuery ? (
         <div className="grid gap-2 py-0.5" aria-hidden>
           {Array.from({ length: 6 }).map((_, index) => (
@@ -54,12 +54,12 @@ export function SpotlightResultsPanel({
           ))}
         </div>
       ) : detailItem ? (
-        <section className="px-2.5 pt-3 pb-2.5" aria-label="Cipher detail">
-          <div className="flex items-start gap-3">
+        <section className="px-2 pt-3 pb-2.5" aria-label="Cipher detail">
+          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
             <CipherIcon
               alt={toCipherIconAlt(detailItem.title)}
               iconUrl={detailItem.iconUrl}
-              className="size-10"
+              className="size-10 border-slate-200"
               loadState={detailItem.iconUrl ? "loading" : "fallback"}
             >
               {toCipherTypeIcon(detailItem.type)}
@@ -68,7 +68,7 @@ export function SpotlightResultsPanel({
               <p className="text-base leading-tight font-semibold text-slate-900">
                 {detailItem.title}
               </p>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="mt-1.5 text-sm text-slate-600">
                 {detailItem.subtitle}
               </p>
             </div>
@@ -81,14 +81,15 @@ export function SpotlightResultsPanel({
                 tabIndex={-1}
                 aria-selected={detailActionIndex === index}
                 className={cn(
-                  "flex items-center justify-between gap-3 rounded-xl border border-slate-400/25 bg-white/50 px-3 py-2.5 text-[13px] leading-[1.3] text-slate-900 transition-colors",
-                  detailActionIndex === index &&
-                    "border-blue-800/30 bg-blue-800/12",
+                  "flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-sm leading-[1.3] transition-all",
+                  detailActionIndex === index
+                    ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
                   copiedDetailField === action.field &&
-                    "animate-in fade-in-0 duration-150 bg-blue-800/25",
+                    "animate-in fade-in-0 duration-150 border-emerald-200 bg-emerald-50",
                 )}
               >
-                <span>{action.label}</span>
+                <span className="font-medium">{action.label}</span>
                 <KbdGroup className="shrink-0 text-slate-500">
                   {action.shortcut.map((shortcutKey) => (
                     <Kbd key={`${action.label}-${shortcutKey}`}>
@@ -108,22 +109,24 @@ export function SpotlightResultsPanel({
               value={item.id}
               data-spotlight-item="true"
               className={cn(
-                "w-full justify-between gap-3 rounded-xl border border-transparent bg-transparent px-3 py-2.5 text-left data-[selected=true]:bg-blue-800/12",
+                "w-full justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all",
+                "border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50",
+                "data-[selected=true]:border-blue-200 data-[selected=true]:bg-blue-50 data-[selected=true]:shadow-sm",
                 copiedItemId === item.id &&
-                  "animate-in fade-in-0 duration-150 bg-blue-800/20 data-[selected=true]:bg-blue-800/20",
+                  "animate-in fade-in-0 duration-150 border-emerald-200 bg-emerald-50 data-[selected=true]:border-emerald-200 data-[selected=true]:bg-emerald-50",
               )}
             >
               <div className="flex items-center gap-3">
                 <CipherIcon
                   alt={toCipherIconAlt(item.title)}
                   iconUrl={item.iconUrl}
-                  className="size-8"
+                  className="size-8 border-slate-200"
                   loadState={item.iconUrl ? "loading" : "fallback"}
                 >
                   {toCipherTypeIcon(item.type)}
                 </CipherIcon>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-900">{item.title}</p>
+                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
                   <p className="mt-0.5 text-xs text-slate-600">
                     {item.subtitle}
                   </p>
