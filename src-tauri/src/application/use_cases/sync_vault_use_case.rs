@@ -514,6 +514,158 @@ impl SyncVaultUseCase {
         Ok(SyncOutcome { context, result })
     }
 
+    pub async fn sync_folders_only(&self, command: SyncVaultCommand) -> AppResult<SyncOutcome> {
+        require_non_empty(&command.account_id, "account_id")?;
+        require_non_empty(&command.base_url, "base_url")?;
+        require_non_empty(&command.access_token, "access_token")?;
+
+        let started_at = Instant::now();
+        let folders_endpoint = format!("{}/api/folders", command.base_url.trim_end_matches('/'));
+        let revision_endpoint = revision_endpoint(&command.base_url);
+        let previous_context = self
+            .vault_repository
+            .set_sync_running(&command.account_id, &command.base_url)
+            .await?;
+
+        log::info!(
+            target: "vanguard::sync",
+            "folders-only sync started account_id={} endpoint={} trigger={:?}",
+            command.account_id,
+            folders_endpoint,
+            command.trigger
+        );
+
+        // Fetch folders from remote
+        let folders = match self.remote_vault.get_folders(command.clone()).await {
+            Ok(folders) => folders,
+            Err(error) => {
+                log::error!(
+                    target: "vanguard::sync",
+                    "folders-only sync fetch failed account_id={} endpoint={} status={} error_code={} message={}",
+                    command.account_id,
+                    folders_endpoint,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error
+                );
+                let message = error.message();
+                self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
+                    .await;
+                return Err(error);
+            }
+        };
+
+        // Persist folders using two-step update flow
+        if let Err(error) = self.persist_folders_only(&command.account_id, folders.clone()).await {
+            log::error!(
+                target: "vanguard::sync",
+                "folders-only sync persist failed account_id={} endpoint=local-repository status={} error_code={} message={}",
+                command.account_id,
+                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error
+            );
+            let message = error.message();
+            self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
+                .await;
+            return Err(error);
+        }
+
+        // Get revision date
+        let revision_ms = match self
+            .poll_revision_use_case
+            .execute(RevisionDateQuery {
+                base_url: command.base_url.clone(),
+                access_token: command.access_token.clone(),
+            })
+            .await
+        {
+            Ok(value) => Some(value),
+            Err(error) => {
+                if previous_context.last_sync_at_ms.is_none() {
+                    log::error!(
+                        target: "vanguard::sync",
+                        "revision-date failed on folders-only sync account_id={} endpoint={} status={} error_code={} message={}",
+                        command.account_id,
+                        revision_endpoint,
+                        error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                        error.code(),
+                        error
+                    );
+                    let message = error.message();
+                    self.mark_sync_error_state(
+                        &command.account_id,
+                        &command.base_url,
+                        &error,
+                        message,
+                    )
+                    .await;
+                    return Err(error);
+                }
+
+                log::warn!(
+                    target: "vanguard::sync",
+                    "revision-date failed after folders-only sync account_id={} endpoint={} status={} error_code={} message={} (fallback_to_previous_revision={})",
+                    command.account_id,
+                    revision_endpoint,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error,
+                    previous_context.last_revision_ms.is_some()
+                );
+                previous_context.last_revision_ms
+            }
+        };
+
+        let synced_at_ms = now_unix_ms()?;
+        let revision_changed = is_revision_changed(previous_context.last_revision_ms, revision_ms);
+        let mut counts = previous_context.counts.clone();
+        counts.folders = self
+            .vault_repository
+            .count_live_folders(&command.account_id)
+            .await?;
+
+        let context = self
+            .vault_repository
+            .set_sync_succeeded(
+                &command.account_id,
+                &command.base_url,
+                revision_ms,
+                synced_at_ms,
+                counts.clone(),
+            )
+            .await?;
+        self.vault_repository
+            .save_snapshot_meta(
+                &command.account_id,
+                VaultSnapshotMeta {
+                    snapshot_revision_ms: revision_ms,
+                    snapshot_synced_at_ms: synced_at_ms,
+                    source: command.trigger,
+                },
+            )
+            .await?;
+
+        let result = SyncResult {
+            duration_ms: clamp_duration_ms(started_at.elapsed()),
+            item_counts: counts,
+            revision_changed,
+        };
+
+        log::info!(
+            target: "vanguard::sync",
+            "folders-only sync finished account_id={} endpoint={} trigger={:?} duration_ms={} revision_changed={} folders={}",
+            command.account_id,
+            folders_endpoint,
+            command.trigger,
+            result.duration_ms,
+            result.revision_changed,
+            result.item_counts.folders
+        );
+
+        Ok(SyncOutcome { context, result })
+    }
+
     async fn execute_with_timeout(&self, command: SyncVaultCommand) -> AppResult<SyncOutcome> {
         if self.sync_policy.timeout_ms == 0 {
             return self.execute_once(command).await;
@@ -1086,6 +1238,41 @@ impl SyncVaultUseCase {
         self.vault_repository
             .upsert_send_live(account_id, send)
             .await
+    }
+
+    async fn persist_folders_only(
+        &self,
+        account_id: &str,
+        folders: Vec<SyncFolder>,
+    ) -> AppResult<()> {
+        // Begin two-step update transaction
+        self.vault_repository
+            .begin_sync_transaction(account_id)
+            .await?;
+
+        // Upsert folders to staging
+        if let Err(error) = self.upsert_folders_chunked(account_id, folders).await {
+            let _ = self
+                .vault_repository
+                .rollback_sync_transaction(account_id)
+                .await;
+            return Err(error);
+        }
+
+        // Commit: staging → live
+        if let Err(error) = self
+            .vault_repository
+            .commit_sync_transaction(account_id)
+            .await
+        {
+            let _ = self
+                .vault_repository
+                .rollback_sync_transaction(account_id)
+                .await;
+            return Err(error);
+        }
+
+        Ok(())
     }
 }
 
