@@ -16,7 +16,7 @@ export function toCipherItem(
     title,
     subtitle,
     searchText: `${rawName} ${rawUsername}`.toLowerCase(),
-    type: cipher.type,
+    type: cipher.type ?? 0,
     iconUrl: getCipherIconUrl(cipher, iconServer),
   };
 }

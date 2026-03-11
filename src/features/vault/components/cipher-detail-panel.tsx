@@ -368,15 +368,6 @@ export function CipherDetailPanel({
     setRevealedCustomFieldKeys(new Set());
   }, []);
 
-  const oneTimePasswordDisplay =
-    oneTimePasswordCode && oneTimePasswordRemaining != null
-      ? `${oneTimePasswordCode} (${oneTimePasswordRemaining}s)`
-      : oneTimePasswordFailed
-        ? "Unavailable"
-        : hasOneTimePassword
-          ? "Loading..."
-          : null;
-
   return (
     <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-none bg-white py-0 shadow-none">
       <CardHeader className="gap-2 border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-6 py-4">
