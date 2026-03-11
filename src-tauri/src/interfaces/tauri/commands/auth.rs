@@ -201,6 +201,45 @@ pub async fn auth_logout(
                 error.log_message()
             );
         }
+
+        // Clear PIN unlock data
+        if let Err(error) = state
+            .pin_unlock_port()
+            .delete_pin_envelope(&account_id, crate::domain::unlock::PinLockType::Persistent)
+            .await
+        {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "auth_logout failed to clear persistent PIN account_id={}: [{}] {}",
+                account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
+        if let Err(error) = state
+            .pin_unlock_port()
+            .delete_pin_envelope(&account_id, crate::domain::unlock::PinLockType::Ephemeral)
+            .await
+        {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "auth_logout failed to clear ephemeral PIN account_id={}: [{}] {}",
+                account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
+
+        // Clear biometric unlock data
+        if let Err(error) = state.biometric_unlock_port().delete_unlock_bundle(&account_id) {
+            log::warn!(
+                target: "vanguard::tauri::auth",
+                "auth_logout failed to clear biometric unlock account_id={}: [{}] {}",
+                account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
     }
 
     state
