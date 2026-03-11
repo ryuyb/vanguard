@@ -66,10 +66,10 @@ pub async fn create_folder(
             )
         })?;
 
-    // 触发 sync 同步数据到本地数据库
+    // 触发 folders-only sync 同步数据到本地数据库
     state
         .sync_service()
-        .sync_now(SyncVaultCommand {
+        .sync_folders_only(SyncVaultCommand {
             account_id: auth_session.account_id.clone(),
             base_url: auth_session.base_url.clone(),
             access_token: auth_session.access_token.clone(),
@@ -131,10 +131,10 @@ pub async fn rename_folder(
             )
         })?;
 
-    // 触发 sync 同步数据到本地数据库
+    // 触发 folders-only sync 同步数据到本地数据库
     state
         .sync_service()
-        .sync_now(SyncVaultCommand {
+        .sync_folders_only(SyncVaultCommand {
             account_id: auth_session.account_id.clone(),
             base_url: auth_session.base_url.clone(),
             access_token: auth_session.access_token.clone(),
@@ -173,10 +173,10 @@ pub async fn delete_folder(
             )
         })?;
 
-    // 触发 sync 同步数据到本地数据库
+    // 触发 folders-only sync 同步数据到本地数据库
     state
         .sync_service()
-        .sync_now(SyncVaultCommand {
+        .sync_folders_only(SyncVaultCommand {
             account_id: auth_session.account_id.clone(),
             base_url: auth_session.base_url.clone(),
             access_token: auth_session.access_token.clone(),

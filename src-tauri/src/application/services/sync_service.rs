@@ -117,6 +117,68 @@ impl SyncService {
         }
     }
 
+    pub async fn sync_folders_only(&self, command: SyncVaultCommand) -> AppResult<SyncOutcome> {
+        require_non_empty(&command.account_id, "account_id")?;
+        let account_id = command.account_id.clone();
+        let endpoint = format!("{}/api/folders", command.base_url.trim_end_matches('/'));
+        let trigger = command.trigger;
+
+        if let Err(error) = self.acquire_running_slot(&account_id) {
+            log::warn!(
+                target: "vanguard::sync",
+                "folders-only sync rejected account_id={} endpoint={} status={} error_code={} message={}",
+                account_id,
+                endpoint,
+                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error
+            );
+            return Err(error);
+        }
+        let _guard = RunningSlotGuard::new(Arc::clone(&self.running_accounts), account_id.clone());
+
+        if let Err(error) = self.enforce_debounce(&account_id) {
+            log::warn!(
+                target: "vanguard::sync",
+                "folders-only sync rejected account_id={} endpoint={} status={} error_code={} message={}",
+                account_id,
+                endpoint,
+                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                error.code(),
+                error
+            );
+            return Err(error);
+        }
+
+        self.sync_event_port.emit_sync_started(&account_id);
+        let started_at = Instant::now();
+
+        match self.sync_vault_use_case.sync_folders_only(command).await {
+            Ok(outcome) => {
+                self.record_sync_success(&account_id, &outcome.result);
+                self.sync_event_port.emit_sync_succeeded(&outcome.context);
+                Ok(outcome)
+            }
+            Err(error) => {
+                self.record_sync_failure(&account_id, clamp_duration_ms(started_at.elapsed()));
+                self.process_sync_auth_error(&account_id, trigger, &error);
+                log::error!(
+                    target: "vanguard::sync",
+                    "folders-only sync failed account_id={} endpoint={} status={} error_code={} message={}",
+                    account_id,
+                    endpoint,
+                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
+                    error.code(),
+                    error
+                );
+                let payload = error.to_payload();
+                self.sync_event_port
+                    .emit_sync_failed(&account_id, &payload.code, &payload.message);
+                Err(error)
+            }
+        }
+    }
+
     pub async fn sync_cipher_by_id(
         &self,
         command: SyncVaultCommand,
