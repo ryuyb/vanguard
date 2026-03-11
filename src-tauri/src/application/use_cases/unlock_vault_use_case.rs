@@ -329,7 +329,10 @@ mod tests {
             .expect_err("empty password should fail");
 
         match error {
-            AppError::ValidationRequired { field } => assert_eq!(field, "master_password"),
+            AppError::ValidationFieldError { field, message } => {
+                assert_eq!(field, "unknown");
+                assert_eq!(message, "master_password cannot be empty");
+            }
             other => panic!("unexpected error variant: {other:?}"),
         }
         assert!(master_calls.lock().expect("master calls lock").is_empty());
@@ -361,7 +364,10 @@ mod tests {
             .expect_err("empty pin should fail");
 
         match error {
-            AppError::ValidationRequired { field } => assert_eq!(field, "pin"),
+            AppError::ValidationFieldError { field, message } => {
+                assert_eq!(field, "unknown");
+                assert_eq!(message, "pin cannot be empty");
+            }
             other => panic!("unexpected error variant: {other:?}"),
         }
         assert!(master_calls.lock().expect("master calls lock").is_empty());

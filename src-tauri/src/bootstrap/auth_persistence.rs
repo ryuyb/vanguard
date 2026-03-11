@@ -402,6 +402,6 @@ mod tests {
             &encrypted,
         )
         .expect_err("decrypt should fail");
-        assert_eq!(error.code(), "validation_error");
+        assert_eq!(error.code(), "VALIDATION_FIELD_ERROR");
     }
 }

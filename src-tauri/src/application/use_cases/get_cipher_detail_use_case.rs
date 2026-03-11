@@ -724,7 +724,7 @@ mod tests {
 
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
         let error = vault_crypto::decrypt_cipher_string(&cipher, &key).expect_err("must fail");
-        assert_eq!(error.code(), "validation_error");
+        assert_eq!(error.code(), "VALIDATION_FIELD_ERROR");
     }
 
     #[test]
@@ -912,7 +912,7 @@ mod tests {
 
         let error = decrypt_cipher_detail(cipher, &user_key)
             .expect_err("invalid encrypted field must fail");
-        assert_eq!(error.code(), "validation_error");
+        assert_eq!(error.code(), "VALIDATION_FIELD_ERROR");
     }
 
     #[test]
@@ -954,7 +954,7 @@ mod tests {
 
         let error =
             decrypt_cipher_detail(cipher, &user_key).expect_err("invalid cipher key must fail");
-        assert_eq!(error.code(), "validation_error");
+        assert_eq!(error.code(), "VALIDATION_FIELD_ERROR");
     }
 
     fn encrypt_type2(plaintext: &str, enc_key: &[u8; 32], mac_key: &[u8; 32]) -> String {
