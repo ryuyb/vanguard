@@ -2,7 +2,9 @@ use specta::specta;
 use tauri::State;
 
 use crate::application::dto::sync::SyncVaultCommand;
-use crate::application::dto::vault::{CreateFolderRequest, DeleteFolderRequest, RenameFolderRequest};
+use crate::application::dto::vault::{
+    CreateFolderRequest, DeleteFolderRequest, RenameFolderRequest,
+};
 use crate::application::vault_crypto;
 use crate::bootstrap::app_state::AppState;
 use crate::domain::sync::SyncTrigger;
@@ -25,9 +27,7 @@ fn log_command_error(command: &str, error: &AppError) -> ErrorPayload {
 
 #[specta]
 #[tauri::command]
-pub async fn list_folders(
-    state: State<'_, AppState>,
-) -> Result<Vec<FolderDto>, ErrorPayload> {
+pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderDto>, ErrorPayload> {
     // 获取当前 session
     let auth_session = session::ensure_fresh_auth_session(&state)
         .await
@@ -115,7 +115,11 @@ pub async fn create_folder(
     // 调用 Vaultwarden API 创建文件夹
     state
         .vaultwarden_client()
-        .create_folder(&auth_session.base_url, &auth_session.access_token, encrypted_name)
+        .create_folder(
+            &auth_session.base_url,
+            &auth_session.access_token,
+            encrypted_name,
+        )
         .await
         .map_err(|error| {
             log_command_error(
@@ -169,8 +173,9 @@ pub async fn rename_folder(
         })?;
 
     // 加密新文件夹名称
-    let encrypted_name = vault_crypto::encrypt_cipher_string(&request.new_name, &(&user_key).into())
-        .map_err(|error| log_command_error("rename_folder", &error))?;
+    let encrypted_name =
+        vault_crypto::encrypt_cipher_string(&request.new_name, &(&user_key).into())
+            .map_err(|error| log_command_error("rename_folder", &error))?;
 
     // 调用 Vaultwarden API 更新文件夹
     state
@@ -222,7 +227,11 @@ pub async fn delete_folder(
     // 调用 Vaultwarden API 删除文件夹
     state
         .vaultwarden_client()
-        .delete_folder(&auth_session.base_url, &auth_session.access_token, &request.folder_id)
+        .delete_folder(
+            &auth_session.base_url,
+            &auth_session.access_token,
+            &request.folder_id,
+        )
         .await
         .map_err(|error| {
             log_command_error(

@@ -30,7 +30,8 @@ export function DeleteFolderDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>确认删除文件夹</AlertDialogTitle>
           <AlertDialogDescription>
-            确定要删除文件夹 <strong className="text-slate-900">"{folderName}"</strong> 吗？
+            确定要删除文件夹{" "}
+            <strong className="text-slate-900">"{folderName}"</strong> 吗？
             <br />
             <br />
             文件夹中的密码不会被删除，它们将移动到"无文件夹"分类中。

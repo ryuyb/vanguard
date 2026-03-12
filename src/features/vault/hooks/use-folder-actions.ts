@@ -1,6 +1,6 @@
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { commands } from "@/bindings";
-import { useMutation } from "@tanstack/react-query";
 
 type UseFolderActionsOptions = {
   onSuccess?: () => void;
@@ -25,7 +25,13 @@ export function useFolderActions(options?: UseFolderActionsOptions) {
   });
 
   const renameFolderMutation = useMutation({
-    mutationFn: async ({ folderId, newName }: { folderId: string; newName: string }) => {
+    mutationFn: async ({
+      folderId,
+      newName,
+    }: {
+      folderId: string;
+      newName: string;
+    }) => {
       const result = await commands.renameFolder({ folderId, newName });
       if (result.status === "error") {
         throw new Error(result.error.message);

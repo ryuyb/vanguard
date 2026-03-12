@@ -556,7 +556,10 @@ impl SyncVaultUseCase {
         };
 
         // Persist folders using two-step update flow
-        if let Err(error) = self.persist_folders_only(&command.account_id, folders.clone()).await {
+        if let Err(error) = self
+            .persist_folders_only(&command.account_id, folders.clone())
+            .await
+        {
             log::error!(
                 target: "vanguard::sync",
                 "folders-only sync persist failed account_id={} endpoint=local-repository status={} error_code={} message={}",

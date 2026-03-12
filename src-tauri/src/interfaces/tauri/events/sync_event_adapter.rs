@@ -4,8 +4,8 @@ use tauri_specta::Event;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::domain::sync::SyncContext;
 use crate::interfaces::tauri::events::sync::{
-    VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut, VaultSyncStarted,
-    VaultSyncSucceeded, VaultFoldersSynced,
+    VaultFoldersSynced, VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut,
+    VaultSyncStarted, VaultSyncSucceeded,
 };
 use crate::interfaces::tauri::mapping;
 

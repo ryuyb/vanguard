@@ -157,7 +157,8 @@ impl SyncService {
             Ok(outcome) => {
                 self.record_sync_success(&account_id, &outcome.result);
                 self.sync_event_port.emit_sync_succeeded(&outcome.context);
-                self.sync_event_port.emit_folders_synced(&account_id, outcome.result.item_counts.folders);
+                self.sync_event_port
+                    .emit_folders_synced(&account_id, outcome.result.item_counts.folders);
                 Ok(outcome)
             }
             Err(error) => {

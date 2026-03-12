@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -70,7 +70,10 @@ export function FolderDialog({
           <div className="grid gap-4 py-4">
             {isCreatingSubFolder && (
               <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                完整路径: <strong>{parentFolderName}/{name || "..."}</strong>
+                完整路径:{" "}
+                <strong>
+                  {parentFolderName}/{name || "..."}
+                </strong>
               </div>
             )}
             <div className="grid gap-2">
@@ -81,7 +84,9 @@ export function FolderDialog({
                 id="folder-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={isCreatingSubFolder ? "输入子文件夹名称" : "输入文件夹名称"}
+                placeholder={
+                  isCreatingSubFolder ? "输入子文件夹名称" : "输入文件夹名称"
+                }
                 autoFocus
                 disabled={isLoading}
               />

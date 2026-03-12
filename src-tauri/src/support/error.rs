@@ -144,7 +144,9 @@ impl AppError {
             Self::VaultLocked => "Vault is locked".to_string(),
             Self::VaultCorrupted => "Vault data is corrupted".to_string(),
             Self::VaultFolderNotFound { folder_id } => format!("Folder not found: {}", folder_id),
-            Self::VaultFolderNameConflict { name } => format!("Folder name already exists: {}", name),
+            Self::VaultFolderNameConflict { name } => {
+                format!("Folder name already exists: {}", name)
+            }
 
             // 验证
             Self::ValidationFieldError { field, message } => {

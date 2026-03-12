@@ -827,20 +827,20 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
-                    .map_err(|error| {
-                        AppError::InternalUnexpected { message: format!("failed to prepare folder upsert statement: {error}") }
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to prepare folder upsert statement: {error}"),
                     })?;
                 for folder in folders {
                     let payload_json = Self::to_json(&folder, "sync folder")?;
                     statement
                         .execute(params![folder.id, payload_json])
-                        .map_err(|error| {
-                            AppError::InternalUnexpected { message: format!("failed to upsert staging folder: {error}") }
+                        .map_err(|error| AppError::InternalUnexpected {
+                            message: format!("failed to upsert staging folder: {error}"),
                         })?;
                 }
             }
-            tx.commit().map_err(|error| {
-                AppError::InternalUnexpected { message: format!("failed to commit upsert folders transaction: {error}") }
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert folders transaction: {error}"),
             })?;
             Ok(())
         })
@@ -871,10 +871,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         let folder_id = folder_id.to_string();
         self.with_account_connection(account_id, move |connection, _account_id| {
             connection
-                .execute(
-                    "DELETE FROM live_folders WHERE id = ?1",
-                    params![folder_id],
-                )
+                .execute("DELETE FROM live_folders WHERE id = ?1", params![folder_id])
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live folder: {error}"),
                 })?;
@@ -886,11 +883,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     async fn count_live_folders(&self, account_id: &str) -> AppResult<u32> {
         self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
-                .query_row(
-                    "SELECT COUNT(1) FROM live_folders",
-                    params![],
-                    |row| row.get::<_, i64>(0),
-                )
+                .query_row("SELECT COUNT(1) FROM live_folders", params![], |row| {
+                    row.get::<_, i64>(0)
+                })
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to count live folders: {error}"),
                 })?;
@@ -913,11 +908,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     message: format!("failed to prepare list live folders statement: {error}"),
                 })?;
 
-            let mut rows = statement.query(params![]).map_err(|error| {
-                AppError::InternalUnexpected {
-                    message: format!("failed to query live folders: {error}"),
-                }
-            })?;
+            let mut rows =
+                statement
+                    .query(params![])
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to query live folders: {error}"),
+                    })?;
 
             let mut folders = Vec::new();
             while let Some(row) = rows.next().map_err(|error| AppError::InternalUnexpected {
@@ -952,26 +948,20 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
-                    .map_err(|error| {
-                        AppError::InternalUnexpected { message: format!(
-                            "failed to prepare collection upsert statement: {error}"
-                        ) }
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to prepare collection upsert statement: {error}"),
                     })?;
                 for collection in collections {
                     let payload_json = Self::to_json(&collection, "sync collection")?;
                     statement
                         .execute(params![collection.id, payload_json])
-                        .map_err(|error| {
-                            AppError::InternalUnexpected { message: format!(
-                                "failed to upsert staging collection: {error}"
-                            ) }
+                        .map_err(|error| AppError::InternalUnexpected {
+                            message: format!("failed to upsert staging collection: {error}"),
                         })?;
                 }
             }
-            tx.commit().map_err(|error| {
-                AppError::InternalUnexpected { message: format!(
-                    "failed to commit upsert collections transaction: {error}"
-                ) }
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert collections transaction: {error}"),
             })?;
             Ok(())
         })
@@ -991,20 +981,20 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
-                    .map_err(|error| {
-                        AppError::InternalUnexpected { message: format!("failed to prepare policy upsert statement: {error}") }
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to prepare policy upsert statement: {error}"),
                     })?;
                 for policy in policies {
                     let payload_json = Self::to_json(&policy, "sync policy")?;
                     statement
                         .execute(params![policy.id, payload_json])
-                        .map_err(|error| {
-                            AppError::InternalUnexpected { message: format!("failed to upsert staging policy: {error}") }
+                        .map_err(|error| AppError::InternalUnexpected {
+                            message: format!("failed to upsert staging policy: {error}"),
                         })?;
                 }
             }
-            tx.commit().map_err(|error| {
-                AppError::InternalUnexpected { message: format!("failed to commit upsert policies transaction: {error}") }
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert policies transaction: {error}"),
             })?;
             Ok(())
         })
@@ -1024,21 +1014,21 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
-                    .map_err(|error| {
-                        AppError::InternalUnexpected { message: format!("failed to prepare cipher upsert statement: {error}") }
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to prepare cipher upsert statement: {error}"),
                     })?;
                 for cipher in ciphers {
                     let sanitized = sanitize_cipher_for_persistence(cipher);
                     let payload_json = Self::to_json(&sanitized, "sync cipher")?;
                     statement
                         .execute(params![sanitized.id, payload_json])
-                        .map_err(|error| {
-                            AppError::InternalUnexpected { message: format!("failed to upsert staging cipher: {error}") }
+                        .map_err(|error| AppError::InternalUnexpected {
+                            message: format!("failed to upsert staging cipher: {error}"),
                         })?;
                 }
             }
-            tx.commit().map_err(|error| {
-                AppError::InternalUnexpected { message: format!("failed to commit upsert ciphers transaction: {error}") }
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert ciphers transaction: {error}"),
             })?;
             Ok(())
         })
@@ -1070,10 +1060,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         let cipher_id = cipher_id.to_string();
         self.with_account_connection(account_id, move |connection, _account_id| {
             connection
-                .execute(
-                    "DELETE FROM live_ciphers WHERE id = ?1",
-                    params![cipher_id],
-                )
+                .execute("DELETE FROM live_ciphers WHERE id = ?1", params![cipher_id])
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live cipher: {error}"),
                 })?;
@@ -1085,11 +1072,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32> {
         self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
-                .query_row(
-                    "SELECT COUNT(1) FROM live_ciphers",
-                    params![],
-                    |row| row.get::<_, i64>(0),
-                )
+                .query_row("SELECT COUNT(1) FROM live_ciphers", params![], |row| {
+                    row.get::<_, i64>(0)
+                })
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to count live ciphers: {error}"),
                 })?;
@@ -1183,20 +1168,20 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                         ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
                         "#,
                     )
-                    .map_err(|error| {
-                        AppError::InternalUnexpected { message: format!("failed to prepare send upsert statement: {error}") }
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to prepare send upsert statement: {error}"),
                     })?;
                 for send in sends {
                     let payload_json = Self::to_json(&send, "sync send")?;
                     statement
                         .execute(params![send.id, payload_json])
-                        .map_err(|error| {
-                            AppError::InternalUnexpected { message: format!("failed to upsert staging send: {error}") }
+                        .map_err(|error| AppError::InternalUnexpected {
+                            message: format!("failed to upsert staging send: {error}"),
                         })?;
                 }
             }
-            tx.commit().map_err(|error| {
-                AppError::InternalUnexpected { message: format!("failed to commit upsert sends transaction: {error}") }
+            tx.commit().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to commit upsert sends transaction: {error}"),
             })?;
             Ok(())
         })
@@ -1227,10 +1212,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         let send_id = send_id.to_string();
         self.with_account_connection(account_id, move |connection, _account_id| {
             connection
-                .execute(
-                    "DELETE FROM live_sends WHERE id = ?1",
-                    params![send_id],
-                )
+                .execute("DELETE FROM live_sends WHERE id = ?1", params![send_id])
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to delete live send: {error}"),
                 })?;
@@ -1242,11 +1224,9 @@ impl VaultRepositoryPort for SqliteVaultRepository {
     async fn count_live_sends(&self, account_id: &str) -> AppResult<u32> {
         self.with_account_connection(account_id, move |connection, _account_id| {
             let count = connection
-                .query_row(
-                    "SELECT COUNT(1) FROM live_sends",
-                    params![],
-                    |row| row.get::<_, i64>(0),
-                )
+                .query_row("SELECT COUNT(1) FROM live_sends", params![], |row| {
+                    row.get::<_, i64>(0)
+                })
                 .map_err(|error| AppError::InternalUnexpected {
                     message: format!("failed to count live sends: {error}"),
                 })?;
@@ -1445,12 +1425,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         let db_path = self.db_path_for_account(&account_id);
 
         {
-            let mut connections = self
-                .connections
-                .lock()
-                .map_err(|_| AppError::InternalUnexpected {
-                    message: "failed to lock sqlite connections cache".into(),
-                })?;
+            let mut connections =
+                self.connections
+                    .lock()
+                    .map_err(|_| AppError::InternalUnexpected {
+                        message: "failed to lock sqlite connections cache".into(),
+                    })?;
             connections.remove(&account_id);
         }
 

@@ -45,7 +45,8 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         }
     })?;
 
-    let remote_vault: Arc<dyn RemoteVaultPort> = Arc::new(VaultwardenRemotePort::new(client.clone()));
+    let remote_vault: Arc<dyn RemoteVaultPort> =
+        Arc::new(VaultwardenRemotePort::new(client.clone()));
     let notification_port: Arc<dyn NotificationPort> = Arc::new(VaultwardenNotificationPort::new());
     let sqlite_dir = resolve_sqlite_dir(manager)?;
     let auth_state_path = resolve_auth_state_path(manager)?;

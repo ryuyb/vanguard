@@ -2,9 +2,10 @@ use super::config::VaultwardenConfig;
 use super::endpoints::VaultwardenEndpoints;
 use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
-    PasswordLoginRequest, PreloginRequest, PreloginResponse, RefreshTokenRequest,
-    RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder, SyncResponse, SyncSend,
-    TokenErrorResponse, TokenRequest, TokenResponse, VerifyEmailTokenRequest, GetFoldersResponse,
+    GetFoldersResponse, PasswordLoginRequest, PreloginRequest, PreloginResponse,
+    RefreshTokenRequest, RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder,
+    SyncResponse, SyncSend, TokenErrorResponse, TokenRequest, TokenResponse,
+    VerifyEmailTokenRequest,
 };
 use std::time::Duration;
 
