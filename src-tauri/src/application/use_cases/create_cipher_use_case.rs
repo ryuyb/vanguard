@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use crate::application::cipher_encryption;
 use crate::application::dto::sync::{CipherMutationResult, CreateCipherCommand, SyncCipher};
+use crate::application::dto::vault::VaultUserKeyMaterial;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
@@ -33,6 +35,7 @@ impl CreateCipherUseCase {
         base_url: String,
         access_token: String,
         cipher: SyncCipher,
+        user_key: VaultUserKeyMaterial,
     ) -> AppResult<CipherMutationResult> {
         if account_id.trim().is_empty() {
             return Err(AppError::ValidationRequired {
@@ -47,19 +50,23 @@ impl CreateCipherUseCase {
             });
         }
 
+        // Encrypt cipher before sending to server
+        let encrypted_cipher = cipher_encryption::encrypt_cipher(&cipher, &user_key)?;
+
         let command = CreateCipherCommand {
             account_id: account_id.clone(),
             base_url,
             access_token,
-            cipher,
+            cipher: encrypted_cipher,
         };
 
         let result = self.remote_vault.create_cipher(command).await?;
 
+        // Store the encrypted cipher locally
         let cipher_with_id = SyncCipher {
             id: result.cipher_id.clone(),
             revision_date: Some(result.revision_date.clone()),
-            ..self.build_cipher_from_result(&result)
+            ..cipher
         };
 
         self.vault_repository
@@ -70,38 +77,5 @@ impl CreateCipherUseCase {
             .emit_cipher_created(&account_id, &result.cipher_id);
 
         Ok(result)
-    }
-
-    fn build_cipher_from_result(&self, _result: &CipherMutationResult) -> SyncCipher {
-        SyncCipher {
-            id: String::new(),
-            organization_id: None,
-            folder_id: None,
-            r#type: None,
-            name: None,
-            notes: None,
-            key: None,
-            favorite: None,
-            edit: None,
-            view_password: None,
-            organization_use_totp: None,
-            creation_date: None,
-            revision_date: None,
-            deleted_date: None,
-            archived_date: None,
-            reprompt: None,
-            permissions: None,
-            object: None,
-            fields: Vec::new(),
-            password_history: Vec::new(),
-            collection_ids: Vec::new(),
-            data: None,
-            login: None,
-            secure_note: None,
-            card: None,
-            identity: None,
-            ssh_key: None,
-            attachments: Vec::new(),
-        }
     }
 }

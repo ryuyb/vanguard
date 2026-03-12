@@ -513,6 +513,19 @@ pub async fn create_cipher(
             )
         })?;
 
+    let user_key = state
+        .get_vault_user_key(&account_id)
+        .map_err(|error| log_command_error("create_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "create_cipher",
+                &AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "vault is locked, please unlock first".to_string(),
+                },
+            )
+        })?;
+
     let result = state
         .create_cipher_use_case()
         .execute(
@@ -520,6 +533,7 @@ pub async fn create_cipher(
             session.base_url,
             session.access_token,
             request.cipher,
+            (&user_key).into(),
         )
         .await
         .map_err(|error| log_command_error("create_cipher", &error))?;
@@ -554,6 +568,19 @@ pub async fn update_cipher(
             )
         })?;
 
+    let user_key = state
+        .get_vault_user_key(&account_id)
+        .map_err(|error| log_command_error("update_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "update_cipher",
+                &AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "vault is locked, please unlock first".to_string(),
+                },
+            )
+        })?;
+
     let result = state
         .update_cipher_use_case()
         .execute(
@@ -562,6 +589,7 @@ pub async fn update_cipher(
             session.access_token,
             request.cipher_id,
             request.cipher,
+            (&user_key).into(),
         )
         .await
         .map_err(|error| log_command_error("update_cipher", &error))?;
