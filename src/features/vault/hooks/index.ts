@@ -1,5 +1,7 @@
 export { useCipherDetailSelection } from "./use-cipher-detail-selection";
+export { useCipherEvents } from "./use-cipher-events";
 export { useCipherFieldCopy } from "./use-cipher-field-copy";
+export { useCipherMutations } from "./use-cipher-mutations";
 export { useExpandedFolderKeys } from "./use-expanded-folder-keys";
 export { useFilteredCiphers } from "./use-filtered-ciphers";
 export { useFolderSelectionGuard } from "./use-folder-selection-guard";

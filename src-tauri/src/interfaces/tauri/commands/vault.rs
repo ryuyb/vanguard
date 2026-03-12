@@ -9,6 +9,7 @@ use crate::application::dto::vault::{
 use crate::application::use_cases::copy_cipher_field_use_case::CopyCipherFieldUseCase;
 use crate::application::use_cases::get_cipher_totp_code_use_case::GetCipherTotpCodeUseCase;
 use crate::application::use_cases::get_vault_view_data_use_case::GetVaultViewDataUseCase;
+use crate::application::use_cases::list_ciphers_use_case::ListCiphersUseCase;
 use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
 use crate::application::use_cases::unlock_vault_use_case::UnlockVaultUseCase;
 use crate::application::use_cases::vault_biometric_use_case::VaultBiometricUseCase;
@@ -320,6 +321,35 @@ pub async fn vault_get_view_data(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn vault_list_ciphers(
+    state: State<'_, AppState>,
+) -> Result<Vec<VaultCipherItemDto>, ErrorPayload> {
+    let ciphers = ListCiphersUseCase::new(state.sync_service())
+        .execute(&*state)
+        .await
+        .map_err(|error| log_command_error("vault_list_ciphers", &error))?;
+
+    Ok(ciphers
+        .into_iter()
+        .map(|cipher| VaultCipherItemDto {
+            id: cipher.id,
+            folder_id: cipher.folder_id,
+            organization_id: cipher.organization_id,
+            r#type: cipher.r#type,
+            name: cipher.name,
+            username: cipher.username,
+            uris: cipher.uris,
+            favorite: cipher.favorite,
+            creation_date: cipher.creation_date,
+            revision_date: cipher.revision_date,
+            deleted_date: cipher.deleted_date,
+            attachment_count: cipher.attachment_count,
+        })
+        .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn vault_get_cipher_detail(
     state: State<'_, AppState>,
     request: VaultCipherDetailRequestDto,
@@ -459,6 +489,125 @@ impl From<&VaultUserKey> for VaultUserKeyMaterial {
             mac_key: user_key.mac_key.clone(),
         }
     }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn create_cipher(
+    request: crate::interfaces::tauri::dto::vault::CreateCipherRequestDto,
+    state: State<'_, AppState>,
+) -> Result<crate::interfaces::tauri::dto::vault::CipherMutationResponseDto, ErrorPayload> {
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("create_cipher", &error))?;
+
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("create_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "create_cipher",
+                &AppError::ValidationRequired {
+                    field: "session".to_string(),
+                },
+            )
+        })?;
+
+    let result = state
+        .create_cipher_use_case()
+        .execute(
+            account_id,
+            session.base_url,
+            session.access_token,
+            request.cipher,
+        )
+        .await
+        .map_err(|error| log_command_error("create_cipher", &error))?;
+
+    Ok(
+        crate::interfaces::tauri::dto::vault::CipherMutationResponseDto {
+            cipher_id: result.cipher_id,
+            revision_date: result.revision_date,
+        },
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_cipher(
+    request: crate::interfaces::tauri::dto::vault::UpdateCipherRequestDto,
+    state: State<'_, AppState>,
+) -> Result<crate::interfaces::tauri::dto::vault::CipherMutationResponseDto, ErrorPayload> {
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("update_cipher", &error))?;
+
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("update_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "update_cipher",
+                &AppError::ValidationRequired {
+                    field: "session".to_string(),
+                },
+            )
+        })?;
+
+    let result = state
+        .update_cipher_use_case()
+        .execute(
+            account_id,
+            session.base_url,
+            session.access_token,
+            request.cipher_id,
+            request.cipher,
+        )
+        .await
+        .map_err(|error| log_command_error("update_cipher", &error))?;
+
+    Ok(
+        crate::interfaces::tauri::dto::vault::CipherMutationResponseDto {
+            cipher_id: result.cipher_id,
+            revision_date: result.revision_date,
+        },
+    )
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_cipher(
+    request: crate::interfaces::tauri::dto::vault::DeleteCipherRequestDto,
+    state: State<'_, AppState>,
+) -> Result<(), ErrorPayload> {
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("delete_cipher", &error))?;
+
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("delete_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "delete_cipher",
+                &AppError::ValidationRequired {
+                    field: "session".to_string(),
+                },
+            )
+        })?;
+
+    state
+        .delete_cipher_use_case()
+        .execute(
+            account_id,
+            session.base_url,
+            session.access_token,
+            request.cipher_id,
+        )
+        .await
+        .map_err(|error| log_command_error("delete_cipher", &error))?;
+
+    Ok(())
 }
 
 impl From<VaultUnlockMethodDto> for UnlockMethod {

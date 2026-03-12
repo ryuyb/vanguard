@@ -41,10 +41,14 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_disable_biometric_unlock,
             interfaces::tauri::commands::vault::vault_lock,
             interfaces::tauri::commands::vault::vault_get_view_data,
+            interfaces::tauri::commands::vault::vault_list_ciphers,
             interfaces::tauri::commands::vault::vault_get_cipher_detail,
             interfaces::tauri::commands::vault::vault_copy_cipher_field,
             interfaces::tauri::commands::vault::vault_get_cipher_totp_code,
-            interfaces::tauri::commands::vault::vault_get_icon_server
+            interfaces::tauri::commands::vault::vault_get_icon_server,
+            interfaces::tauri::commands::vault::create_cipher,
+            interfaces::tauri::commands::vault::update_cipher,
+            interfaces::tauri::commands::vault::delete_cipher
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,
@@ -52,7 +56,10 @@ pub fn run() {
             interfaces::tauri::events::sync::VaultSyncFailed,
             interfaces::tauri::events::sync::VaultSyncAuthRequired,
             interfaces::tauri::events::sync::VaultSyncLoggedOut,
-            interfaces::tauri::events::sync::VaultFoldersSynced
+            interfaces::tauri::events::sync::VaultFoldersSynced,
+            interfaces::tauri::events::cipher::CipherCreated,
+            interfaces::tauri::events::cipher::CipherUpdated,
+            interfaces::tauri::events::cipher::CipherDeleted
         ]);
 
     let invoke_handler = specta_builder.invoke_handler();

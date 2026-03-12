@@ -12,6 +12,7 @@ use crate::application::ports::notification_port::NotificationPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::domain::sync::{PushType, SyncTrigger, WsStatus};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -22,6 +23,7 @@ pub struct RealtimeSyncService {
     vault_repository: Arc<dyn VaultRepositoryPort>,
     sync_event_port: Arc<dyn SyncEventPort>,
     sync_service: Arc<SyncService>,
+    fetch_cipher_use_case: Arc<FetchCipherUseCase>,
     sync_policy: SyncPolicy,
     device_identifier: String,
     workers: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
@@ -33,6 +35,7 @@ impl RealtimeSyncService {
         vault_repository: Arc<dyn VaultRepositoryPort>,
         sync_event_port: Arc<dyn SyncEventPort>,
         sync_service: Arc<SyncService>,
+        fetch_cipher_use_case: Arc<FetchCipherUseCase>,
         sync_policy: SyncPolicy,
         device_identifier: String,
     ) -> Self {
@@ -41,6 +44,7 @@ impl RealtimeSyncService {
             vault_repository,
             sync_event_port,
             sync_service,
+            fetch_cipher_use_case,
             sync_policy,
             device_identifier,
             workers: Arc::new(Mutex::new(HashMap::new())),
@@ -547,20 +551,56 @@ impl RealtimeSyncService {
                 .await;
         };
 
-        let command = SyncVaultCommand {
-            account_id: String::from(account_id),
-            base_url: String::from(base_url),
-            access_token: String::from(access_token),
-            exclude_domains: false,
-            trigger: SyncTrigger::WebSocket,
-        };
+        if push_type == PushType::SyncCipherDelete {
+            match self
+                .vault_repository
+                .delete_cipher(account_id, cipher_id)
+                .await
+            {
+                Ok(_) => {
+                    self.sync_event_port
+                        .emit_cipher_deleted(account_id, cipher_id);
+                    log::debug!(
+                        target: "vanguard::sync::ws",
+                        "cipher deleted via websocket account_id={} cipher_id={}",
+                        account_id,
+                        cipher_id
+                    );
+                    return EventOutcome::Continue;
+                }
+                Err(error) => {
+                    log::warn!(
+                        target: "vanguard::sync::ws",
+                        "cipher delete failed account_id={} cipher_id={} error={}",
+                        account_id,
+                        cipher_id,
+                        error
+                    );
+                    return EventOutcome::Continue;
+                }
+            }
+        }
 
         match self
-            .sync_service
-            .sync_cipher_by_id(command, String::from(cipher_id), push_type)
+            .fetch_cipher_use_case
+            .execute(
+                String::from(account_id),
+                String::from(base_url),
+                String::from(access_token),
+                String::from(cipher_id),
+            )
             .await
         {
-            Ok(_) => EventOutcome::Continue,
+            Ok(_) => {
+                log::debug!(
+                    target: "vanguard::sync::ws",
+                    "cipher synced via websocket account_id={} cipher_id={} type={:?}",
+                    account_id,
+                    cipher_id,
+                    push_type
+                );
+                EventOutcome::Continue
+            }
             Err(error) => {
                 log::warn!(
                     target: "vanguard::sync::ws",

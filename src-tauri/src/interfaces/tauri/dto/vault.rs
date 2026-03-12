@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::application::dto::sync::SyncCipher;
 use crate::interfaces::tauri::dto::sync::SyncStatusResponseDto;
 
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -366,4 +367,30 @@ pub struct VaultCipherSshKeyDetailDto {
 pub struct FolderDto {
     pub id: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCipherRequestDto {
+    pub cipher: SyncCipher,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCipherRequestDto {
+    pub cipher_id: String,
+    pub cipher: SyncCipher,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteCipherRequestDto {
+    pub cipher_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CipherMutationResponseDto {
+    pub cipher_id: String,
+    pub revision_date: String,
 }

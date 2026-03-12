@@ -1056,6 +1056,41 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         .await
     }
 
+    async fn upsert_cipher(&self, account_id: &str, cipher: &SyncCipher) -> AppResult<()> {
+        let cipher = cipher.clone();
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            let sanitized = sanitize_cipher_for_persistence(cipher);
+            let payload_json = Self::to_json(&sanitized, "cipher")?;
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO live_ciphers (id, payload_json)
+                    VALUES (?1, ?2)
+                    ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
+                    "#,
+                    params![sanitized.id, payload_json],
+                )
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to upsert cipher: {error}"),
+                })?;
+            Ok(())
+        })
+        .await
+    }
+
+    async fn delete_cipher(&self, account_id: &str, cipher_id: &str) -> AppResult<()> {
+        let cipher_id = cipher_id.to_string();
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            connection
+                .execute("DELETE FROM live_ciphers WHERE id = ?1", params![cipher_id])
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to delete cipher: {error}"),
+                })?;
+            Ok(())
+        })
+        .await
+    }
+
     async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()> {
         let cipher_id = cipher_id.to_string();
         self.with_account_connection(account_id, move |connection, _account_id| {

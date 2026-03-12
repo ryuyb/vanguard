@@ -14,9 +14,13 @@ use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::create_cipher_use_case::CreateCipherUseCase;
+use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
+use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
+use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
 use crate::infrastructure::persistence::{
@@ -80,16 +84,47 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         poll_revision_use_case,
         sync_policy.clone(),
     ));
+    let fetch_cipher_use_case = Arc::new(FetchCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
     let realtime_sync_service = Arc::new(RealtimeSyncService::new(
         notification_port,
-        vault_repository,
-        sync_event_port,
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
         Arc::clone(&sync_service),
+        Arc::clone(&fetch_cipher_use_case),
         sync_policy,
         config.device_identifier,
     ));
     let get_cipher_detail_use_case =
         Arc::new(GetCipherDetailUseCase::new(Arc::clone(&sync_service)));
+
+    let create_cipher_use_case = Arc::new(CreateCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let update_cipher_use_case = Arc::new(UpdateCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let delete_cipher_use_case = Arc::new(DeleteCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let fetch_cipher_use_case = Arc::new(FetchCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
 
     Ok(AppState::new(
         auth_service,
@@ -101,6 +136,10 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         biometric_unlock_port,
         clipboard_port,
         get_cipher_detail_use_case,
+        create_cipher_use_case,
+        update_cipher_use_case,
+        delete_cipher_use_case,
+        fetch_cipher_use_case,
         auth_state_path,
     ))
 }

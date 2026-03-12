@@ -2,7 +2,7 @@ use super::config::VaultwardenConfig;
 use super::endpoints::VaultwardenEndpoints;
 use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
-    GetFoldersResponse, PasswordLoginRequest, PreloginRequest, PreloginResponse,
+    CipherResponse, GetFoldersResponse, PasswordLoginRequest, PreloginRequest, PreloginResponse,
     RefreshTokenRequest, RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder,
     SyncResponse, SyncSend, TokenErrorResponse, TokenRequest, TokenResponse,
     VerifyEmailTokenRequest,
@@ -650,6 +650,102 @@ impl VaultwardenClient {
                 )))
             }
         }
+    }
+
+    pub async fn create_cipher(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        cipher: &SyncCipher,
+    ) -> VaultwardenResult<CipherResponse> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::ciphers(base_url);
+
+        let response = self
+            .http_client
+            .post(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(cipher)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str::<CipherResponse>(&body)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid cipher response: {error}")))
+    }
+
+    pub async fn update_cipher(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        cipher_id: &str,
+        cipher: &SyncCipher,
+    ) -> VaultwardenResult<CipherResponse> {
+        let endpoint = self.cipher_endpoint(base_url, cipher_id)?;
+
+        let response = self
+            .http_client
+            .put(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(cipher)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str::<CipherResponse>(&body)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid cipher response: {error}")))
+    }
+
+    pub async fn delete_cipher(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        cipher_id: &str,
+    ) -> VaultwardenResult<()> {
+        let endpoint = self.cipher_endpoint(base_url, cipher_id)?;
+
+        let response = self
+            .http_client
+            .delete(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        Ok(())
     }
 
     fn validated_base_url(base_url: &str) -> VaultwardenResult<&str> {

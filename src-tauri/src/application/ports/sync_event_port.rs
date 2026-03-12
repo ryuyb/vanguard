@@ -12,4 +12,10 @@ pub trait SyncEventPort: Send + Sync {
     fn emit_auth_required(&self, account_id: &str, status: u16, message: &str);
 
     fn emit_logged_out(&self, account_id: &str, reason: &str);
+
+    fn emit_cipher_created(&self, account_id: &str, cipher_id: &str);
+
+    fn emit_cipher_updated(&self, account_id: &str, cipher_id: &str);
+
+    fn emit_cipher_deleted(&self, account_id: &str, cipher_id: &str);
 }

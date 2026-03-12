@@ -15,7 +15,11 @@ use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
+use crate::application::use_cases::create_cipher_use_case::CreateCipherUseCase;
+use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
+use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
+use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
@@ -81,6 +85,10 @@ pub struct AppState {
     biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
     clipboard_port: Arc<dyn ClipboardPort>,
     get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
+    create_cipher_use_case: Arc<CreateCipherUseCase>,
+    update_cipher_use_case: Arc<UpdateCipherUseCase>,
+    delete_cipher_use_case: Arc<DeleteCipherUseCase>,
+    fetch_cipher_use_case: Arc<FetchCipherUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
     auth_state_path: Arc<PathBuf>,
@@ -101,6 +109,10 @@ impl AppState {
         biometric_unlock_port: Arc<dyn BiometricUnlockPort>,
         clipboard_port: Arc<dyn ClipboardPort>,
         get_cipher_detail_use_case: Arc<GetCipherDetailUseCase>,
+        create_cipher_use_case: Arc<CreateCipherUseCase>,
+        update_cipher_use_case: Arc<UpdateCipherUseCase>,
+        delete_cipher_use_case: Arc<DeleteCipherUseCase>,
+        fetch_cipher_use_case: Arc<FetchCipherUseCase>,
         auth_state_path: PathBuf,
     ) -> Self {
         let persisted_auth_state = match load_persisted_auth_state_from_disk(&auth_state_path) {
@@ -127,6 +139,10 @@ impl AppState {
             biometric_unlock_port,
             clipboard_port,
             get_cipher_detail_use_case,
+            create_cipher_use_case,
+            update_cipher_use_case,
+            delete_cipher_use_case,
+            fetch_cipher_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
             auth_state_path: Arc::new(auth_state_path),
@@ -170,6 +186,22 @@ impl AppState {
 
     pub fn get_cipher_detail_use_case(&self) -> Arc<GetCipherDetailUseCase> {
         Arc::clone(&self.get_cipher_detail_use_case)
+    }
+
+    pub fn create_cipher_use_case(&self) -> Arc<CreateCipherUseCase> {
+        Arc::clone(&self.create_cipher_use_case)
+    }
+
+    pub fn update_cipher_use_case(&self) -> Arc<UpdateCipherUseCase> {
+        Arc::clone(&self.update_cipher_use_case)
+    }
+
+    pub fn delete_cipher_use_case(&self) -> Arc<DeleteCipherUseCase> {
+        Arc::clone(&self.delete_cipher_use_case)
+    }
+
+    pub fn fetch_cipher_use_case(&self) -> Arc<FetchCipherUseCase> {
+        Arc::clone(&self.fetch_cipher_use_case)
     }
 
     pub fn set_vault_user_key(&self, account_id: String, key: VaultUserKey) -> AppResult<()> {

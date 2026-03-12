@@ -719,3 +719,10 @@ pub struct VaultSession {
     pub access_token: String,
     pub refresh_token: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CipherResponse {
+    pub id: String,
+    pub revision_date: String,
+}

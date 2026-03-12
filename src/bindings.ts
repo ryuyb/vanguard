@@ -205,6 +205,14 @@ async vaultGetViewData() : Promise<Result<VaultViewDataResponseDto, ErrorPayload
     else return { status: "error", error: e  as any };
 }
 },
+async vaultListCiphers() : Promise<Result<VaultCipherItemDto[], ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_list_ciphers") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultGetCipherDetail(request: VaultCipherDetailRequestDto) : Promise<Result<VaultCipherDetailResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_detail", { request }) };
@@ -236,6 +244,30 @@ async vaultGetIconServer() : Promise<Result<string, ErrorPayload>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async createCipher(request: CreateCipherRequestDto) : Promise<Result<CipherMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_cipher", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateCipher(request: UpdateCipherRequestDto) : Promise<Result<CipherMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_cipher", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteCipher(request: DeleteCipherRequestDto) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_cipher", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -243,6 +275,9 @@ async vaultGetIconServer() : Promise<Result<string, ErrorPayload>> {
 
 
 export const events = __makeEvents__<{
+cipherCreated: CipherCreated,
+cipherDeleted: CipherDeleted,
+cipherUpdated: CipherUpdated,
 vaultFoldersSynced: VaultFoldersSynced,
 vaultSyncAuthRequired: VaultSyncAuthRequired,
 vaultSyncFailed: VaultSyncFailed,
@@ -250,6 +285,9 @@ vaultSyncLoggedOut: VaultSyncLoggedOut,
 vaultSyncStarted: VaultSyncStarted,
 vaultSyncSucceeded: VaultSyncSucceeded
 }>({
+cipherCreated: "cipher:created",
+cipherDeleted: "cipher:deleted",
+cipherUpdated: "cipher:updated",
 vaultFoldersSynced: "vault-folders:synced",
 vaultSyncAuthRequired: "vault-sync:auth-required",
 vaultSyncFailed: "vault-sync:failed",
@@ -264,7 +302,13 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+export type CipherCreated = { accountId: string; cipherId: string }
+export type CipherDeleted = { accountId: string; cipherId: string }
+export type CipherMutationResponseDto = { cipherId: string; revisionDate: string }
+export type CipherUpdated = { accountId: string; cipherId: string }
+export type CreateCipherRequestDto = { cipher: SyncCipher }
 export type CreateFolderRequest = { name: string }
+export type DeleteCipherRequestDto = { cipherId: string }
 export type DeleteFolderRequest = { folderId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
 export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
@@ -280,6 +324,19 @@ export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; a
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
+export type SyncAttachment = { id: string; key: string | null; file_name: string | null; size: string | null; size_name: string | null; url: string | null; object: string | null }
+export type SyncCipher = { id: string; organization_id: string | null; folder_id: string | null; type: number | null; name: string | null; notes: string | null; key: string | null; favorite: boolean | null; edit: boolean | null; view_password: boolean | null; organization_use_totp: boolean | null; creation_date: string | null; revision_date: string | null; deleted_date: string | null; archived_date: string | null; reprompt: number | null; permissions: SyncCipherPermissions | null; object: string | null; fields: SyncCipherField[]; password_history: SyncCipherPasswordHistory[]; collection_ids: string[]; data: SyncCipherData | null; login: SyncCipherLogin | null; secure_note: SyncCipherSecureNote | null; card: SyncCipherCard | null; identity: SyncCipherIdentity | null; ssh_key: SyncCipherSshKey | null; attachments: SyncAttachment[] }
+export type SyncCipherCard = { cardholder_name: string | null; brand: string | null; number: string | null; exp_month: string | null; exp_year: string | null; code: string | null }
+export type SyncCipherData = { name: string | null; notes: string | null; fields: SyncCipherField[]; password_history: SyncCipherPasswordHistory[]; uri: string | null; uris: SyncCipherLoginUri[]; username: string | null; password: string | null; password_revision_date: string | null; totp: string | null; autofill_on_page_load: boolean | null; fido2_credentials: SyncCipherLoginFido2Credential[]; type: number | null; cardholder_name: string | null; brand: string | null; number: string | null; exp_month: string | null; exp_year: string | null; code: string | null; title: string | null; first_name: string | null; middle_name: string | null; last_name: string | null; address1: string | null; address2: string | null; address3: string | null; city: string | null; state: string | null; postal_code: string | null; country: string | null; company: string | null; email: string | null; phone: string | null; ssn: string | null; passport_number: string | null; license_number: string | null; private_key: string | null; public_key: string | null; key_fingerprint: string | null }
+export type SyncCipherField = { name: string | null; value: string | null; type: number | null; linked_id: number | null }
+export type SyncCipherIdentity = { title: string | null; first_name: string | null; middle_name: string | null; last_name: string | null; address1: string | null; address2: string | null; address3: string | null; city: string | null; state: string | null; postal_code: string | null; country: string | null; company: string | null; email: string | null; phone: string | null; ssn: string | null; username: string | null; passport_number: string | null; license_number: string | null }
+export type SyncCipherLogin = { uri: string | null; uris: SyncCipherLoginUri[]; username: string | null; password: string | null; password_revision_date: string | null; totp: string | null; autofill_on_page_load: boolean | null; fido2_credentials: SyncCipherLoginFido2Credential[] }
+export type SyncCipherLoginFido2Credential = { credential_id: string | null; key_type: string | null; key_algorithm: string | null; key_curve: string | null; key_value: string | null; rp_id: string | null; rp_name: string | null; counter: string | null; user_handle: string | null; user_name: string | null; user_display_name: string | null; discoverable: string | null; creation_date: string | null }
+export type SyncCipherLoginUri = { uri: string | null; match: number | null; uri_checksum: string | null }
+export type SyncCipherPasswordHistory = { password: string | null; last_used_date: string | null }
+export type SyncCipherPermissions = { delete: boolean | null; restore: boolean | null }
+export type SyncCipherSecureNote = { type: number | null }
+export type SyncCipherSshKey = { private_key: string | null; public_key: string | null; key_fingerprint: string | null }
 export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
 export type SyncMetricsDto = { windowSize: number; sampleCount: number; successCount: number; failureCount: number; failureRate: number; lastDurationMs: number | null; averageDurationMs: number | null; lastCounts: SyncCountsDto | null; averageCounts: SyncCountsDto | null }
 export type SyncNowRequestDto = { excludeDomains: boolean | null }
@@ -288,6 +345,7 @@ export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
 export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }
 export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
 export type VaultCipherCardDetailDto = { cardholderName: string | null; brand: string | null; number: string | null; expMonth: string | null; expYear: string | null; code: string | null }

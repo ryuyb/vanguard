@@ -13,6 +13,7 @@ import {
   TRASH_ID,
 } from "@/features/vault/constants";
 import { useCipherDetailSelection } from "@/features/vault/hooks/use-cipher-detail-selection";
+import { useCipherEvents } from "@/features/vault/hooks/use-cipher-events";
 import { useExpandedFolderKeys } from "@/features/vault/hooks/use-expanded-folder-keys";
 import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers";
 import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
@@ -85,6 +86,26 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     selectedCipherId,
     useClearSelectionWhenMissing,
   } = useCipherDetailSelection();
+
+  const loadCiphersList = useCallback(async () => {
+    try {
+      const result = await commands.vaultListCiphers();
+      if (result.status === "error") {
+        errorHandler.handle(result.error);
+        return;
+      }
+
+      setViewData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ciphers: result.data,
+        };
+      });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
   const loadVaultData = useCallback(async () => {
     setIsRefreshing(true);
@@ -165,6 +186,28 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
         return {
           ...prev,
           folders: folderItems,
+        };
+      });
+    },
+  });
+
+  // 监听 cipher 事件，实现细粒度更新
+  useCipherEvents({
+    onCipherCreated: () => {
+      // 创建新 cipher 后只重新加载 ciphers 列表
+      void loadCiphersList();
+    },
+    onCipherUpdated: () => {
+      // 更新 cipher 后只重新加载 ciphers 列表
+      void loadCiphersList();
+    },
+    onCipherDeleted: (cipherId) => {
+      // 删除 cipher 时直接从本地状态移除，避免任何网络请求
+      setViewData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ciphers: prev.ciphers.filter((cipher) => cipher.id !== cipherId),
         };
       });
     },

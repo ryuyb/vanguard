@@ -534,7 +534,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       ))}
 
                       <div className="flex items-center gap-1">
-                        <span className="inline-flex size-6 items-center justify-center" aria-hidden="true">
+                        <span
+                          className="inline-flex size-6 items-center justify-center"
+                          aria-hidden="true"
+                        >
                           <Folder className="size-4 text-slate-400" />
                         </span>
                         <button

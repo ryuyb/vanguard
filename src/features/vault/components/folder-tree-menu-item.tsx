@@ -98,7 +98,10 @@ export function FolderTreeMenuItem({
               </button>
             </CollapsibleTrigger>
           ) : (
-            <span className="inline-flex size-6 items-center justify-center" aria-hidden="true">
+            <span
+              className="inline-flex size-6 items-center justify-center"
+              aria-hidden="true"
+            >
               <Folder className="size-4 text-slate-400" />
             </span>
           )}
@@ -119,14 +122,22 @@ export function FolderTreeMenuItem({
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
-                  onClick={() => onRenameFolder(node.folderId!, node.label)}
+                  onClick={() => {
+                    if (node.folderId) {
+                      onRenameFolder(node.folderId, node.label);
+                    }
+                  }}
                   className="gap-2"
                 >
                   <Edit2 className="size-4" />
                   <span>重命名</span>
                 </ContextMenuItem>
                 <ContextMenuItem
-                  onClick={() => onDeleteFolder(node.folderId!, node.label)}
+                  onClick={() => {
+                    if (node.folderId) {
+                      onDeleteFolder(node.folderId, node.label);
+                    }
+                  }}
                   className="gap-2 text-red-600 focus:text-red-600"
                 >
                   <Trash2 className="size-4" />

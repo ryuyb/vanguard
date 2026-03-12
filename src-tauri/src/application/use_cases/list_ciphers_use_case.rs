@@ -1,0 +1,173 @@
+use std::sync::Arc;
+
+use crate::application::dto::vault::VaultCipherItem;
+use crate::application::ports::vault_runtime_port::VaultRuntimePort;
+use crate::application::services::sync_service::SyncService;
+use crate::application::vault_crypto;
+use crate::support::error::AppError;
+use crate::support::result::AppResult;
+
+#[derive(Clone)]
+pub struct ListCiphersUseCase {
+    sync_service: Arc<SyncService>,
+}
+
+impl ListCiphersUseCase {
+    pub fn new(sync_service: Arc<SyncService>) -> Self {
+        Self { sync_service }
+    }
+
+    pub async fn execute(&self, runtime: &dyn VaultRuntimePort) -> AppResult<Vec<VaultCipherItem>> {
+        let account_id = runtime.active_account_id()?;
+
+        let user_key = runtime
+            .get_vault_user_key_material(&account_id)?
+            .ok_or_else(|| AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "vault is locked, please unlock with master password first".to_string(),
+            })?;
+
+        let total_ciphers = self
+            .sync_service
+            .count_live_ciphers(account_id.clone())
+            .await?;
+
+        let ciphers = if total_ciphers == 0 {
+            Vec::new()
+        } else {
+            self.sync_service
+                .list_live_ciphers(account_id.clone(), 0, total_ciphers)
+                .await?
+        };
+
+        let ciphers = ciphers
+            .into_iter()
+            .map(|cipher| {
+                let login_username = vault_crypto::decrypt_optional_field(
+                    cipher
+                        .login
+                        .as_ref()
+                        .and_then(|login| login.username.clone()),
+                    &user_key,
+                    "cipher.login.username",
+                )?;
+                let data_username = vault_crypto::decrypt_optional_field(
+                    cipher.data.as_ref().and_then(|data| data.username.clone()),
+                    &user_key,
+                    "cipher.data.username",
+                )?;
+                let login_uri = vault_crypto::decrypt_optional_field(
+                    cipher.login.as_ref().and_then(|login| login.uri.clone()),
+                    &user_key,
+                    "cipher.login.uri",
+                )?;
+                let login_uris = cipher
+                    .login
+                    .as_ref()
+                    .map(|login| decrypt_login_uris(&login.uris, &user_key, "cipher.login.uris"))
+                    .transpose()?
+                    .unwrap_or_default();
+                let data_uri = vault_crypto::decrypt_optional_field(
+                    cipher.data.as_ref().and_then(|data| data.uri.clone()),
+                    &user_key,
+                    "cipher.data.uri",
+                )?;
+                let data_uris = cipher
+                    .data
+                    .as_ref()
+                    .map(|data| decrypt_login_uris(&data.uris, &user_key, "cipher.data.uris"))
+                    .transpose()?
+                    .unwrap_or_default();
+
+                Ok(VaultCipherItem {
+                    id: cipher.id,
+                    folder_id: cipher.folder_id,
+                    organization_id: cipher.organization_id,
+                    r#type: cipher.r#type,
+                    name: vault_crypto::decrypt_optional_field(
+                        cipher.name,
+                        &user_key,
+                        "cipher.name",
+                    )?,
+                    username: first_non_empty(login_username, data_username),
+                    uris: collect_cipher_uris(login_uri, login_uris, data_uri, data_uris),
+                    favorite: cipher.favorite,
+                    creation_date: cipher.creation_date,
+                    revision_date: cipher.revision_date,
+                    deleted_date: cipher.deleted_date,
+                    attachment_count: cipher.attachments.len().min(u32::MAX as usize) as u32,
+                })
+            })
+            .collect::<Result<Vec<_>, AppError>>()?;
+
+        Ok(ciphers)
+    }
+}
+
+fn decrypt_login_uris(
+    entries: &[crate::application::dto::sync::SyncCipherLoginUri],
+    user_key: &crate::application::dto::vault::VaultUserKeyMaterial,
+    path: &str,
+) -> Result<Vec<String>, AppError> {
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            vault_crypto::decrypt_optional_field(
+                entry.uri.clone(),
+                user_key,
+                &format!("{path}[{index}].uri"),
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|values| values.into_iter().flatten().collect())
+}
+
+fn first_non_empty(left: Option<String>, right: Option<String>) -> Option<String> {
+    if let Some(value) = left {
+        if !value.trim().is_empty() {
+            return Some(value);
+        }
+    }
+    if let Some(value) = right {
+        if !value.trim().is_empty() {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn collect_cipher_uris(
+    login_uri: Option<String>,
+    login_uris: Vec<String>,
+    data_uri: Option<String>,
+    data_uris: Vec<String>,
+) -> Vec<String> {
+    let mut uris: Vec<String> = Vec::new();
+
+    if let Some(candidate) = login_uri {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    for candidate in login_uris {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    if let Some(candidate) = data_uri {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+    for candidate in data_uris {
+        push_unique_non_empty_uri(&mut uris, candidate);
+    }
+
+    uris
+}
+
+fn push_unique_non_empty_uri(uris: &mut Vec<String>, candidate: String) {
+    let normalized = candidate.trim();
+    if normalized.is_empty() {
+        return;
+    }
+    if uris.iter().any(|existing| existing == normalized) {
+        return;
+    }
+    uris.push(normalized.to_string());
+}

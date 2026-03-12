@@ -8,14 +8,17 @@ use crate::application::dto::auth::{
     WebauthnRequestExtensions as AppWebauthnRequestExtensions,
 };
 use crate::application::dto::sync::{
-    RevisionDateQuery, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload,
+    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RevisionDateQuery, SyncCipher,
+    SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand,
 };
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 use super::error::VaultwardenError;
-use super::mapper::{map_sync_cipher, map_sync_folder, map_sync_response, map_sync_send};
+use super::mapper::{
+    map_cipher_to_remote, map_sync_cipher, map_sync_folder, map_sync_response, map_sync_send,
+};
 use super::models::{
     PasswordLoginRequest, PreloginRequest, RefreshTokenRequest, SendEmailLoginRequest,
     TokenErrorResponse, TokenResponse, TwoFactorProviderHint, VerifyEmailTokenRequest,
@@ -258,6 +261,46 @@ impl RemoteVaultPort for VaultwardenRemotePort {
     async fn get_revision_date(&self, query: RevisionDateQuery) -> AppResult<i64> {
         self.client
             .revision_date(&query.base_url, &query.access_token)
+            .await
+            .map_err(map_vaultwarden_error)
+    }
+
+    async fn create_cipher(&self, command: CreateCipherCommand) -> AppResult<CipherMutationResult> {
+        let remote_cipher = map_cipher_to_remote(&command.cipher);
+        let response = self
+            .client
+            .create_cipher(&command.base_url, &command.access_token, &remote_cipher)
+            .await
+            .map_err(map_vaultwarden_error)?;
+
+        Ok(CipherMutationResult {
+            cipher_id: response.id,
+            revision_date: response.revision_date,
+        })
+    }
+
+    async fn update_cipher(&self, command: UpdateCipherCommand) -> AppResult<CipherMutationResult> {
+        let remote_cipher = map_cipher_to_remote(&command.cipher);
+        let response = self
+            .client
+            .update_cipher(
+                &command.base_url,
+                &command.access_token,
+                &command.cipher_id,
+                &remote_cipher,
+            )
+            .await
+            .map_err(map_vaultwarden_error)?;
+
+        Ok(CipherMutationResult {
+            cipher_id: response.id,
+            revision_date: response.revision_date,
+        })
+    }
+
+    async fn delete_cipher(&self, command: DeleteCipherCommand) -> AppResult<()> {
+        self.client
+            .delete_cipher(&command.base_url, &command.access_token, &command.cipher_id)
             .await
             .map_err(map_vaultwarden_error)
     }

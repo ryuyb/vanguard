@@ -38,8 +38,8 @@ A Tauri-based desktop client for Vaultwarden, aiming for 1Password-like usabilit
 **Rust changes:**
 ```bash
 cargo test
-cargo fmt
 cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt
 ```
 
 **Frontend changes:**

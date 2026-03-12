@@ -1,10 +1,15 @@
 pub mod copy_cipher_field_use_case;
+pub mod create_cipher_use_case;
+pub mod delete_cipher_use_case;
+pub mod fetch_cipher_use_case;
 pub mod get_cipher_detail_use_case;
 pub mod get_cipher_totp_code_use_case;
 pub mod get_vault_view_data_use_case;
+pub mod list_ciphers_use_case;
 pub mod master_password_unlock_use_case;
 pub mod poll_revision_use_case;
 pub mod sync_vault_use_case;
 pub mod unlock_vault_use_case;
+pub mod update_cipher_use_case;
 pub mod vault_biometric_use_case;
 pub mod vault_pin_use_case;

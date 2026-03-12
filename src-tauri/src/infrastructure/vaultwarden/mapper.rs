@@ -360,7 +360,222 @@ pub fn map_sync_send(send: RemoteSyncSend) -> SyncSend {
         object: send.object,
     }
 }
-
+pub fn map_cipher_to_remote(cipher: &SyncCipher) -> RemoteSyncCipher {
+    RemoteSyncCipher {
+        id: cipher.id.clone(),
+        organization_id: cipher.organization_id.clone(),
+        folder_id: cipher.folder_id.clone(),
+        r#type: cipher.r#type,
+        name: cipher.name.clone(),
+        notes: cipher.notes.clone(),
+        key: cipher.key.clone(),
+        favorite: cipher.favorite,
+        edit: cipher.edit,
+        view_password: cipher.view_password,
+        organization_use_totp: cipher.organization_use_totp,
+        creation_date: cipher.creation_date.clone(),
+        revision_date: cipher.revision_date.clone(),
+        deleted_date: cipher.deleted_date.clone(),
+        archived_date: cipher.archived_date.clone(),
+        reprompt: cipher.reprompt,
+        permissions: cipher
+            .permissions
+            .as_ref()
+            .map(|p| RemoteSyncCipherPermissions {
+                delete: p.delete,
+                restore: p.restore,
+            }),
+        object: cipher.object.clone(),
+        fields: cipher
+            .fields
+            .iter()
+            .map(|f| RemoteSyncCipherField {
+                name: f.name.clone(),
+                value: f.value.clone(),
+                r#type: f.r#type,
+                linked_id: f.linked_id,
+            })
+            .collect(),
+        password_history: cipher
+            .password_history
+            .iter()
+            .map(|h| RemoteSyncCipherPasswordHistory {
+                password: h.password.clone(),
+                last_used_date: h.last_used_date.clone(),
+            })
+            .collect(),
+        collection_ids: cipher.collection_ids.clone(),
+        data: cipher.data.as_ref().map(|d| RemoteSyncCipherData {
+            name: d.name.clone(),
+            notes: d.notes.clone(),
+            fields: d
+                .fields
+                .iter()
+                .map(|f| RemoteSyncCipherField {
+                    name: f.name.clone(),
+                    value: f.value.clone(),
+                    r#type: f.r#type,
+                    linked_id: f.linked_id,
+                })
+                .collect(),
+            password_history: d
+                .password_history
+                .iter()
+                .map(|h| RemoteSyncCipherPasswordHistory {
+                    password: h.password.clone(),
+                    last_used_date: h.last_used_date.clone(),
+                })
+                .collect(),
+            uri: d.uri.clone(),
+            uris: d
+                .uris
+                .iter()
+                .map(|u| RemoteSyncCipherLoginUri {
+                    uri: u.uri.clone(),
+                    r#match: u.r#match,
+                    uri_checksum: u.uri_checksum.clone(),
+                })
+                .collect(),
+            username: d.username.clone(),
+            password: d.password.clone(),
+            password_revision_date: d.password_revision_date.clone(),
+            totp: d.totp.clone(),
+            autofill_on_page_load: d.autofill_on_page_load,
+            fido2_credentials: d
+                .fido2_credentials
+                .iter()
+                .map(|c| RemoteSyncCipherLoginFido2Credential {
+                    credential_id: c.credential_id.clone(),
+                    key_type: c.key_type.clone(),
+                    key_algorithm: c.key_algorithm.clone(),
+                    key_curve: c.key_curve.clone(),
+                    key_value: c.key_value.clone(),
+                    rp_id: c.rp_id.clone(),
+                    rp_name: c.rp_name.clone(),
+                    counter: c.counter.clone(),
+                    user_handle: c.user_handle.clone(),
+                    user_name: c.user_name.clone(),
+                    user_display_name: c.user_display_name.clone(),
+                    discoverable: c.discoverable.clone(),
+                    creation_date: c.creation_date.clone(),
+                })
+                .collect(),
+            r#type: d.r#type,
+            cardholder_name: d.cardholder_name.clone(),
+            brand: d.brand.clone(),
+            number: d.number.clone(),
+            exp_month: d.exp_month.clone(),
+            exp_year: d.exp_year.clone(),
+            code: d.code.clone(),
+            title: d.title.clone(),
+            first_name: d.first_name.clone(),
+            middle_name: d.middle_name.clone(),
+            last_name: d.last_name.clone(),
+            address1: d.address1.clone(),
+            address2: d.address2.clone(),
+            address3: d.address3.clone(),
+            city: d.city.clone(),
+            state: d.state.clone(),
+            postal_code: d.postal_code.clone(),
+            country: d.country.clone(),
+            company: d.company.clone(),
+            email: d.email.clone(),
+            phone: d.phone.clone(),
+            ssn: d.ssn.clone(),
+            passport_number: d.passport_number.clone(),
+            license_number: d.license_number.clone(),
+            private_key: d.private_key.clone(),
+            public_key: d.public_key.clone(),
+            key_fingerprint: d.key_fingerprint.clone(),
+        }),
+        login: cipher.login.as_ref().map(|l| RemoteSyncCipherLogin {
+            uri: l.uri.clone(),
+            uris: l
+                .uris
+                .iter()
+                .map(|u| RemoteSyncCipherLoginUri {
+                    uri: u.uri.clone(),
+                    r#match: u.r#match,
+                    uri_checksum: u.uri_checksum.clone(),
+                })
+                .collect(),
+            username: l.username.clone(),
+            password: l.password.clone(),
+            password_revision_date: l.password_revision_date.clone(),
+            totp: l.totp.clone(),
+            autofill_on_page_load: l.autofill_on_page_load,
+            fido2_credentials: l
+                .fido2_credentials
+                .iter()
+                .map(|c| RemoteSyncCipherLoginFido2Credential {
+                    credential_id: c.credential_id.clone(),
+                    key_type: c.key_type.clone(),
+                    key_algorithm: c.key_algorithm.clone(),
+                    key_curve: c.key_curve.clone(),
+                    key_value: c.key_value.clone(),
+                    rp_id: c.rp_id.clone(),
+                    rp_name: c.rp_name.clone(),
+                    counter: c.counter.clone(),
+                    user_handle: c.user_handle.clone(),
+                    user_name: c.user_name.clone(),
+                    user_display_name: c.user_display_name.clone(),
+                    discoverable: c.discoverable.clone(),
+                    creation_date: c.creation_date.clone(),
+                })
+                .collect(),
+        }),
+        secure_note: cipher
+            .secure_note
+            .as_ref()
+            .map(|n| RemoteSyncCipherSecureNote { r#type: n.r#type }),
+        card: cipher.card.as_ref().map(|c| RemoteSyncCipherCard {
+            cardholder_name: c.cardholder_name.clone(),
+            brand: c.brand.clone(),
+            number: c.number.clone(),
+            exp_month: c.exp_month.clone(),
+            exp_year: c.exp_year.clone(),
+            code: c.code.clone(),
+        }),
+        identity: cipher.identity.as_ref().map(|i| RemoteSyncCipherIdentity {
+            title: i.title.clone(),
+            first_name: i.first_name.clone(),
+            middle_name: i.middle_name.clone(),
+            last_name: i.last_name.clone(),
+            address1: i.address1.clone(),
+            address2: i.address2.clone(),
+            address3: i.address3.clone(),
+            city: i.city.clone(),
+            state: i.state.clone(),
+            postal_code: i.postal_code.clone(),
+            country: i.country.clone(),
+            company: i.company.clone(),
+            email: i.email.clone(),
+            phone: i.phone.clone(),
+            ssn: i.ssn.clone(),
+            username: i.username.clone(),
+            passport_number: i.passport_number.clone(),
+            license_number: i.license_number.clone(),
+        }),
+        ssh_key: cipher.ssh_key.as_ref().map(|s| RemoteSyncCipherSshKey {
+            private_key: s.private_key.clone(),
+            public_key: s.public_key.clone(),
+            key_fingerprint: s.key_fingerprint.clone(),
+        }),
+        attachments: cipher
+            .attachments
+            .iter()
+            .map(|a| RemoteSyncAttachment {
+                id: a.id.clone(),
+                key: a.key.clone(),
+                file_name: a.file_name.clone(),
+                size: a.size.clone(),
+                size_name: a.size_name.clone(),
+                url: a.url.clone(),
+                object: a.object.clone(),
+            })
+            .collect(),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::map_sync_cipher;

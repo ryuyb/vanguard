@@ -1,5 +1,6 @@
 use crate::domain::sync::{SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 #[derive(Debug, Clone)]
 pub struct SyncVaultCommand {
@@ -10,7 +11,7 @@ pub struct SyncVaultCommand {
     pub trigger: SyncTrigger,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncVaultPayload {
     pub profile: SyncProfile,
     pub folders: Vec<SyncFolder>,
@@ -47,7 +48,7 @@ pub struct SyncMetricsSummary {
     pub average_item_counts: Option<SyncItemCounts>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncProfile {
     pub id: String,
     pub name: Option<String>,
@@ -55,7 +56,7 @@ pub struct SyncProfile {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncFolder {
     pub id: String,
     pub name: Option<String>,
@@ -63,7 +64,7 @@ pub struct SyncFolder {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCollection {
     pub id: String,
     pub organization_id: Option<String>,
@@ -72,7 +73,7 @@ pub struct SyncCollection {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncPolicy {
     pub id: String,
     pub organization_id: Option<String>,
@@ -81,7 +82,7 @@ pub struct SyncPolicy {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipher {
     pub id: String,
     pub organization_id: Option<String>,
@@ -113,7 +114,7 @@ pub struct SyncCipher {
     pub attachments: Vec<SyncAttachment>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncAttachment {
     pub id: String,
     pub key: Option<String>,
@@ -124,13 +125,13 @@ pub struct SyncAttachment {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherPermissions {
     pub delete: Option<bool>,
     pub restore: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherField {
     pub name: Option<String>,
     pub value: Option<String>,
@@ -138,13 +139,13 @@ pub struct SyncCipherField {
     pub linked_id: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherPasswordHistory {
     pub password: Option<String>,
     pub last_used_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherData {
     pub name: Option<String>,
     pub notes: Option<String>,
@@ -187,7 +188,7 @@ pub struct SyncCipherData {
     pub key_fingerprint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherLogin {
     pub uri: Option<String>,
     pub uris: Vec<SyncCipherLoginUri>,
@@ -199,14 +200,14 @@ pub struct SyncCipherLogin {
     pub fido2_credentials: Vec<SyncCipherLoginFido2Credential>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherLoginUri {
     pub uri: Option<String>,
     pub r#match: Option<i32>,
     pub uri_checksum: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherLoginFido2Credential {
     pub credential_id: Option<String>,
     pub key_type: Option<String>,
@@ -223,12 +224,12 @@ pub struct SyncCipherLoginFido2Credential {
     pub creation_date: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherSecureNote {
     pub r#type: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherCard {
     pub cardholder_name: Option<String>,
     pub brand: Option<String>,
@@ -238,7 +239,7 @@ pub struct SyncCipherCard {
     pub code: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherIdentity {
     pub title: Option<String>,
     pub first_name: Option<String>,
@@ -260,14 +261,14 @@ pub struct SyncCipherIdentity {
     pub license_number: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncCipherSshKey {
     pub private_key: Option<String>,
     pub public_key: Option<String>,
     pub key_fingerprint: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncSend {
     pub id: String,
     pub r#type: Option<i32>,
@@ -277,19 +278,19 @@ pub struct SyncSend {
     pub object: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncDomains {
     pub equivalent_domains: Vec<Vec<String>>,
     pub global_equivalent_domains: Vec<Vec<String>>,
     pub excluded_global_equivalent_domains: Vec<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncUserDecryption {
     pub master_password_unlock: Option<SyncMasterPasswordUnlock>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncMasterPasswordUnlock {
     pub kdf: Option<SyncKdfParams>,
     pub master_key_encrypted_user_key: Option<String>,
@@ -297,10 +298,41 @@ pub struct SyncMasterPasswordUnlock {
     pub salt: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncKdfParams {
     pub kdf_type: Option<i32>,
     pub iterations: Option<i32>,
     pub memory: Option<i32>,
     pub parallelism: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateCipherCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub cipher: SyncCipher,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateCipherCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub cipher_id: String,
+    pub cipher: SyncCipher,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteCipherCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub cipher_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CipherMutationResult {
+    pub cipher_id: String,
+    pub revision_date: String,
 }

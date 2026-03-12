@@ -68,6 +68,10 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn upsert_cipher_live(&self, account_id: &str, cipher: SyncCipher) -> AppResult<()>;
 
+    async fn upsert_cipher(&self, account_id: &str, cipher: &SyncCipher) -> AppResult<()>;
+
+    async fn delete_cipher(&self, account_id: &str, cipher_id: &str) -> AppResult<()>;
+
     async fn delete_cipher_live(&self, account_id: &str, cipher_id: &str) -> AppResult<()>;
 
     async fn count_live_ciphers(&self, account_id: &str) -> AppResult<u32>;

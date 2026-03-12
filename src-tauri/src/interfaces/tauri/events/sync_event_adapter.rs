@@ -3,6 +3,7 @@ use tauri_specta::Event;
 
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::domain::sync::SyncContext;
+use crate::interfaces::tauri::events::cipher::{CipherCreated, CipherDeleted, CipherUpdated};
 use crate::interfaces::tauri::events::sync::{
     VaultFoldersSynced, VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut,
     VaultSyncStarted, VaultSyncSucceeded,
@@ -104,6 +105,48 @@ impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
             log::warn!(
                 target: "vanguard::tauri::sync",
                 "failed to emit vault-sync-logged-out for account_id={account_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_cipher_created(&self, account_id: &str, cipher_id: &str) {
+        if let Err(error) = (CipherCreated {
+            account_id: String::from(account_id),
+            cipher_id: String::from(cipher_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::cipher",
+                "failed to emit cipher:created for account_id={account_id} cipher_id={cipher_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_cipher_updated(&self, account_id: &str, cipher_id: &str) {
+        if let Err(error) = (CipherUpdated {
+            account_id: String::from(account_id),
+            cipher_id: String::from(cipher_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::cipher",
+                "failed to emit cipher:updated for account_id={account_id} cipher_id={cipher_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_cipher_deleted(&self, account_id: &str, cipher_id: &str) {
+        if let Err(error) = (CipherDeleted {
+            account_id: String::from(account_id),
+            cipher_id: String::from(cipher_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::cipher",
+                "failed to emit cipher:deleted for account_id={account_id} cipher_id={cipher_id}: {error}"
             );
         }
     }
