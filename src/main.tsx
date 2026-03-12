@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import "./main.css";
 
+import { TanStackDevtools } from "@tanstack/react-devtools";
+import { formDevtoolsPlugin } from "@tanstack/react-form-devtools";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -51,5 +53,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <RouterProvider router={router} />
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
+    <TanStackDevtools plugins={[formDevtoolsPlugin()]} />
   </StrictMode>,
 );
