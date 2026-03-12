@@ -4,6 +4,11 @@ Vanguard is a desktop client for Vaultwarden with a 1Password-like experience.
 
 It is built for people who want a clean, native-feeling Vaultwarden app on desktop without extra setup complexity.
 
+> [!CAUTION]
+> ⚠️ Vanguard is still incomplete and under active development.
+> It may contain bugs and may damage or corrupt saved data.
+> Use it with caution, and avoid relying on it as the only copy of important vault data.
+
 ## Platform Support
 
 - macOS only (current release)
