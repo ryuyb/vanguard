@@ -251,13 +251,19 @@ fn decrypt_aes_cbc(iv: &[u8], ciphertext: &[u8], enc_key: &[u8]) -> Result<Vec<u
 
 /// Encrypts a string using AES-256-CBC with HMAC-SHA256 (encryption type 2)
 /// Returns a CipherString in the format: "2.iv|ciphertext|mac"
-pub fn encrypt_cipher_string(plaintext: &str, key: &VaultUserKeyMaterial) -> Result<String, AppError> {
+pub fn encrypt_cipher_string(
+    plaintext: &str,
+    key: &VaultUserKeyMaterial,
+) -> Result<String, AppError> {
     encrypt_cipher_bytes(plaintext.as_bytes(), key)
 }
 
 /// Encrypts bytes using AES-256-CBC with HMAC-SHA256 (encryption type 2)
 /// Returns a CipherString in the format: "2.iv|ciphertext|mac"
-pub fn encrypt_cipher_bytes(plaintext: &[u8], key: &VaultUserKeyMaterial) -> Result<String, AppError> {
+pub fn encrypt_cipher_bytes(
+    plaintext: &[u8],
+    key: &VaultUserKeyMaterial,
+) -> Result<String, AppError> {
     // Generate random IV (16 bytes for AES-256-CBC)
     let mut iv = [0u8; 16];
     rand::rng().fill(&mut iv);
@@ -272,7 +278,7 @@ pub fn encrypt_cipher_bytes(plaintext: &[u8], key: &VaultUserKeyMaterial) -> Res
         // Format: "2.iv|ciphertext|mac"
         Ok(format!(
             "2.{}|{}|{}",
-            STANDARD.encode(&iv),
+            STANDARD.encode(iv),
             STANDARD.encode(&ciphertext),
             STANDARD.encode(&mac)
         ))
@@ -280,7 +286,7 @@ pub fn encrypt_cipher_bytes(plaintext: &[u8], key: &VaultUserKeyMaterial) -> Res
         // Format: "0.iv|ciphertext" (type 0, no MAC)
         Ok(format!(
             "0.{}|{}",
-            STANDARD.encode(&iv),
+            STANDARD.encode(iv),
             STANDARD.encode(&ciphertext)
         ))
     }
@@ -311,12 +317,11 @@ fn encrypt_aes_cbc(iv: &[u8], plaintext: &[u8], enc_key: &[u8]) -> Result<Vec<u8
 }
 
 fn calculate_mac(iv: &[u8], ciphertext: &[u8], mac_key: &[u8]) -> Result<Vec<u8>, AppError> {
-    let mut signer = HmacSha256::new_from_slice(mac_key).map_err(|error| {
-        AppError::ValidationFieldError {
+    let mut signer =
+        HmacSha256::new_from_slice(mac_key).map_err(|error| AppError::ValidationFieldError {
             field: "unknown".to_string(),
             message: format!("invalid mac key: {error}"),
-        }
-    })?;
+        })?;
     signer.update(iv);
     signer.update(ciphertext);
     Ok(signer.finalize().into_bytes().to_vec())

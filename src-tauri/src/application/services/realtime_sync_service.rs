@@ -12,7 +12,7 @@ use crate::application::ports::notification_port::NotificationPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::sync_service::SyncService;
-use crate::domain::sync::{SyncTrigger, WsStatus};
+use crate::domain::sync::{PushType, SyncTrigger, WsStatus};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -350,50 +350,60 @@ impl RealtimeSyncService {
             event.received_at_ms
         );
 
-        if event.event_type == 11 {
+        let Some(push_type) = PushType::from_i32(event.event_type) else {
+            log::debug!(
+                target: "vanguard::sync::ws",
+                "ignored unknown websocket event type account_id={} type={}",
+                account_id,
+                event.event_type
+            );
+            return EventOutcome::Continue;
+        };
+
+        if push_type.is_logout() {
             return self.handle_logout_event(account_id);
         }
 
-        if is_incremental_cipher_event_type(event.event_type) {
+        if push_type.is_incremental_cipher_event() {
             let cipher_id = extract_payload_id(event.payload.as_ref());
             return self
                 .trigger_websocket_incremental_cipher_sync(
                     account_id,
                     base_url,
                     access_token,
-                    event.event_type,
+                    push_type,
                     cipher_id.as_deref(),
                 )
                 .await;
         }
 
-        if is_incremental_folder_event_type(event.event_type) {
+        if push_type.is_incremental_folder_event() {
             let folder_id = extract_payload_id(event.payload.as_ref());
             return self
                 .trigger_websocket_incremental_folder_sync(
                     account_id,
                     base_url,
                     access_token,
-                    event.event_type,
+                    push_type,
                     folder_id.as_deref(),
                 )
                 .await;
         }
 
-        if is_incremental_send_event_type(event.event_type) {
+        if push_type.is_incremental_send_event() {
             let send_id = extract_payload_id(event.payload.as_ref());
             return self
                 .trigger_websocket_incremental_send_sync(
                     account_id,
                     base_url,
                     access_token,
-                    event.event_type,
+                    push_type,
                     send_id.as_deref(),
                 )
                 .await;
         }
 
-        if is_sync_event_type(event.event_type) {
+        if push_type.is_sync_event() {
             let burst_outcome = self.collect_sync_burst(account_id).await;
             if matches!(burst_outcome, BurstOutcome::Stop) {
                 return EventOutcome::Stop;
@@ -413,15 +423,15 @@ impl RealtimeSyncService {
             }
 
             return self
-                .trigger_websocket_sync(account_id, base_url, access_token, event.event_type)
+                .trigger_websocket_sync(account_id, base_url, access_token, push_type)
                 .await;
         }
 
         log::debug!(
             target: "vanguard::sync::ws",
-            "ignored websocket event account_id={} type={}",
+            "ignored websocket event account_id={} type={:?}",
             account_id,
-            event.event_type
+            push_type
         );
         EventOutcome::Continue
     }
@@ -448,12 +458,14 @@ impl RealtimeSyncService {
                         continue;
                     }
 
-                    if event.event_type == 11 {
-                        return self.handle_logout_event(account_id).into();
-                    }
-                    if is_sync_event_type(event.event_type) {
-                        merged_count = merged_count.saturating_add(1);
-                        continue;
+                    if let Some(push_type) = PushType::from_i32(event.event_type) {
+                        if push_type.is_logout() {
+                            return self.handle_logout_event(account_id).into();
+                        }
+                        if push_type.is_sync_event() {
+                            merged_count = merged_count.saturating_add(1);
+                            continue;
+                        }
                     }
 
                     log::debug!(
@@ -489,7 +501,7 @@ impl RealtimeSyncService {
         account_id: &str,
         base_url: &str,
         access_token: &str,
-        event_type: i32,
+        push_type: PushType,
     ) -> EventOutcome {
         let command = SyncVaultCommand {
             account_id: String::from(account_id),
@@ -501,9 +513,9 @@ impl RealtimeSyncService {
         if let Err(error) = self.sync_service.sync_now(command).await {
             log::warn!(
                 target: "vanguard::sync::ws",
-                "websocket-triggered sync failed account_id={} type={} status={} error_code={} message={}",
+                "websocket-triggered sync failed account_id={} type={:?} status={} error_code={} message={}",
                 account_id,
-                event_type,
+                push_type,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
                 error
@@ -520,18 +532,18 @@ impl RealtimeSyncService {
         account_id: &str,
         base_url: &str,
         access_token: &str,
-        event_type: i32,
+        push_type: PushType,
         cipher_id: Option<&str>,
     ) -> EventOutcome {
         let Some(cipher_id) = cipher_id else {
             log::debug!(
                 target: "vanguard::sync::ws",
-                "incremental websocket sync fallback to full sync due to missing cipher id account_id={} type={}",
+                "incremental websocket sync fallback to full sync due to missing cipher id account_id={} type={:?}",
                 account_id,
-                event_type
+                push_type
             );
             return self
-                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .trigger_websocket_sync(account_id, base_url, access_token, push_type)
                 .await;
         };
 
@@ -545,16 +557,16 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_cipher_by_id(command, String::from(cipher_id), event_type)
+            .sync_cipher_by_id(command, String::from(cipher_id), push_type as i32)
             .await
         {
             Ok(_) => EventOutcome::Continue,
             Err(error) => {
                 log::warn!(
                     target: "vanguard::sync::ws",
-                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} cipher_id={} status={} error_code={} message={}",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={:?} cipher_id={} status={} error_code={} message={}",
                     account_id,
-                    event_type,
+                    push_type,
                     cipher_id,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
@@ -563,7 +575,7 @@ impl RealtimeSyncService {
                 if is_auth_status_error(&error) {
                     return EventOutcome::Stop;
                 }
-                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                self.trigger_websocket_sync(account_id, base_url, access_token, push_type)
                     .await
             }
         }
@@ -574,18 +586,18 @@ impl RealtimeSyncService {
         account_id: &str,
         base_url: &str,
         access_token: &str,
-        event_type: i32,
+        push_type: PushType,
         folder_id: Option<&str>,
     ) -> EventOutcome {
         let Some(folder_id) = folder_id else {
             log::debug!(
                 target: "vanguard::sync::ws",
-                "incremental websocket sync fallback to full sync due to missing folder id account_id={} type={}",
+                "incremental websocket sync fallback to full sync due to missing folder id account_id={} type={:?}",
                 account_id,
-                event_type
+                push_type
             );
             return self
-                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .trigger_websocket_sync(account_id, base_url, access_token, push_type)
                 .await;
         };
 
@@ -599,16 +611,16 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_folder_by_id(command, String::from(folder_id), event_type)
+            .sync_folder_by_id(command, String::from(folder_id), push_type as i32)
             .await
         {
             Ok(_) => EventOutcome::Continue,
             Err(error) => {
                 log::warn!(
                     target: "vanguard::sync::ws",
-                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} folder_id={} status={} error_code={} message={}",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={:?} folder_id={} status={} error_code={} message={}",
                     account_id,
-                    event_type,
+                    push_type,
                     folder_id,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
@@ -617,7 +629,7 @@ impl RealtimeSyncService {
                 if is_auth_status_error(&error) {
                     return EventOutcome::Stop;
                 }
-                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                self.trigger_websocket_sync(account_id, base_url, access_token, push_type)
                     .await
             }
         }
@@ -628,18 +640,18 @@ impl RealtimeSyncService {
         account_id: &str,
         base_url: &str,
         access_token: &str,
-        event_type: i32,
+        push_type: PushType,
         send_id: Option<&str>,
     ) -> EventOutcome {
         let Some(send_id) = send_id else {
             log::debug!(
                 target: "vanguard::sync::ws",
-                "incremental websocket sync fallback to full sync due to missing send id account_id={} type={}",
+                "incremental websocket sync fallback to full sync due to missing send id account_id={} type={:?}",
                 account_id,
-                event_type
+                push_type
             );
             return self
-                .trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                .trigger_websocket_sync(account_id, base_url, access_token, push_type)
                 .await;
         };
 
@@ -653,16 +665,16 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_send_by_id(command, String::from(send_id), event_type)
+            .sync_send_by_id(command, String::from(send_id), push_type as i32)
             .await
         {
             Ok(_) => EventOutcome::Continue,
             Err(error) => {
                 log::warn!(
                     target: "vanguard::sync::ws",
-                    "incremental websocket sync failed and will fallback to full sync account_id={} type={} send_id={} status={} error_code={} message={}",
+                    "incremental websocket sync failed and will fallback to full sync account_id={} type={:?} send_id={} status={} error_code={} message={}",
                     account_id,
-                    event_type,
+                    push_type,
                     send_id,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
@@ -671,7 +683,7 @@ impl RealtimeSyncService {
                 if is_auth_status_error(&error) {
                     return EventOutcome::Stop;
                 }
-                self.trigger_websocket_sync(account_id, base_url, access_token, event_type)
+                self.trigger_websocket_sync(account_id, base_url, access_token, push_type)
                     .await
             }
         }
@@ -806,25 +818,6 @@ fn is_retryable_ws_error(error: &AppError) -> bool {
             | AppError::ValidationFormatError { .. }
             | AppError::ValidationRequired { .. }
     )
-}
-
-fn is_sync_event_type(event_type: i32) -> bool {
-    matches!(
-        event_type,
-        0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 10 | 12 | 13 | 14
-    )
-}
-
-fn is_incremental_cipher_event_type(event_type: i32) -> bool {
-    matches!(event_type, 0..=2)
-}
-
-fn is_incremental_folder_event_type(event_type: i32) -> bool {
-    matches!(event_type, 3 | 7 | 8)
-}
-
-fn is_incremental_send_event_type(event_type: i32) -> bool {
-    matches!(event_type, 12..=14)
 }
 
 fn extract_payload_id(payload: Option<&JsonValue>) -> Option<String> {

@@ -1,3 +1,7 @@
+mod push_type;
+
+pub use push_type::PushType;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncState {
     Idle,
