@@ -46,13 +46,14 @@ cargo clippy --all-targets --all-features -- -D warnings
 ```bash
 pnpm run biome:write
 pnpm run biome:format
+pnpm build
 ```
 
 Fix all issues before committing.
 
 ### Commit Messages
 
-Follow **Conventional Commits** specification:
+Follow **Conventional Commits** specification, use English:
 ```
 <type>(<scope>): <subject>
 

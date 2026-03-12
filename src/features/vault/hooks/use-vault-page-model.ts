@@ -9,6 +9,7 @@ import {
   ALL_ITEMS_ID,
   DEFAULT_ICON_SERVER,
   FAVORITES_ID,
+  NO_FOLDER_ID,
   TRASH_ID,
 } from "@/features/vault/constants";
 import { useCipherDetailSelection } from "@/features/vault/hooks/use-cipher-detail-selection";
@@ -338,6 +339,14 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     [viewData?.ciphers],
   );
 
+  const noFolderCipherCount = useMemo(
+    () =>
+      (viewData?.ciphers ?? []).filter(
+        (cipher) => !cipher.folderId && cipher.deletedDate == null,
+      ).length,
+    [viewData?.ciphers],
+  );
+
   const selectedMenuName = useMemo(() => {
     if (selectedMenuId === ALL_ITEMS_ID) {
       return "All items";
@@ -347,6 +356,9 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     }
     if (selectedMenuId === TRASH_ID) {
       return "Trash";
+    }
+    if (selectedMenuId === NO_FOLDER_ID) {
+      return "无文件夹";
     }
     return (
       sortedFolders.find((folder) => folder.id === selectedMenuId)?.name ??
@@ -399,6 +411,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     logoutLabel,
     markCipherIconFallback,
     markCipherIconLoaded,
+    noFolderCipherCount,
     onFolderTreeOpenChange,
     onLock,
     onLogout,
@@ -443,10 +456,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     isLoggingOut: boolean;
     isRefreshing: boolean;
     loadCipherDetail: (cipherId: string) => Promise<void>;
+    loadVaultData: () => Promise<void>;
     lockLabel: string;
     logoutLabel: string;
     markCipherIconFallback: (cipherId: string) => void;
     markCipherIconLoaded: (cipherId: string) => void;
+    noFolderCipherCount: number;
     onFolderTreeOpenChange: (nodeKey: string, open: boolean) => void;
     onLock: () => Promise<void>;
     onLogout: () => Promise<void>;

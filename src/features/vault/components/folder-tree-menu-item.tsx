@@ -1,4 +1,4 @@
-import { ChevronRight, Edit2, FolderPlus, Trash2 } from "lucide-react";
+import { ChevronRight, Edit2, Folder, FolderPlus, Trash2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -98,14 +98,17 @@ export function FolderTreeMenuItem({
               </button>
             </CollapsibleTrigger>
           ) : (
-            <span className="inline-block size-6" aria-hidden="true" />
+            <span className="inline-flex size-6 items-center justify-center" aria-hidden="true">
+              <Folder className="size-4 text-slate-400" />
+            </span>
           )}
 
-          {node.folderId && onRenameFolder && onDeleteFolder && onCreateSubFolder ? (
+          {node.folderId &&
+          onRenameFolder &&
+          onDeleteFolder &&
+          onCreateSubFolder ? (
             <ContextMenu>
-              <ContextMenuTrigger asChild>
-                {folderButton}
-              </ContextMenuTrigger>
+              <ContextMenuTrigger asChild>{folderButton}</ContextMenuTrigger>
               <ContextMenuContent className="w-48">
                 <ContextMenuItem
                   onClick={() => onCreateSubFolder(node.key)}

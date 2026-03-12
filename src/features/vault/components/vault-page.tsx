@@ -2,6 +2,7 @@ import {
   Archive,
   ArrowUpDown,
   ChevronDown,
+  Folder,
   FolderPlus,
   LoaderCircle,
   Lock,
@@ -43,14 +44,15 @@ import {
   FAVORITES_ID,
   FolderTreeMenuItem,
   ICON_OBSERVER_CONFIG,
+  NO_FOLDER_ID,
   TRASH_ID,
   toTypeFilterLabel,
   VaultSettingsDialog,
 } from "@/features/vault";
-import { FolderDialog } from "@/features/vault/components/folder-dialog";
 import { DeleteFolderDialog } from "@/features/vault/components/delete-folder-dialog";
-import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
+import { FolderDialog } from "@/features/vault/components/folder-dialog";
 import { useVaultPageModel } from "@/features/vault/hooks";
+import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
 import { getCipherIconUrl } from "@/features/vault/utils";
 import { toast } from "@/lib/toast";
@@ -104,7 +106,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   // 文件夹操作状态
-  const [folderDialogMode, setFolderDialogMode] = useState<"create" | "rename">("create");
+  const [folderDialogMode, setFolderDialogMode] = useState<"create" | "rename">(
+    "create",
+  );
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -135,6 +139,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     logoutLabel,
     markCipherIconFallback,
     markCipherIconLoaded,
+    noFolderCipherCount,
     onFolderTreeOpenChange,
     onLock,
     onLogout,
@@ -209,7 +214,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         },
         onError: (error) => {
           toast.error("创建失败", {
-            description: error instanceof Error ? error.message : "创建文件夹时发生错误",
+            description:
+              error instanceof Error ? error.message : "创建文件夹时发生错误",
           });
         },
       });
@@ -225,10 +231,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
           },
           onError: (error) => {
             toast.error("重命名失败", {
-              description: error instanceof Error ? error.message : "重命名文件夹时发生错误",
+              description:
+                error instanceof Error
+                  ? error.message
+                  : "重命名文件夹时发生错误",
             });
           },
-        }
+        },
       );
     }
   };
@@ -248,7 +257,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         },
         onError: (error) => {
           toast.error("删除失败", {
-            description: error instanceof Error ? error.message : "删除文件夹时发生错误",
+            description:
+              error instanceof Error ? error.message : "删除文件夹时发生错误",
           });
         },
       });
@@ -522,6 +532,34 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           onCreateSubFolder={handleCreateSubFolder}
                         />
                       ))}
+
+                      <div className="flex items-center gap-1">
+                        <span className="inline-flex size-6 items-center justify-center" aria-hidden="true">
+                          <Folder className="size-4 text-slate-400" />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMenuId(NO_FOLDER_ID)}
+                          className={[
+                            "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium transition-all",
+                            selectedMenuId === NO_FOLDER_ID
+                              ? "bg-blue-50 text-blue-700 shadow-sm"
+                              : "text-slate-700 hover:bg-slate-50",
+                          ].join(" ")}
+                        >
+                          <span className="truncate">无文件夹</span>
+                          <span
+                            className={[
+                              "text-xs font-semibold",
+                              selectedMenuId === NO_FOLDER_ID
+                                ? "text-blue-600"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          >
+                            {noFolderCipherCount}
+                          </span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </ScrollArea>

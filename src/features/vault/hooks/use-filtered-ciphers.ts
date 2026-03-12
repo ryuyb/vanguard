@@ -3,6 +3,7 @@ import type { VaultCipherItemDto, VaultViewDataResponseDto } from "@/bindings";
 import {
   ALL_ITEMS_ID,
   FAVORITES_ID,
+  NO_FOLDER_ID,
   TRASH_ID,
 } from "@/features/vault/constants";
 import type {
@@ -44,6 +45,9 @@ export function useFilteredCiphers({
       }
       if (selectedMenuId === TRASH_ID) {
         return isDeleted(cipher);
+      }
+      if (selectedMenuId === NO_FOLDER_ID) {
+        return !cipher.folderId && !isDeleted(cipher);
       }
       return cipher.folderId === selectedMenuId && !isDeleted(cipher);
     });

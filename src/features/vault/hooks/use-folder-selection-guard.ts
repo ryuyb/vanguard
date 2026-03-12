@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import {
   ALL_ITEMS_ID,
   FAVORITES_ID,
+  NO_FOLDER_ID,
   TRASH_ID,
 } from "@/features/vault/constants";
 
@@ -19,7 +20,8 @@ export function useFolderSelectionGuard({
     if (
       selectedMenuId === ALL_ITEMS_ID ||
       selectedMenuId === FAVORITES_ID ||
-      selectedMenuId === TRASH_ID
+      selectedMenuId === TRASH_ID ||
+      selectedMenuId === NO_FOLDER_ID
     ) {
       return;
     }
