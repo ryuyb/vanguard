@@ -2,11 +2,14 @@ import {
   Archive,
   ArrowUpDown,
   ChevronDown,
+  Edit2,
   Folder,
   FolderPlus,
   LoaderCircle,
   Lock,
   LogOut,
+  MoreVertical,
+  Plus,
   Search,
   Settings,
   Star,
@@ -16,6 +19,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import type { SyncCipher, VaultCipherDetailDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,12 +53,16 @@ import {
   toTypeFilterLabel,
   VaultSettingsDialog,
 } from "@/features/vault";
+import { CipherFormDialog } from "@/features/vault/components/cipher-form-dialog";
+import { DeleteCipherDialog } from "@/features/vault/components/delete-cipher-dialog";
 import { DeleteFolderDialog } from "@/features/vault/components/delete-folder-dialog";
 import { FolderDialog } from "@/features/vault/components/folder-dialog";
 import { useVaultPageModel } from "@/features/vault/hooks";
+import { useCipherMutations } from "@/features/vault/hooks/use-cipher-mutations";
 import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
 import { getCipherIconUrl } from "@/features/vault/utils";
+import { vaultCipherDetailToSyncCipher } from "@/features/vault/utils/cipher-converter";
 import { toast } from "@/lib/toast";
 
 type VaultPageProps = {
@@ -115,6 +123,21 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   const [selectedFolderName, setSelectedFolderName] = useState("");
   const [parentFolderName, setParentFolderName] = useState<string | null>(null);
 
+  // Cipher 操作状态
+  const [cipherFormMode, setCipherFormMode] = useState<"create" | "edit">(
+    "create",
+  );
+  const [isCipherFormOpen, setIsCipherFormOpen] = useState(false);
+  const [isDeleteCipherDialogOpen, setIsDeleteCipherDialogOpen] =
+    useState(false);
+  const [selectedCipherForEdit, setSelectedCipherForEdit] =
+    useState<SyncCipher | null>(null);
+  const [selectedCipherIdForDelete, setSelectedCipherIdForDelete] = useState<
+    string | null
+  >(null);
+  const [selectedCipherNameForDelete, setSelectedCipherNameForDelete] =
+    useState("");
+
   const {
     avatarText,
     cipherDetailError,
@@ -169,6 +192,12 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   const folderActions = useFolderActions({
     onSuccess: () => {
       void loadVaultData();
+    },
+  });
+
+  const cipherMutations = useCipherMutations({
+    onSuccess: () => {
+      // 成功后会自动触发事件，由 useCipherEvents 处理刷新
     },
   });
 
@@ -259,6 +288,81 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
           toast.error("删除失败", {
             description:
               error instanceof Error ? error.message : "删除文件夹时发生错误",
+          });
+        },
+      });
+    }
+  };
+
+  // Cipher 操作处理函数
+  const handleCreateCipher = () => {
+    setCipherFormMode("create");
+    setSelectedCipherForEdit(null);
+    setIsCipherFormOpen(true);
+  };
+
+  const handleEditCipher = (cipher: VaultCipherDetailDto) => {
+    setCipherFormMode("edit");
+    setSelectedCipherForEdit(vaultCipherDetailToSyncCipher(cipher));
+    setIsCipherFormOpen(true);
+  };
+
+  const handleDeleteCipher = (cipherId: string, cipherName: string) => {
+    setSelectedCipherIdForDelete(cipherId);
+    setSelectedCipherNameForDelete(cipherName);
+    setIsDeleteCipherDialogOpen(true);
+  };
+
+  const handleCipherFormConfirm = (cipher: SyncCipher) => {
+    if (cipherFormMode === "create") {
+      cipherMutations.createCipher.mutate(cipher, {
+        onSuccess: () => {
+          setIsCipherFormOpen(false);
+          toast.success("创建成功", {
+            description: `项目 "${cipher.name}" 已创建`,
+          });
+        },
+        onError: (error) => {
+          toast.error("创建失败", {
+            description:
+              error instanceof Error ? error.message : "创建项目时发生错误",
+          });
+        },
+      });
+    } else if (cipherFormMode === "edit") {
+      cipherMutations.updateCipher.mutate(
+        { cipherId: cipher.id, cipher },
+        {
+          onSuccess: () => {
+            setIsCipherFormOpen(false);
+            toast.success("保存成功", {
+              description: `项目 "${cipher.name}" 已更新`,
+            });
+          },
+          onError: (error) => {
+            toast.error("保存失败", {
+              description:
+                error instanceof Error ? error.message : "保存项目时发生错误",
+            });
+          },
+        },
+      );
+    }
+  };
+
+  const handleDeleteCipherConfirm = () => {
+    if (selectedCipherIdForDelete) {
+      cipherMutations.deleteCipher.mutate(selectedCipherIdForDelete, {
+        onSuccess: () => {
+          setIsDeleteCipherDialogOpen(false);
+          toast.success("删除成功", {
+            description: `项目 "${selectedCipherNameForDelete}" 已删除`,
+          });
+        },
+        onError: (error) => {
+          toast.error("删除失败", {
+            description:
+              error instanceof Error ? error.message : "删除项目时发生错误",
           });
         },
       });
@@ -654,6 +758,16 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       type="button"
                       variant="ghost"
                       className="size-8 px-0"
+                      aria-label="新建项目"
+                      title="新建项目"
+                      onClick={handleCreateCipher}
+                    >
+                      <Plus className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="size-8 px-0"
                       aria-label={
                         isInlineSearchOpen
                           ? "关闭搜索"
@@ -827,7 +941,46 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       !isCipherDetailLoading &&
                       !cipherDetailError &&
                       selectedCipherDetail && (
-                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden">
+                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden space-y-3">
+                          {/* Cipher 操作栏 */}
+                          <div className="flex items-center justify-end gap-2 px-1">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2"
+                                >
+                                  <MoreVertical className="size-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    handleEditCipher(selectedCipherDetail)
+                                  }
+                                >
+                                  <Edit2 className="size-4" />
+                                  编辑
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() =>
+                                    handleDeleteCipher(
+                                      selectedCipherDetail.id,
+                                      selectedCipherDetail.name ?? "Untitled",
+                                    )
+                                  }
+                                >
+                                  <Trash2 className="size-4" />
+                                  删除
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
@@ -872,6 +1025,36 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={handleDeleteDialogConfirm}
         isLoading={folderActions.deleteFolder.isLoading}
+      />
+
+      <CipherFormDialog
+        open={isCipherFormOpen}
+        mode={cipherFormMode}
+        initialCipher={selectedCipherForEdit}
+        folderId={
+          selectedMenuId !== ALL_ITEMS_ID &&
+          selectedMenuId !== FAVORITES_ID &&
+          selectedMenuId !== TRASH_ID &&
+          selectedMenuId !== NO_FOLDER_ID
+            ? selectedMenuId
+            : null
+        }
+        folders={viewData?.folders ?? []}
+        onOpenChange={setIsCipherFormOpen}
+        onConfirm={handleCipherFormConfirm}
+        isLoading={
+          cipherFormMode === "create"
+            ? cipherMutations.createCipher.isLoading
+            : cipherMutations.updateCipher.isLoading
+        }
+      />
+
+      <DeleteCipherDialog
+        open={isDeleteCipherDialogOpen}
+        cipherName={selectedCipherNameForDelete}
+        onOpenChange={setIsDeleteCipherDialogOpen}
+        onConfirm={handleDeleteCipherConfirm}
+        isLoading={cipherMutations.deleteCipher.isLoading}
       />
     </main>
   );
