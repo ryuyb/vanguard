@@ -332,6 +332,14 @@ pub struct DeleteCipherCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct SoftDeleteCipherCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub cipher_id: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct CipherMutationResult {
     pub cipher_id: String,
     pub revision_date: String,

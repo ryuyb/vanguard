@@ -48,7 +48,8 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_get_icon_server,
             interfaces::tauri::commands::vault::create_cipher,
             interfaces::tauri::commands::vault::update_cipher,
-            interfaces::tauri::commands::vault::delete_cipher
+            interfaces::tauri::commands::vault::delete_cipher,
+            interfaces::tauri::commands::vault::soft_delete_cipher
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,

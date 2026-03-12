@@ -19,6 +19,7 @@ use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
 use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
+use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::app_state::AppState;
@@ -120,6 +121,12 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         Arc::clone(&sync_event_port),
     ));
 
+    let soft_delete_cipher_use_case = Arc::new(SoftDeleteCipherUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
     let fetch_cipher_use_case = Arc::new(FetchCipherUseCase::new(
         Arc::clone(&remote_vault),
         Arc::clone(&vault_repository),
@@ -139,6 +146,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         create_cipher_use_case,
         update_cipher_use_case,
         delete_cipher_use_case,
+        soft_delete_cipher_use_case,
         fetch_cipher_use_case,
         auth_state_path,
     ))

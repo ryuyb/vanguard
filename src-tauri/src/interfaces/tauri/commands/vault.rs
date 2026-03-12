@@ -638,6 +638,47 @@ pub async fn delete_cipher(
     Ok(())
 }
 
+#[tauri::command]
+#[specta::specta]
+pub async fn soft_delete_cipher(
+    request: crate::interfaces::tauri::dto::vault::SoftDeleteCipherRequestDto,
+    state: State<'_, AppState>,
+) -> Result<crate::interfaces::tauri::dto::vault::CipherMutationResponseDto, ErrorPayload> {
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("soft_delete_cipher", &error))?;
+
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("soft_delete_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "soft_delete_cipher",
+                &AppError::ValidationRequired {
+                    field: "session".to_string(),
+                },
+            )
+        })?;
+
+    let result = state
+        .soft_delete_cipher_use_case()
+        .execute(
+            account_id,
+            session.base_url,
+            session.access_token,
+            request.cipher_id,
+        )
+        .await
+        .map_err(|error| log_command_error("soft_delete_cipher", &error))?;
+
+    Ok(
+        crate::interfaces::tauri::dto::vault::CipherMutationResponseDto {
+            cipher_id: result.cipher_id,
+            revision_date: result.revision_date,
+        },
+    )
+}
+
 impl From<VaultUnlockMethodDto> for UnlockMethod {
     fn from(method: VaultUnlockMethodDto) -> Self {
         match method {

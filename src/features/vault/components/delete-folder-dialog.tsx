@@ -37,7 +37,7 @@ export function DeleteFolderDialog({
             文件夹中的密码不会被删除，它们将移动到"无文件夹"分类中。
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        <AlertDialogFooter className="gap-2">
           <AlertDialogCancel disabled={isLoading}>取消</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {

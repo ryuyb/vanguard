@@ -8,8 +8,9 @@ use crate::application::dto::auth::{
     WebauthnRequestExtensions as AppWebauthnRequestExtensions,
 };
 use crate::application::dto::sync::{
-    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RevisionDateQuery, SyncCipher,
-    SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand,
+    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RevisionDateQuery,
+    SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload,
+    UpdateCipherCommand,
 };
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
@@ -303,6 +304,22 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .delete_cipher(&command.base_url, &command.access_token, &command.cipher_id)
             .await
             .map_err(map_vaultwarden_error)
+    }
+
+    async fn soft_delete_cipher(
+        &self,
+        command: SoftDeleteCipherCommand,
+    ) -> AppResult<CipherMutationResult> {
+        let response = self
+            .client
+            .soft_delete_cipher(&command.base_url, &command.access_token, &command.cipher_id)
+            .await
+            .map_err(map_vaultwarden_error)?;
+
+        Ok(CipherMutationResult {
+            cipher_id: response.id,
+            revision_date: response.revision_date,
+        })
     }
 }
 

@@ -388,6 +388,12 @@ pub struct DeleteCipherRequestDto {
     pub cipher_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SoftDeleteCipherRequestDto {
+    pub cipher_id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CipherMutationResponseDto {

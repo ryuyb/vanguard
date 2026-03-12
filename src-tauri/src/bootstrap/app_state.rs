@@ -19,6 +19,7 @@ use crate::application::use_cases::create_cipher_use_case::CreateCipherUseCase;
 use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
 use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
+use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
@@ -88,6 +89,7 @@ pub struct AppState {
     create_cipher_use_case: Arc<CreateCipherUseCase>,
     update_cipher_use_case: Arc<UpdateCipherUseCase>,
     delete_cipher_use_case: Arc<DeleteCipherUseCase>,
+    soft_delete_cipher_use_case: Arc<SoftDeleteCipherUseCase>,
     fetch_cipher_use_case: Arc<FetchCipherUseCase>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
@@ -112,6 +114,7 @@ impl AppState {
         create_cipher_use_case: Arc<CreateCipherUseCase>,
         update_cipher_use_case: Arc<UpdateCipherUseCase>,
         delete_cipher_use_case: Arc<DeleteCipherUseCase>,
+        soft_delete_cipher_use_case: Arc<SoftDeleteCipherUseCase>,
         fetch_cipher_use_case: Arc<FetchCipherUseCase>,
         auth_state_path: PathBuf,
     ) -> Self {
@@ -142,6 +145,7 @@ impl AppState {
             create_cipher_use_case,
             update_cipher_use_case,
             delete_cipher_use_case,
+            soft_delete_cipher_use_case,
             fetch_cipher_use_case,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
@@ -198,6 +202,10 @@ impl AppState {
 
     pub fn delete_cipher_use_case(&self) -> Arc<DeleteCipherUseCase> {
         Arc::clone(&self.delete_cipher_use_case)
+    }
+
+    pub fn soft_delete_cipher_use_case(&self) -> Arc<SoftDeleteCipherUseCase> {
+        Arc::clone(&self.soft_delete_cipher_use_case)
     }
 
     pub fn fetch_cipher_use_case(&self) -> Arc<FetchCipherUseCase> {

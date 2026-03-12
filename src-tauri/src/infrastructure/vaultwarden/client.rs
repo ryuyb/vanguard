@@ -748,6 +748,41 @@ impl VaultwardenClient {
         Ok(())
     }
 
+    pub async fn soft_delete_cipher(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        cipher_id: &str,
+    ) -> VaultwardenResult<CipherResponse> {
+        let endpoint = format!(
+            "{}/delete",
+            self.cipher_endpoint(base_url, cipher_id)?
+        );
+
+        let response = self
+            .http_client
+            .put(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body));
+        }
+
+        serde_json::from_str(&body).map_err(|error| {
+            VaultwardenError::Decode(format!("failed to parse cipher response: {error}"))
+        })
+    }
+
     fn validated_base_url(base_url: &str) -> VaultwardenResult<&str> {
         VaultwardenConfig::validate_base_url(base_url)?;
         Ok(base_url.trim_end_matches('/'))

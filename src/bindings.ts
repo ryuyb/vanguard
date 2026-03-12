@@ -268,6 +268,14 @@ async deleteCipher(request: DeleteCipherRequestDto) : Promise<Result<null, Error
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async softDeleteCipher(request: SoftDeleteCipherRequestDto) : Promise<Result<CipherMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("soft_delete_cipher", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -324,6 +332,7 @@ export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; a
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
+export type SoftDeleteCipherRequestDto = { cipherId: string }
 export type SyncAttachment = { id: string; key: string | null; file_name: string | null; size: string | null; size_name: string | null; url: string | null; object: string | null }
 export type SyncCipher = { id: string; organization_id: string | null; folder_id: string | null; type: number | null; name: string | null; notes: string | null; key: string | null; favorite: boolean | null; edit: boolean | null; view_password: boolean | null; organization_use_totp: boolean | null; creation_date: string | null; revision_date: string | null; deleted_date: string | null; archived_date: string | null; reprompt: number | null; permissions: SyncCipherPermissions | null; object: string | null; fields: SyncCipherField[]; password_history: SyncCipherPasswordHistory[]; collection_ids: string[]; data: SyncCipherData | null; login: SyncCipherLogin | null; secure_note: SyncCipherSecureNote | null; card: SyncCipherCard | null; identity: SyncCipherIdentity | null; ssh_key: SyncCipherSshKey | null; attachments: SyncAttachment[] }
 export type SyncCipherCard = { cardholder_name: string | null; brand: string | null; number: string | null; exp_month: string | null; exp_year: string | null; code: string | null }

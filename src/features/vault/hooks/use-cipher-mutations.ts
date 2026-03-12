@@ -40,7 +40,7 @@ export function useCipherMutations(options?: UseCipherMutationsOptions) {
 
   const deleteCipherMutation = useMutation({
     mutationFn: async (cipherId: string) => {
-      const result = await commands.deleteCipher({ cipherId });
+      const result = await commands.softDeleteCipher({ cipherId });
       if (result.status === "error") {
         throw new Error(result.error.message);
       }
