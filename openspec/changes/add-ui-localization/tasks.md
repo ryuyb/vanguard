@@ -1,8 +1,8 @@
 ## 1. Localization Foundation
 
-- [ ] 1.1 Add the frontend i18n dependencies and create the shared `src/i18n/` module structure
-- [ ] 1.2 Define supported app locales (`zh`, `en`), locale metadata, storage key, and fallback behavior
-- [ ] 1.3 Create translation resource files for Chinese and English with an initial namespace layout for common, auth, vault, spotlight, and errors
+- [x] 1.1 Add the frontend i18n dependencies and create the shared `src/i18n/` module structure
+- [x] 1.2 Define supported app locales (`zh`, `en`), locale metadata, storage key, and fallback behavior
+- [x] 1.3 Create translation resource files for Chinese and English with an initial namespace layout for common, auth, vault, spotlight, and errors
 
 ## 2. App Bootstrapping
 
