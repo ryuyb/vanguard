@@ -8,7 +8,7 @@ use crate::application::dto::vault::{
 use crate::application::vault_crypto;
 use crate::bootstrap::app_state::AppState;
 use crate::domain::sync::SyncTrigger;
-use crate::interfaces::tauri::dto::vault::FolderDto;
+use crate::interfaces::tauri::dto::folder::FolderDto;
 use crate::interfaces::tauri::session;
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;

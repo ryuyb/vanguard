@@ -11,10 +11,10 @@ use crate::interfaces::tauri::dto::auth::{
     SendEmailLoginRequestDto, SessionResponseDto, TwoFactorChallengeDto, TwoFactorProviderHintDto,
     VerifyEmailTokenRequestDto, WebauthnAllowCredentialDto, WebauthnRequestExtensionsDto,
 };
+use crate::interfaces::tauri::dto::cipher::VaultCipherDetailDto;
 use crate::interfaces::tauri::dto::sync::{
     SyncCountsDto, SyncMetricsDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
 };
-use crate::interfaces::tauri::dto::vault::VaultCipherDetailDto;
 use crate::support::error::AppError;
 use std::collections::HashMap;
 

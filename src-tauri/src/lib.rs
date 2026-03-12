@@ -40,16 +40,16 @@ pub fn run() {
             interfaces::tauri::commands::vault::vault_enable_biometric_unlock,
             interfaces::tauri::commands::vault::vault_disable_biometric_unlock,
             interfaces::tauri::commands::vault::vault_lock,
-            interfaces::tauri::commands::vault::vault_get_view_data,
-            interfaces::tauri::commands::vault::vault_list_ciphers,
-            interfaces::tauri::commands::vault::vault_get_cipher_detail,
-            interfaces::tauri::commands::vault::vault_copy_cipher_field,
-            interfaces::tauri::commands::vault::vault_get_cipher_totp_code,
-            interfaces::tauri::commands::vault::vault_get_icon_server,
-            interfaces::tauri::commands::vault::create_cipher,
-            interfaces::tauri::commands::vault::update_cipher,
-            interfaces::tauri::commands::vault::delete_cipher,
-            interfaces::tauri::commands::vault::soft_delete_cipher
+            interfaces::tauri::commands::cipher::vault_get_view_data,
+            interfaces::tauri::commands::cipher::vault_list_ciphers,
+            interfaces::tauri::commands::cipher::vault_get_cipher_detail,
+            interfaces::tauri::commands::cipher::vault_copy_cipher_field,
+            interfaces::tauri::commands::cipher::vault_get_cipher_totp_code,
+            interfaces::tauri::commands::cipher::vault_get_icon_server,
+            interfaces::tauri::commands::cipher::create_cipher,
+            interfaces::tauri::commands::cipher::update_cipher,
+            interfaces::tauri::commands::cipher::delete_cipher,
+            interfaces::tauri::commands::cipher::soft_delete_cipher
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,
