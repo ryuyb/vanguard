@@ -5,7 +5,7 @@ use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::domain::sync::SyncContext;
 use crate::interfaces::tauri::events::sync::{
     VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut, VaultSyncStarted,
-    VaultSyncSucceeded,
+    VaultSyncSucceeded, VaultFoldersSynced,
 };
 use crate::interfaces::tauri::mapping;
 
@@ -61,6 +61,20 @@ impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
             log::warn!(
                 target: "vanguard::tauri::sync",
                 "failed to emit vault-sync-failed for account_id={account_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_folders_synced(&self, account_id: &str, folder_count: u32) {
+        if let Err(error) = (VaultFoldersSynced {
+            account_id: String::from(account_id),
+            folder_count,
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::sync",
+                "failed to emit vault-folders-synced for account_id={account_id}: {error}"
             );
         }
     }

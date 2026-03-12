@@ -89,10 +89,45 @@ export function buildFolderTree(
 ): FolderTreeNode[] {
   const root = new Map<string, FolderTreeNodeDraft>();
 
+  // 第一遍：收集所有实际存在的完整 folder 路径
+  const existingFolderPaths = new Set<string>();
   for (const folder of folders) {
     const segments = normalizeFolderSegments(folder.name);
-    let current = root;
+    existingFolderPaths.add(segments.join("/"));
+  }
+
+  // 第二遍：构建树，如果父路径不存在则使用原始 name
+  for (const folder of folders) {
+    const segments = normalizeFolderSegments(folder.name);
+
+    // 检查是否所有父路径都存在（作为独立的 folder）
+    let canBuildHierarchy = true;
     const pathParts: string[] = [];
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      pathParts.push(segments[index]);
+      const parentPath = pathParts.join("/");
+      if (!existingFolderPaths.has(parentPath)) {
+        canBuildHierarchy = false;
+        break;
+      }
+    }
+
+    if (!canBuildHierarchy) {
+      // 父路径不存在，直接使用原始 name 作为根节点
+      const originalName = folder.name ?? "Untitled folder";
+      const key = folder.id;
+      root.set(key, {
+        key,
+        label: originalName,
+        folderId: folder.id,
+        childrenMap: new Map<string, FolderTreeNodeDraft>(),
+      });
+      continue;
+    }
+
+    // 父路径存在，正常构建层级结构
+    let current = root;
+    pathParts.length = 0;
 
     for (let index = 0; index < segments.length; index += 1) {
       const segment = segments[index];

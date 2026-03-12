@@ -15,6 +15,7 @@ import { useCipherDetailSelection } from "@/features/vault/hooks/use-cipher-deta
 import { useExpandedFolderKeys } from "@/features/vault/hooks/use-expanded-folder-keys";
 import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers";
 import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
+import { useFoldersSync } from "@/features/vault/hooks/use-folders-sync";
 import { useIconState } from "@/features/vault/hooks/use-icon-state";
 import { useInlineSearchFocus } from "@/features/vault/hooks/use-inline-search-focus";
 import type {
@@ -147,6 +148,26 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   useEffect(() => {
     void loadVaultData();
   }, [loadVaultData]);
+
+  // 监听 folders 同步事件，只更新 folders 数据
+  useFoldersSync({
+    onFoldersSynced: (folders) => {
+      // 将 FolderDto[] 转换为 VaultFolderItemDto[]
+      const folderItems = folders.map((folder) => ({
+        id: folder.id,
+        name: folder.name,
+      }));
+
+      // 更新 viewData 中的 folders
+      setViewData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          folders: folderItems,
+        };
+      });
+    },
+  });
 
   const onLock = async () => {
     setIsLocking(true);

@@ -58,3 +58,14 @@ pub struct VaultSyncLoggedOut {
 impl tauri_specta::Event for VaultSyncLoggedOut {
     const NAME: &'static str = "vault-sync:logged-out";
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultFoldersSynced {
+    pub account_id: String,
+    pub folder_count: u32,
+}
+
+impl tauri_specta::Event for VaultFoldersSynced {
+    const NAME: &'static str = "vault-folders:synced";
+}

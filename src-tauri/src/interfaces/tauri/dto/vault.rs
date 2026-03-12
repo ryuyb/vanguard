@@ -360,3 +360,10 @@ pub struct VaultCipherSshKeyDetailDto {
     pub public_key: Option<String>,
     pub key_fingerprint: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderDto {
+    pub id: String,
+    pub name: String,
+}

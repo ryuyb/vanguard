@@ -22,6 +22,7 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_restore_state,
             interfaces::tauri::commands::auth::auth_logout,
             interfaces::tauri::commands::desktop::desktop_open_main_window,
+            interfaces::tauri::commands::folder::list_folders,
             interfaces::tauri::commands::folder::create_folder,
             interfaces::tauri::commands::folder::rename_folder,
             interfaces::tauri::commands::folder::delete_folder,
@@ -50,7 +51,8 @@ pub fn run() {
             interfaces::tauri::events::sync::VaultSyncSucceeded,
             interfaces::tauri::events::sync::VaultSyncFailed,
             interfaces::tauri::events::sync::VaultSyncAuthRequired,
-            interfaces::tauri::events::sync::VaultSyncLoggedOut
+            interfaces::tauri::events::sync::VaultSyncLoggedOut,
+            interfaces::tauri::events::sync::VaultFoldersSynced
         ]);
 
     let invoke_handler = specta_builder.invoke_handler();

@@ -53,6 +53,14 @@ async desktopOpenMainWindow() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async listFolders() : Promise<Result<FolderDto[], ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_folders") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async createFolder(request: CreateFolderRequest) : Promise<Result<null, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("create_folder", { request }) };
@@ -235,12 +243,14 @@ async vaultGetIconServer() : Promise<Result<string, ErrorPayload>> {
 
 
 export const events = __makeEvents__<{
+vaultFoldersSynced: VaultFoldersSynced,
 vaultSyncAuthRequired: VaultSyncAuthRequired,
 vaultSyncFailed: VaultSyncFailed,
 vaultSyncLoggedOut: VaultSyncLoggedOut,
 vaultSyncStarted: VaultSyncStarted,
 vaultSyncSucceeded: VaultSyncSucceeded
 }>({
+vaultFoldersSynced: "vault-folders:synced",
 vaultSyncAuthRequired: "vault-sync:auth-required",
 vaultSyncFailed: "vault-sync:failed",
 vaultSyncLoggedOut: "vault-sync:logged-out",
@@ -258,6 +268,7 @@ export type CreateFolderRequest = { name: string }
 export type DeleteFolderRequest = { folderId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
 export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
+export type FolderDto = { id: string; name: string }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
@@ -304,6 +315,7 @@ export type VaultDisablePinUnlockRequestDto = Record<string, never>
 export type VaultEnableBiometricUnlockRequestDto = Record<string, never>
 export type VaultEnablePinUnlockRequestDto = { pin: string; lockType: VaultPinLockTypeDto }
 export type VaultFolderItemDto = { id: string; name: string | null }
+export type VaultFoldersSynced = { accountId: string; folderCount: number }
 export type VaultLockRequestDto = Record<string, never>
 export type VaultPinLockTypeDto = "disabled" | "ephemeral" | "persistent"
 export type VaultPinStatusResponseDto = { supported: boolean; enabled: boolean; lockType: VaultPinLockTypeDto }
