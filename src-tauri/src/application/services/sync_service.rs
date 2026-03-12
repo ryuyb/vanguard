@@ -11,7 +11,7 @@ use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
-use crate::domain::sync::{SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
+use crate::domain::sync::{PushType, SyncContext, SyncItemCounts, SyncResult, SyncTrigger};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::task::JoinHandle;
@@ -185,7 +185,7 @@ impl SyncService {
         &self,
         command: SyncVaultCommand,
         cipher_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&cipher_id, "cipher_id")?;
@@ -197,10 +197,10 @@ impl SyncService {
         if let Err(error) = self.acquire_running_slot(&account_id) {
             log::warn!(
                 target: "vanguard::sync",
-                "incremental sync rejected account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                "incremental sync rejected account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                 account_id,
                 endpoint,
-                event_type,
+                push_type,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
                 error
@@ -213,7 +213,7 @@ impl SyncService {
 
         match self
             .sync_vault_use_case
-            .execute_cipher_incremental(command, cipher_id, event_type)
+            .execute_cipher_incremental(command, cipher_id, push_type)
             .await
         {
             Ok(outcome) => {
@@ -226,10 +226,10 @@ impl SyncService {
                 self.process_sync_auth_error(&account_id, trigger, &error);
                 log::error!(
                     target: "vanguard::sync",
-                    "incremental sync failed account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                    "incremental sync failed account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                     account_id,
                     endpoint,
-                    event_type,
+                    push_type,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
                     error
@@ -246,7 +246,7 @@ impl SyncService {
         &self,
         command: SyncVaultCommand,
         folder_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&folder_id, "folder_id")?;
@@ -258,10 +258,10 @@ impl SyncService {
         if let Err(error) = self.acquire_running_slot(&account_id) {
             log::warn!(
                 target: "vanguard::sync",
-                "incremental sync rejected account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                "incremental sync rejected account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                 account_id,
                 endpoint,
-                event_type,
+                push_type,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
                 error
@@ -274,7 +274,7 @@ impl SyncService {
 
         match self
             .sync_vault_use_case
-            .execute_folder_incremental(command, folder_id, event_type)
+            .execute_folder_incremental(command, folder_id, push_type)
             .await
         {
             Ok(outcome) => {
@@ -287,10 +287,10 @@ impl SyncService {
                 self.process_sync_auth_error(&account_id, trigger, &error);
                 log::error!(
                     target: "vanguard::sync",
-                    "incremental sync failed account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                    "incremental sync failed account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                     account_id,
                     endpoint,
-                    event_type,
+                    push_type,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
                     error
@@ -307,7 +307,7 @@ impl SyncService {
         &self,
         command: SyncVaultCommand,
         send_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&send_id, "send_id")?;
@@ -319,10 +319,10 @@ impl SyncService {
         if let Err(error) = self.acquire_running_slot(&account_id) {
             log::warn!(
                 target: "vanguard::sync",
-                "incremental sync rejected account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                "incremental sync rejected account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                 account_id,
                 endpoint,
-                event_type,
+                push_type,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
                 error
@@ -335,7 +335,7 @@ impl SyncService {
 
         match self
             .sync_vault_use_case
-            .execute_send_incremental(command, send_id, event_type)
+            .execute_send_incremental(command, send_id, push_type)
             .await
         {
             Ok(outcome) => {
@@ -348,10 +348,10 @@ impl SyncService {
                 self.process_sync_auth_error(&account_id, trigger, &error);
                 log::error!(
                     target: "vanguard::sync",
-                    "incremental sync failed account_id={} endpoint={} event_type={} status={} error_code={} message={}",
+                    "incremental sync failed account_id={} endpoint={} push_type={:?} status={} error_code={} message={}",
                     account_id,
                     endpoint,
-                    event_type,
+                    push_type,
                     error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                     error.code(),
                     error

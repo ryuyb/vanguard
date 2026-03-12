@@ -557,7 +557,7 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_cipher_by_id(command, String::from(cipher_id), push_type as i32)
+            .sync_cipher_by_id(command, String::from(cipher_id), push_type)
             .await
         {
             Ok(_) => EventOutcome::Continue,
@@ -611,7 +611,7 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_folder_by_id(command, String::from(folder_id), push_type as i32)
+            .sync_folder_by_id(command, String::from(folder_id), push_type)
             .await
         {
             Ok(_) => EventOutcome::Continue,
@@ -665,7 +665,7 @@ impl RealtimeSyncService {
 
         match self
             .sync_service
-            .sync_send_by_id(command, String::from(send_id), push_type as i32)
+            .sync_send_by_id(command, String::from(send_id), push_type)
             .await
         {
             Ok(_) => EventOutcome::Continue,

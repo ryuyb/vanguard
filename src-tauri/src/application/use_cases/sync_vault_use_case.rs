@@ -9,7 +9,7 @@ use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
-use crate::domain::sync::{SyncItemCounts, SyncResult, SyncTrigger, VaultSnapshotMeta};
+use crate::domain::sync::{PushType, SyncItemCounts, SyncResult, SyncTrigger, VaultSnapshotMeta};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::time::{sleep, timeout, Duration};
@@ -77,7 +77,7 @@ impl SyncVaultUseCase {
         &self,
         command: SyncVaultCommand,
         cipher_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&command.base_url, "base_url")?;
@@ -94,25 +94,25 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental cipher sync started account_id={} endpoint={} trigger={:?} event_type={} cipher_id={}",
+            "incremental cipher sync started account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={}",
             command.account_id,
             cipher_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             cipher_id
         );
 
         if let Err(error) = self
-            .apply_cipher_incremental_update(&command, &cipher_id, event_type)
+            .apply_cipher_incremental_update(&command, &cipher_id, push_type)
             .await
         {
             log::error!(
                 target: "vanguard::sync",
-                "incremental cipher sync failed account_id={} endpoint={} trigger={:?} event_type={} cipher_id={} status={} error_code={} message={}",
+                "incremental cipher sync failed account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={} status={} error_code={} message={}",
                 command.account_id,
                 cipher_endpoint,
                 command.trigger,
-                event_type,
+                push_type,
                 cipher_id,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
@@ -206,11 +206,11 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental cipher sync finished account_id={} endpoint={} trigger={:?} event_type={} cipher_id={} duration_ms={} revision_changed={} ciphers={}",
+            "incremental cipher sync finished account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={} duration_ms={} revision_changed={} ciphers={}",
             command.account_id,
             cipher_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             cipher_id,
             result.duration_ms,
             result.revision_changed,
@@ -224,7 +224,7 @@ impl SyncVaultUseCase {
         &self,
         command: SyncVaultCommand,
         folder_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&command.base_url, "base_url")?;
@@ -241,25 +241,25 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental folder sync started account_id={} endpoint={} trigger={:?} event_type={} folder_id={}",
+            "incremental folder sync started account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={}",
             command.account_id,
             folder_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             folder_id
         );
 
         if let Err(error) = self
-            .apply_folder_incremental_update(&command, &folder_id, event_type)
+            .apply_folder_incremental_update(&command, &folder_id, push_type)
             .await
         {
             log::error!(
                 target: "vanguard::sync",
-                "incremental folder sync failed account_id={} endpoint={} trigger={:?} event_type={} folder_id={} status={} error_code={} message={}",
+                "incremental folder sync failed account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={} status={} error_code={} message={}",
                 command.account_id,
                 folder_endpoint,
                 command.trigger,
-                event_type,
+                push_type,
                 folder_id,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
@@ -353,11 +353,11 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental folder sync finished account_id={} endpoint={} trigger={:?} event_type={} folder_id={} duration_ms={} revision_changed={} folders={}",
+            "incremental folder sync finished account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={} duration_ms={} revision_changed={} folders={}",
             command.account_id,
             folder_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             folder_id,
             result.duration_ms,
             result.revision_changed,
@@ -371,7 +371,7 @@ impl SyncVaultUseCase {
         &self,
         command: SyncVaultCommand,
         send_id: String,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&command.base_url, "base_url")?;
@@ -388,25 +388,25 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental send sync started account_id={} endpoint={} trigger={:?} event_type={} send_id={}",
+            "incremental send sync started account_id={} endpoint={} trigger={:?} push_type={:?} send_id={}",
             command.account_id,
             send_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             send_id
         );
 
         if let Err(error) = self
-            .apply_send_incremental_update(&command, &send_id, event_type)
+            .apply_send_incremental_update(&command, &send_id, push_type)
             .await
         {
             log::error!(
                 target: "vanguard::sync",
-                "incremental send sync failed account_id={} endpoint={} trigger={:?} event_type={} send_id={} status={} error_code={} message={}",
+                "incremental send sync failed account_id={} endpoint={} trigger={:?} push_type={:?} send_id={} status={} error_code={} message={}",
                 command.account_id,
                 send_endpoint,
                 command.trigger,
-                event_type,
+                push_type,
                 send_id,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
@@ -500,11 +500,11 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental send sync finished account_id={} endpoint={} trigger={:?} event_type={} send_id={} duration_ms={} revision_changed={} sends={}",
+            "incremental send sync finished account_id={} endpoint={} trigger={:?} push_type={:?} send_id={} duration_ms={} revision_changed={} sends={}",
             command.account_id,
             send_endpoint,
             command.trigger,
-            event_type,
+            push_type,
             send_id,
             result.duration_ms,
             result.revision_changed,
@@ -1144,9 +1144,9 @@ impl SyncVaultUseCase {
         &self,
         command: &SyncVaultCommand,
         cipher_id: &str,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<()> {
-        if event_type == 2 {
+        if push_type == PushType::SyncLoginDelete || push_type == PushType::SyncCipherDelete {
             self.vault_repository
                 .delete_cipher_live(&command.account_id, cipher_id)
                 .await?;
@@ -1182,9 +1182,9 @@ impl SyncVaultUseCase {
         &self,
         command: &SyncVaultCommand,
         folder_id: &str,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<()> {
-        if event_type == 8 {
+        if push_type == PushType::SyncFolderDelete {
             self.vault_repository
                 .delete_folder_live(&command.account_id, folder_id)
                 .await?;
@@ -1213,9 +1213,9 @@ impl SyncVaultUseCase {
         &self,
         command: &SyncVaultCommand,
         send_id: &str,
-        event_type: i32,
+        push_type: PushType,
     ) -> AppResult<()> {
-        if event_type == 14 {
+        if push_type == PushType::SyncSendDelete {
             self.vault_repository
                 .delete_send_live(&command.account_id, send_id)
                 .await?;
