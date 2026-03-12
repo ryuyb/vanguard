@@ -754,10 +754,7 @@ impl VaultwardenClient {
         access_token: &str,
         cipher_id: &str,
     ) -> VaultwardenResult<CipherResponse> {
-        let endpoint = format!(
-            "{}/delete",
-            self.cipher_endpoint(base_url, cipher_id)?
-        );
+        let endpoint = format!("{}/delete", self.cipher_endpoint(base_url, cipher_id)?);
 
         let response = self
             .http_client

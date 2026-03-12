@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::application::dto::sync::{CipherMutationResult, SoftDeleteCipherCommand, SyncVaultCommand};
+use crate::application::dto::sync::{
+    CipherMutationResult, SoftDeleteCipherCommand, SyncVaultCommand,
+};
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;

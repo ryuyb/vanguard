@@ -36,7 +36,11 @@ impl VaultwardenEndpoints {
     }
 
     pub fn cipher_soft_delete(base_url: &str, cipher_id: &str) -> String {
-        format!("{}/api/ciphers/{}/delete", normalize_base(base_url), cipher_id)
+        format!(
+            "{}/api/ciphers/{}/delete",
+            normalize_base(base_url),
+            cipher_id
+        )
     }
 
     pub fn folder(base_url: &str, folder_id: &str) -> String {
