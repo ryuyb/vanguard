@@ -12,9 +12,9 @@
 
 ## 3. Shared Utilities
 
-- [ ] 3.1 Refactor shared error-message and toast helpers to resolve translated copy from the active locale
-- [ ] 3.2 Add shared locale-aware formatting helpers for sorting and date/time rendering
-- [ ] 3.3 Replace hard-coded locale usage in shared vault utilities with the new locale helpers
+- [x] 3.1 Refactor shared error-message and toast helpers to resolve translated copy from the active locale
+- [x] 3.2 Add shared locale-aware formatting helpers for sorting and date/time rendering
+- [x] 3.3 Replace hard-coded locale usage in shared vault utilities with the new locale helpers
 
 ## 4. Feature Copy Migration
 

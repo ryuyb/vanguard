@@ -10,6 +10,7 @@ import type {
   FolderTreeNode,
   FolderTreeNodeDraft,
 } from "@/features/vault/types";
+import { getLocaleCollator } from "@/i18n";
 
 export function toTypeFilterLabel(filter: CipherTypeFilter): string {
   if (filter === "login") {
@@ -47,8 +48,9 @@ export function toAvatarText(email: string | null | undefined): string {
 export function sortFolders(
   folders: VaultFolderItemDto[],
 ): VaultFolderItemDto[] {
+  const collator = getLocaleCollator();
   return [...folders].sort((left, right) =>
-    (left.name ?? "").localeCompare(right.name ?? "", "zh-Hans-CN"),
+    collator.compare(left.name ?? "", right.name ?? ""),
   );
 }
 
@@ -156,10 +158,9 @@ export function buildFolderTree(
   const toSortedNodes = (
     map: Map<string, FolderTreeNodeDraft>,
   ): FolderTreeNode[] => {
+    const collator = getLocaleCollator();
     return [...map.values()]
-      .sort((left, right) =>
-        left.label.localeCompare(right.label, "zh-Hans-CN"),
-      )
+      .sort((left, right) => collator.compare(left.label, right.label))
       .map((node) => ({
         key: node.key,
         label: node.label,

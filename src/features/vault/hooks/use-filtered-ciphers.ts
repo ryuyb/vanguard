@@ -12,6 +12,7 @@ import type {
   CipherTypeFilter,
 } from "@/features/vault/types";
 import { toSortableDate } from "@/features/vault/utils";
+import { getLocaleCollator } from "@/i18n";
 
 function isDeleted(cipher: VaultCipherItemDto) {
   return cipher.deletedDate != null;
@@ -86,9 +87,10 @@ export function useFilteredCiphers({
 
     return [...searchFiltered].sort((left, right) => {
       if (sortBy === "title") {
-        const titleCompare = (left.name ?? "").localeCompare(
+        const collator = getLocaleCollator();
+        const titleCompare = collator.compare(
+          left.name ?? "",
           right.name ?? "",
-          "zh-Hans-CN",
         );
         return sortDirection === "asc" ? titleCompare : -titleCompare;
       }
