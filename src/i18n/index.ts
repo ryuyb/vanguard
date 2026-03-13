@@ -1,4 +1,4 @@
-export { appI18n } from "./app-i18n";
+export { appI18n, changeAppLocale, initializeAppI18n } from "./app-i18n";
 export {
   APP_LOCALE_METADATA,
   APP_LOCALE_OPTIONS,
@@ -19,3 +19,4 @@ export {
   type TranslationResourceTree,
   translationResources,
 } from "./resources";
+export { clearSavedLocale, loadSavedLocale, saveLocale } from "./storage";
