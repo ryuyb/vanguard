@@ -25,6 +25,6 @@
 
 ## 5. Validation
 
-- [ ] 5.1 Verify Chinese and English switching works immediately from general settings without restarting the current window
-- [ ] 5.2 Verify the saved language is restored on relaunch for the main app and Spotlight entry point
-- [ ] 5.3 Run `pnpm build` and `pnpm biome:check` after the migration and fix any localization-related regressions
+- [x] 5.1 Verify Chinese and English switching works immediately from general settings without restarting the current window
+- [x] 5.2 Verify the saved language is restored on relaunch for the main app and Spotlight entry point
+- [x] 5.3 Run `pnpm build` and `pnpm biome:check` after the migration and fix any localization-related regressions
