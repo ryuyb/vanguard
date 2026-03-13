@@ -1,32 +1,21 @@
-import {
-  APP_LOCALE_STORAGE_KEY,
-  type AppLocale,
-  resolveAppLocale,
-} from "./locales";
+import { commands } from "@/bindings";
+import { type AppLocale, resolveAppLocale } from "./locales";
 
-export function loadSavedLocale(): AppLocale | null {
+export async function loadSavedLocale(): Promise<AppLocale | null> {
   try {
-    const saved = localStorage.getItem(APP_LOCALE_STORAGE_KEY);
-    if (!saved) {
+    const result = await commands.configGetAppConfig();
+    if (result.status === "error") {
       return null;
     }
-    return resolveAppLocale(saved);
+    return resolveAppLocale(result.data.locale);
   } catch {
     return null;
   }
 }
 
-export function saveLocale(locale: AppLocale): void {
+export async function saveLocale(locale: AppLocale): Promise<void> {
   try {
-    localStorage.setItem(APP_LOCALE_STORAGE_KEY, locale);
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-export function clearSavedLocale(): void {
-  try {
-    localStorage.removeItem(APP_LOCALE_STORAGE_KEY);
+    await commands.configUpdateAppConfig({ locale });
   } catch {
     // Ignore storage errors
   }

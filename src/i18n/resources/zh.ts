@@ -478,6 +478,7 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
           enablePin: "启用 PIN 解锁失败。",
           disablePin: "禁用 PIN 解锁失败。",
           pinRequired: "请输入 PIN。",
+          saveFailed: "保存设置失败。",
         },
       },
     },

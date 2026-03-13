@@ -11,7 +11,7 @@ import { loadSavedLocale, saveLocale } from "./storage";
 export const appI18n = createInstance();
 
 export async function initializeAppI18n(initialLocale?: string): Promise<void> {
-  const savedLocale = loadSavedLocale();
+  const savedLocale = await loadSavedLocale();
   const locale = resolveAppLocale(
     initialLocale ?? savedLocale,
     DEFAULT_APP_LOCALE,
@@ -34,5 +34,5 @@ export async function initializeAppI18n(initialLocale?: string): Promise<void> {
 export async function changeAppLocale(locale: string): Promise<void> {
   const resolved = resolveAppLocale(locale, DEFAULT_APP_LOCALE);
   await appI18n.changeLanguage(resolved);
-  saveLocale(resolved);
+  await saveLocale(resolved);
 }

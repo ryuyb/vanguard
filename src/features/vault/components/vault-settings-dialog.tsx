@@ -1,6 +1,7 @@
 import { Shield, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -187,6 +188,30 @@ export function VaultSettingsDialog({
   const quickAccessCapturedRef = useRef(false);
   const lockCapturedRef = useRef(false);
 
+  const loadAppConfig = useCallback(async () => {
+    try {
+      const result = await commands.configGetAppConfig();
+      if (result.status === "ok") {
+        const config = result.data;
+        setLanguage(config.locale as AppLocale);
+        setLaunchOnLogin(config.launchOnLogin);
+        setShowWebsiteIcon(config.showWebsiteIcon);
+        setQuickAccessShortcut(config.quickAccessShortcut);
+        setLockShortcut(config.lockShortcut);
+        setRequireMasterPasswordAfter(
+          config.requireMasterPasswordInterval as RequireMasterPasswordOption,
+        );
+        setLockWhenDeviceSleep(config.lockOnSleep);
+        setAutoLockIdleDelay(config.idleAutoLockDelay as AutoLockIdleOption);
+        setClipboardClearAfter(
+          config.clipboardClearDelay as ClipboardClearOption,
+        );
+      }
+    } catch {
+      // Ignore config load errors, use default values
+    }
+  }, []);
+
   const loadSecuritySettings = useCallback(async () => {
     setIsStatusLoading(true);
     setErrorText(null);
@@ -240,9 +265,9 @@ export function VaultSettingsDialog({
       return;
     }
     setActiveSection("general");
-    setLanguage(appI18n.language as AppLocale);
+    void loadAppConfig();
     void loadSecuritySettings();
-  }, [loadSecuritySettings, open]);
+  }, [loadAppConfig, loadSecuritySettings, open]);
 
   const onPinDialogOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -259,11 +284,132 @@ export function VaultSettingsDialog({
     [isPinBusy],
   );
 
-  const onLanguageChange = useCallback((value: string) => {
-    const newLocale = value as AppLocale;
-    setLanguage(newLocale);
-    void changeAppLocale(newLocale);
-  }, []);
+  const onLanguageChange = useCallback(
+    async (value: string) => {
+      const newLocale = value as AppLocale;
+      try {
+        await changeAppLocale(newLocale);
+        setLanguage(newLocale);
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onLaunchOnLoginChange = useCallback(
+    async (checked: boolean) => {
+      setLaunchOnLogin(checked);
+      try {
+        await commands.configUpdateAppConfig({ launchOnLogin: checked });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onShowWebsiteIconChange = useCallback(
+    async (checked: boolean) => {
+      setShowWebsiteIcon(checked);
+      try {
+        await commands.configUpdateAppConfig({ showWebsiteIcon: checked });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onQuickAccessShortcutSave = useCallback(
+    async (shortcut: string) => {
+      try {
+        await commands.configUpdateAppConfig({ quickAccessShortcut: shortcut });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onLockShortcutSave = useCallback(
+    async (shortcut: string) => {
+      try {
+        await commands.configUpdateAppConfig({ lockShortcut: shortcut });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onRequireMasterPasswordChange = useCallback(
+    async (value: RequireMasterPasswordOption) => {
+      setRequireMasterPasswordAfter(value);
+      try {
+        await commands.configUpdateAppConfig({
+          requireMasterPasswordInterval: value,
+        });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onLockOnSleepChange = useCallback(
+    async (checked: boolean) => {
+      setLockWhenDeviceSleep(checked);
+      try {
+        await commands.configUpdateAppConfig({ lockOnSleep: checked });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onAutoLockIdleDelayChange = useCallback(
+    async (value: AutoLockIdleOption) => {
+      setAutoLockIdleDelay(value);
+      try {
+        await commands.configUpdateAppConfig({ idleAutoLockDelay: value });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onClipboardClearAfterChange = useCallback(
+    async (value: ClipboardClearOption) => {
+      setClipboardClearAfter(value);
+      try {
+        await commands.configUpdateAppConfig({ clipboardClearDelay: value });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
 
   const onBiometricCheckedChange = useCallback(
     async (checked: boolean) => {
@@ -396,8 +542,10 @@ export function VaultSettingsDialog({
     setIsQuickAccessCapturing(false);
     if (!quickAccessCapturedRef.current) {
       setQuickAccessShortcut(quickAccessOriginalShortcutRef.current);
+    } else {
+      void onQuickAccessShortcutSave(quickAccessShortcut);
     }
-  }, []);
+  }, [onQuickAccessShortcutSave, quickAccessShortcut]);
 
   const onQuickAccessKeyDownCapture = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -442,8 +590,10 @@ export function VaultSettingsDialog({
     setIsLockCapturing(false);
     if (!lockCapturedRef.current) {
       setLockShortcut(lockOriginalShortcutRef.current);
+    } else {
+      void onLockShortcutSave(lockShortcut);
     }
-  }, []);
+  }, [lockShortcut, onLockShortcutSave]);
 
   const onLockKeyDownCapture = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -607,7 +757,7 @@ export function VaultSettingsDialog({
                     <Select
                       value={requireMasterPasswordAfter}
                       onValueChange={(value) =>
-                        setRequireMasterPasswordAfter(
+                        void onRequireMasterPasswordChange(
                           value as RequireMasterPasswordOption,
                         )
                       }
@@ -658,7 +808,7 @@ export function VaultSettingsDialog({
                       className="mt-0.5 size-4 accent-sky-600"
                       checked={lockWhenDeviceSleep}
                       onChange={(event) => {
-                        setLockWhenDeviceSleep(event.target.checked);
+                        void onLockOnSleepChange(event.target.checked);
                       }}
                     />
                   </label>
@@ -670,7 +820,7 @@ export function VaultSettingsDialog({
                     <Select
                       value={autoLockIdleDelay}
                       onValueChange={(value) =>
-                        setAutoLockIdleDelay(value as AutoLockIdleOption)
+                        void onAutoLockIdleDelayChange(value as AutoLockIdleOption)
                       }
                     >
                       <SelectTrigger
@@ -713,7 +863,7 @@ export function VaultSettingsDialog({
                     <Select
                       value={clipboardClearAfter}
                       onValueChange={(value) =>
-                        setClipboardClearAfter(value as ClipboardClearOption)
+                        void onClipboardClearAfterChange(value as ClipboardClearOption)
                       }
                     >
                       <SelectTrigger
@@ -771,7 +921,7 @@ export function VaultSettingsDialog({
                       className="mt-0.5 size-4 accent-sky-600"
                       checked={launchOnLogin}
                       onChange={(event) => {
-                        setLaunchOnLogin(event.target.checked);
+                        void onLaunchOnLoginChange(event.target.checked);
                       }}
                     />
                   </label>
@@ -791,7 +941,7 @@ export function VaultSettingsDialog({
                       className="mt-0.5 size-4 accent-sky-600"
                       checked={showWebsiteIcon}
                       onChange={(event) => {
-                        setShowWebsiteIcon(event.target.checked);
+                        void onShowWebsiteIconChange(event.target.checked);
                       }}
                     />
                   </label>
