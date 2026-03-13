@@ -7,11 +7,11 @@
 
 ## 2. Frontend settings persistence switch
 
-- [ ] 2.1 Replace frontend locale load/save implementation to use backend config APIs instead of localStorage
-- [ ] 2.2 Update app and Spotlight locale bootstrap flow to initialize from backend-provided locale before rendering user-facing copy
-- [ ] 2.3 Refactor Vault Settings dialog to initialize general/security preference controls from backend app-config values
-- [ ] 2.4 Refactor Vault Settings preference updates to write through backend app-config APIs and reflect saved values on reopen
-- [ ] 2.5 Remove or retire obsolete localStorage-based language persistence and component-state-only settings persistence code paths
+- [x] 2.1 Replace frontend locale load/save implementation to use backend config APIs instead of localStorage
+- [x] 2.2 Update app and Spotlight locale bootstrap flow to initialize from backend-provided locale before rendering user-facing copy
+- [x] 2.3 Refactor Vault Settings dialog to initialize general/security preference controls from backend app-config values
+- [x] 2.4 Refactor Vault Settings preference updates to write through backend app-config APIs and reflect saved values on reopen
+- [x] 2.5 Remove or retire obsolete localStorage-based language persistence and component-state-only settings persistence code paths
 
 ## 3. Multi-account auth-state storage refactor
 

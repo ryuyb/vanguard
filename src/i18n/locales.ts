@@ -13,7 +13,6 @@ export type AppLocaleMetadata = {
 
 export const DEFAULT_APP_LOCALE: AppLocale = "zh";
 export const FALLBACK_APP_LOCALE: AppLocale = DEFAULT_APP_LOCALE;
-export const APP_LOCALE_STORAGE_KEY = "vanguard.app.locale";
 
 export const APP_LOCALE_METADATA: Record<AppLocale, AppLocaleMetadata> = {
   zh: {

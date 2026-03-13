@@ -490,6 +490,7 @@ export const enTranslationCatalog: AppTranslationCatalog = {
           enablePin: "Failed to enable PIN unlock.",
           disablePin: "Failed to disable PIN unlock.",
           pinRequired: "PIN is required.",
+          saveFailed: "Failed to save settings.",
         },
       },
     },

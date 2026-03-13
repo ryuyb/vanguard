@@ -10,7 +10,6 @@ export {
 export {
   APP_LOCALE_METADATA,
   APP_LOCALE_OPTIONS,
-  APP_LOCALE_STORAGE_KEY,
   APP_LOCALES,
   type AppLocale,
   type AppLocaleMetadata,
@@ -27,4 +26,4 @@ export {
   type TranslationResourceTree,
   translationResources,
 } from "./resources";
-export { clearSavedLocale, loadSavedLocale, saveLocale } from "./storage";
+export { loadSavedLocale, saveLocale } from "./storage";
