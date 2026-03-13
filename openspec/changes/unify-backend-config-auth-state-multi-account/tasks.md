@@ -1,9 +1,9 @@
 ## 1. Backend app-config unification
 
-- [ ] 1.1 Extend backend app config model to include `locale` with supported-value validation and default fallback behavior
-- [ ] 1.2 Extend backend app config schema to include Vault Settings preferences (launch-on-login, show-website-icon, shortcuts, require-master-password interval, lock-on-sleep, idle auto-lock delay, clipboard clear delay)
-- [ ] 1.3 Expose backend commands/services to read and update full global app config as the single source of truth
-- [ ] 1.4 Ensure all app-config persistence paths keep atomic write and consistent error logging behavior
+- [x] 1.1 Extend backend app config model to include `locale` with supported-value validation and default fallback behavior
+- [x] 1.2 Extend backend app config schema to include Vault Settings preferences (launch-on-login, show-website-icon, shortcuts, require-master-password interval, lock-on-sleep, idle auto-lock delay, clipboard clear delay)
+- [x] 1.3 Expose backend commands/services to read and update full global app config as the single source of truth
+- [x] 1.4 Ensure all app-config persistence paths keep atomic write and consistent error logging behavior
 
 ## 2. Frontend settings persistence switch
 

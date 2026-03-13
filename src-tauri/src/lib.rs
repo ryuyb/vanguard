@@ -21,6 +21,8 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_verify_email_token,
             interfaces::tauri::commands::auth::auth_restore_state,
             interfaces::tauri::commands::auth::auth_logout,
+            interfaces::tauri::commands::config::config_get_app_config,
+            interfaces::tauri::commands::config::config_update_app_config,
             interfaces::tauri::commands::desktop::desktop_open_main_window,
             interfaces::tauri::commands::folder::list_folders,
             interfaces::tauri::commands::folder::create_folder,

@@ -45,6 +45,22 @@ async authLogout(request: LogoutRequestDto) : Promise<Result<null, ErrorPayload>
     else return { status: "error", error: e  as any };
 }
 },
+async configGetAppConfig() : Promise<Result<AppConfigDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_get_app_config") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async configUpdateAppConfig(request: UpdateAppConfigRequest) : Promise<Result<AppConfigDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_update_app_config", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async desktopOpenMainWindow() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("desktop_open_main_window") };
@@ -310,6 +326,7 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+export type AppConfigDto = { deviceIdentifier: string; allowInvalidCerts: boolean; syncPollIntervalSeconds: number; locale: string; launchOnLogin: boolean; showWebsiteIcon: boolean; quickAccessShortcut: string; lockShortcut: string; requireMasterPasswordInterval: string; lockOnSleep: boolean; idleAutoLockDelay: string; clipboardClearDelay: string }
 export type CipherCreated = { accountId: string; cipherId: string }
 export type CipherDeleted = { accountId: string; cipherId: string }
 export type CipherMutationResponseDto = { cipherId: string; revisionDate: string }
@@ -354,6 +371,7 @@ export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null }
 export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
 export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }
 export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
