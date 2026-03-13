@@ -94,16 +94,14 @@ pub fn config_update_app_config(
     use serde_json::json;
     use tauri_plugin_store::StoreExt;
 
-    let store = app_handle
-        .store("app-config.json")
-        .map_err(|error| {
-            log_command_error(
-                "config_update_app_config",
-                AppError::InternalUnexpected {
-                    message: format!("failed to open config store: {error}"),
-                },
-            )
-        })?;
+    let store = app_handle.store("app-config.json").map_err(|error| {
+        log_command_error(
+            "config_update_app_config",
+            AppError::InternalUnexpected {
+                message: format!("failed to open config store: {error}"),
+            },
+        )
+    })?;
 
     if let Some(locale) = request.locale {
         store.set("locale".to_string(), json!(locale));

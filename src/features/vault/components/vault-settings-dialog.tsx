@@ -820,7 +820,9 @@ export function VaultSettingsDialog({
                     <Select
                       value={autoLockIdleDelay}
                       onValueChange={(value) =>
-                        void onAutoLockIdleDelayChange(value as AutoLockIdleOption)
+                        void onAutoLockIdleDelayChange(
+                          value as AutoLockIdleOption,
+                        )
                       }
                     >
                       <SelectTrigger
@@ -863,7 +865,9 @@ export function VaultSettingsDialog({
                     <Select
                       value={clipboardClearAfter}
                       onValueChange={(value) =>
-                        void onClipboardClearAfterChange(value as ClipboardClearOption)
+                        void onClipboardClearAfterChange(
+                          value as ClipboardClearOption,
+                        )
                       }
                     >
                       <SelectTrigger

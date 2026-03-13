@@ -15,13 +15,13 @@
 
 ## 3. Multi-account auth-state storage refactor
 
-- [ ] 3.1 Refactor persisted auth-state storage from single `auth-state.json` to per-account files under `auth-states/{account_id}.json`
-- [ ] 3.2 Add active-account index file `auth-states/active.json` and update login/account-switch flows to maintain it
-- [ ] 3.3 Update restore-auth-state flow to resolve persisted context based on active account index and handle missing/invalid target file as needs-login
-- [ ] 3.4 Update logout flow to delete current account auth-state and refresh/remove active index according to remaining account states
+- [x] 3.1 Refactor persisted auth-state storage from single `auth-state.json` to per-account files under `auth-states/{account_id}.json`
+- [x] 3.2 Add active-account index file `auth-states/active.json` and update login/account-switch flows to maintain it
+- [x] 3.3 Update restore-auth-state flow to resolve persisted context based on active account index and handle missing/invalid target file as needs-login
+- [x] 3.4 Update logout flow to delete current account auth-state and refresh/remove active index according to remaining account states
 
 ## 4. Validation and regression checks
 
-- [ ] 4.1 Add or update backend tests for app-config validation/defaulting (locale + bounded settings options) and per-account auth-state read/write behavior
-- [ ] 4.2 Add or update frontend/integration checks for settings persistence (Vault Settings reopen consistency, locale bootstrap) and multi-account login/logout/restore scenarios
-- [ ] 4.3 Run required project checks for touched surfaces (Rust and frontend) and resolve all issues
+- [x] 4.1 Add or update backend tests for app-config validation/defaulting (locale + bounded settings options) and per-account auth-state read/write behavior
+- [x] 4.2 Add or update frontend/integration checks for settings persistence (Vault Settings reopen consistency, locale bootstrap) and multi-account login/logout/restore scenarios
+- [x] 4.3 Run required project checks for touched surfaces (Rust and frontend) and resolve all issues
