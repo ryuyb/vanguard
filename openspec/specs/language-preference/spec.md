@@ -19,7 +19,7 @@ The system SHALL update the active locale immediately after the user selects a s
 - **THEN** it keeps or restores a supported locale instead of entering an undefined language state
 
 ### Requirement: Selected language persists across launches
-The system SHALL persist the last selected language and restore it when the app starts again.
+The system SHALL persist the last selected language in backend app configuration and restore it when the app starts again.
 
 #### Scenario: Relaunch restores English preference
 - **WHEN** the user previously selected `en` and launches the app again
@@ -30,7 +30,7 @@ The system SHALL persist the last selected language and restore it when the app 
 - **THEN** the app initializes with `zh` as the default locale
 
 ### Requirement: App windows resolve a consistent saved language
-The system SHALL keep separately rendered app windows aligned with the same saved language preference.
+The system SHALL keep separately rendered app windows aligned with the same saved language preference resolved from backend app configuration.
 
 #### Scenario: Spotlight opens after locale change
 - **WHEN** the user changes the saved language in the main app and later opens Spotlight
@@ -38,4 +38,4 @@ The system SHALL keep separately rendered app windows aligned with the same save
 
 #### Scenario: Background window refreshes locale from saved preference
 - **WHEN** an already-open app window regains focus after the saved locale changed elsewhere
-- **THEN** it reloads the supported saved locale before rendering new user-visible copy
+- **THEN** it reloads the supported saved locale from backend configuration before rendering new user-visible copy
