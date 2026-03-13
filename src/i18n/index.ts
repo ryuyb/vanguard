@@ -1,5 +1,13 @@
 export { appI18n, changeAppLocale, initializeAppI18n } from "./app-i18n";
 export {
+  formatDate,
+  formatDateTime,
+  formatRelativeTime,
+  formatTime,
+  getLocaleCollator,
+  sortByLocale,
+} from "./formatting";
+export {
   APP_LOCALE_METADATA,
   APP_LOCALE_OPTIONS,
   APP_LOCALE_STORAGE_KEY,
