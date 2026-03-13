@@ -10,29 +10,29 @@ import type {
   FolderTreeNode,
   FolderTreeNodeDraft,
 } from "@/features/vault/types";
-import { getLocaleCollator } from "@/i18n";
+import { appI18n, getLocaleCollator } from "@/i18n";
 
 export function toTypeFilterLabel(filter: CipherTypeFilter): string {
   if (filter === "login") {
-    return "Login";
+    return appI18n.t("vault.page.filters.types.login");
   }
   if (filter === "card") {
-    return "Card";
+    return appI18n.t("vault.page.filters.types.card");
   }
   if (filter === "identify") {
-    return "Identify";
+    return appI18n.t("vault.page.filters.types.identity");
   }
   if (filter === "note") {
-    return "Note";
+    return appI18n.t("vault.page.filters.types.note");
   }
   if (filter === "ssh_key") {
-    return "SSH key";
+    return appI18n.t("vault.page.filters.types.sshKey");
   }
-  return "All types";
+  return appI18n.t("vault.page.filters.types.all");
 }
 
 export function toVaultErrorText(error: unknown): string {
-  return toErrorText(error, "加载 vault 数据失败，请稍后重试。");
+  return toErrorText(error, appI18n.t("vault.feedback.loadError"));
 }
 
 export function toAvatarText(email: string | null | undefined): string {
@@ -83,7 +83,7 @@ function normalizeFolderSegments(folderName: string | null): string[] {
   if (segments.length > 0) {
     return segments;
   }
-  return ["Untitled folder"];
+  return [appI18n.t("vault.page.folders.untitledFolder")];
 }
 
 export function buildFolderTree(
@@ -116,7 +116,8 @@ export function buildFolderTree(
 
     if (!canBuildHierarchy) {
       // 父路径不存在，直接使用原始 name 作为根节点
-      const originalName = folder.name ?? "Untitled folder";
+      const originalName =
+        folder.name ?? appI18n.t("vault.page.folders.untitledFolder");
       const key = folder.id;
       root.set(key, {
         key,
@@ -305,7 +306,10 @@ export function toCipherIconUrl(
 
 export function toCipherIconAlt(name: string | null | undefined): string {
   const normalized = (name ?? "").trim();
-  return normalized ? `${normalized} icon` : "Vault item icon";
+  if (normalized) {
+    return appI18n.t("vault.feedback.iconAlt", { name: normalized });
+  }
+  return appI18n.t("vault.feedback.iconAltFallback");
 }
 
 export function getCipherIconUrl(

@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { SyncCipher, VaultFolderItemDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +54,7 @@ export function CipherFormDialog({
   onConfirm,
   isLoading = false,
 }: CipherFormDialogProps) {
+  const { t } = useTranslation();
   const form = useForm({
     defaultValues: {
       cipherType: CIPHER_TYPE_LOGIN,
@@ -318,10 +320,14 @@ export function CipherFormDialog({
       <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-900">
-            {mode === "create" ? "新建项目" : "编辑项目"}
+            {mode === "create"
+              ? t("vault.dialogs.cipherForm.createTitle")
+              : t("vault.dialogs.cipherForm.editTitle")}
           </DialogTitle>
           <DialogDescription className="text-sm text-slate-600">
-            {mode === "create" ? "创建一个新的密码或安全笔记" : "修改项目信息"}
+            {mode === "create"
+              ? t("vault.dialogs.cipherForm.createDescription")
+              : t("vault.dialogs.cipherForm.editDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -336,7 +342,7 @@ export function CipherFormDialog({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor="cipher-type" className="text-sm font-semibold">
-                  类型
+                  {t("vault.dialogs.cipherForm.fields.type")}
                 </Label>
                 <Select
                   value={String(field.state.value)}
@@ -348,16 +354,16 @@ export function CipherFormDialog({
                   </SelectTrigger>
                   <SelectContent className="w-full">
                     <SelectItem value={String(CIPHER_TYPE_LOGIN)}>
-                      登录
+                      {t("vault.dialogs.cipherForm.types.login")}
                     </SelectItem>
                     <SelectItem value={String(CIPHER_TYPE_NOTE)}>
-                      安全笔记
+                      {t("vault.dialogs.cipherForm.types.note")}
                     </SelectItem>
                     <SelectItem value={String(CIPHER_TYPE_CARD)}>
-                      支付卡
+                      {t("vault.dialogs.cipherForm.types.card")}
                     </SelectItem>
                     <SelectItem value={String(CIPHER_TYPE_SSH_KEY)}>
-                      SSH 密钥
+                      {t("vault.dialogs.cipherForm.types.sshKey")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -369,19 +375,22 @@ export function CipherFormDialog({
             name="name"
             validators={{
               onChange: ({ value }) =>
-                !value.trim() ? "名称不能为空" : undefined,
+                !value.trim()
+                  ? t("vault.dialogs.cipherForm.validation.nameRequired")
+                  : undefined,
             }}
           >
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor="cipher-name" className="text-sm font-semibold">
-                  名称 <span className="text-red-500">*</span>
+                  {t("vault.dialogs.cipherForm.fields.name")}{" "}
+                  <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="cipher-name"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="例如：GitHub、Gmail"
+                  placeholder={t("vault.dialogs.cipherForm.placeholders.name")}
                   required
                   className="h-10"
                 />
@@ -396,7 +405,7 @@ export function CipherFormDialog({
                   htmlFor="cipher-folder"
                   className="text-sm font-semibold"
                 >
-                  文件夹
+                  {t("vault.dialogs.cipherForm.fields.folder")}
                 </Label>
                 <Select
                   value={field.state.value || "no-folder"}
@@ -405,13 +414,17 @@ export function CipherFormDialog({
                   }
                 >
                   <SelectTrigger id="cipher-folder" className="h-10 w-full">
-                    <SelectValue placeholder="无文件夹" />
+                    <SelectValue
+                      placeholder={t("vault.dialogs.cipherForm.noFolder")}
+                    />
                   </SelectTrigger>
                   <SelectContent className="w-full max-h-60">
-                    <SelectItem value="no-folder">无文件夹</SelectItem>
+                    <SelectItem value="no-folder">
+                      {t("vault.dialogs.cipherForm.noFolder")}
+                    </SelectItem>
                     {folders.map((folder) => (
                       <SelectItem key={folder.id} value={folder.id}>
-                        {folder.name || "未命名文件夹"}
+                        {folder.name || t("vault.page.folders.untitledFolder")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -431,13 +444,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-username"
                           className="text-sm font-semibold"
                         >
-                          用户名
+                          {t("vault.dialogs.cipherForm.fields.username")}
                         </Label>
                         <Input
                           id="cipher-username"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="用户名或邮箱"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.username",
+                          )}
                           className="h-10"
                         />
                       </div>
@@ -451,14 +466,16 @@ export function CipherFormDialog({
                           htmlFor="cipher-password"
                           className="text-sm font-semibold"
                         >
-                          密码
+                          {t("vault.dialogs.cipherForm.fields.password")}
                         </Label>
                         <Input
                           id="cipher-password"
                           type="password"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="密码"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.password",
+                          )}
                           className="h-10"
                         />
                       </div>
@@ -472,13 +489,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-totp"
                           className="text-sm font-semibold"
                         >
-                          验证器密钥 (TOTP)
+                          {t("vault.dialogs.cipherForm.fields.totp")}
                         </Label>
                         <Input
                           id="cipher-totp"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="otpauth://totp/... 或密钥"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.totp",
+                          )}
                           className="h-10"
                         />
                       </div>
@@ -489,7 +508,7 @@ export function CipherFormDialog({
                     {(field) => (
                       <div className="space-y-3">
                         <Label className="text-sm font-semibold">
-                          网站地址
+                          {t("vault.dialogs.cipherForm.fields.uris")}
                         </Label>
                         {field.state.value.map((uri, index) => (
                           <div
@@ -503,7 +522,9 @@ export function CipherFormDialog({
                                 updated[index] = e.target.value;
                                 field.handleChange(updated);
                               }}
-                              placeholder="https://example.com"
+                              placeholder={t(
+                                "vault.dialogs.cipherForm.placeholders.uri",
+                              )}
                               type="url"
                               className="h-10 flex-1"
                             />
@@ -535,7 +556,7 @@ export function CipherFormDialog({
                           className="w-full h-10"
                         >
                           <Plus className="size-4" />
-                          添加网站地址
+                          {t("vault.dialogs.cipherForm.actions.addUri")}
                         </Button>
                       </div>
                     )}
@@ -556,13 +577,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-cardholder-name"
                           className="text-sm font-semibold"
                         >
-                          持卡人姓名
+                          {t("vault.dialogs.cipherForm.fields.cardholderName")}
                         </Label>
                         <Input
                           id="cipher-cardholder-name"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="持卡人姓名"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.cardholderName",
+                          )}
                           className="h-10"
                         />
                       </div>
@@ -576,13 +599,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-card-number"
                           className="text-sm font-semibold"
                         >
-                          卡号
+                          {t("vault.dialogs.cipherForm.fields.cardNumber")}
                         </Label>
                         <Input
                           id="cipher-card-number"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="1234 5678 9012 3456"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.cardNumber",
+                          )}
                           className="h-10"
                         />
                       </div>
@@ -596,7 +621,7 @@ export function CipherFormDialog({
                           htmlFor="cipher-card-brand"
                           className="text-sm font-semibold"
                         >
-                          品牌
+                          {t("vault.dialogs.cipherForm.fields.cardBrand")}
                         </Label>
                         <Select
                           value={field.state.value}
@@ -606,20 +631,36 @@ export function CipherFormDialog({
                             id="cipher-card-brand"
                             className="h-10 w-full"
                           >
-                            <SelectValue placeholder="选择卡品牌" />
+                            <SelectValue
+                              placeholder={t(
+                                "vault.dialogs.cipherForm.placeholders.cardBrand",
+                              )}
+                            />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Visa">Visa</SelectItem>
+                            <SelectItem value="Visa">
+                              {t("vault.dialogs.cipherForm.brands.visa")}
+                            </SelectItem>
                             <SelectItem value="Mastercard">
-                              Mastercard
+                              {t("vault.dialogs.cipherForm.brands.mastercard")}
                             </SelectItem>
                             <SelectItem value="American Express">
-                              American Express
+                              {t(
+                                "vault.dialogs.cipherForm.brands.americanExpress",
+                              )}
                             </SelectItem>
-                            <SelectItem value="Discover">Discover</SelectItem>
-                            <SelectItem value="UnionPay">银联</SelectItem>
-                            <SelectItem value="JCB">JCB</SelectItem>
-                            <SelectItem value="Other">其他</SelectItem>
+                            <SelectItem value="Discover">
+                              {t("vault.dialogs.cipherForm.brands.discover")}
+                            </SelectItem>
+                            <SelectItem value="UnionPay">
+                              {t("vault.dialogs.cipherForm.brands.unionPay")}
+                            </SelectItem>
+                            <SelectItem value="JCB">
+                              {t("vault.dialogs.cipherForm.brands.jcb")}
+                            </SelectItem>
+                            <SelectItem value="Other">
+                              {t("vault.dialogs.cipherForm.brands.other")}
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -634,7 +675,7 @@ export function CipherFormDialog({
                             htmlFor="cipher-exp-month"
                             className="text-sm font-semibold"
                           >
-                            过期月份
+                            {t("vault.dialogs.cipherForm.fields.expMonth")}
                           </Label>
                           <Select
                             value={field.state.value}
@@ -644,7 +685,11 @@ export function CipherFormDialog({
                               id="cipher-exp-month"
                               className="h-10 w-full"
                             >
-                              <SelectValue placeholder="月" />
+                              <SelectValue
+                                placeholder={t(
+                                  "vault.dialogs.cipherForm.placeholders.month",
+                                )}
+                              />
                             </SelectTrigger>
                             <SelectContent>
                               {Array.from({ length: 12 }, (_, i) => {
@@ -668,7 +713,7 @@ export function CipherFormDialog({
                             htmlFor="cipher-exp-year"
                             className="text-sm font-semibold"
                           >
-                            过期年份
+                            {t("vault.dialogs.cipherForm.fields.expYear")}
                           </Label>
                           <Select
                             value={field.state.value}
@@ -678,7 +723,11 @@ export function CipherFormDialog({
                               id="cipher-exp-year"
                               className="h-10 w-full"
                             >
-                              <SelectValue placeholder="年" />
+                              <SelectValue
+                                placeholder={t(
+                                  "vault.dialogs.cipherForm.placeholders.year",
+                                )}
+                              />
                             </SelectTrigger>
                             <SelectContent>
                               {Array.from({ length: 20 }, (_, i) => {
@@ -705,14 +754,16 @@ export function CipherFormDialog({
                           htmlFor="cipher-security-code"
                           className="text-sm font-semibold"
                         >
-                          安全码
+                          {t("vault.dialogs.cipherForm.fields.securityCode")}
                         </Label>
                         <Input
                           id="cipher-security-code"
                           type="password"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="CVV/CVC"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.securityCode",
+                          )}
                           maxLength={4}
                           className="h-10"
                         />
@@ -735,13 +786,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-ssh-private-key"
                           className="text-sm font-semibold"
                         >
-                          私钥
+                          {t("vault.dialogs.cipherForm.fields.sshPrivateKey")}
                         </Label>
                         <Textarea
                           id="cipher-ssh-private-key"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.sshPrivateKey",
+                          )}
                           rows={6}
                           className="resize-none font-mono text-xs break-all w-full"
                         />
@@ -756,13 +809,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-ssh-public-key"
                           className="text-sm font-semibold"
                         >
-                          公钥
+                          {t("vault.dialogs.cipherForm.fields.sshPublicKey")}
                         </Label>
                         <Textarea
                           id="cipher-ssh-public-key"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="ssh-rsa AAAA..."
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.sshPublicKey",
+                          )}
                           rows={3}
                           className="resize-none font-mono text-xs break-all w-full"
                         />
@@ -777,13 +832,15 @@ export function CipherFormDialog({
                           htmlFor="cipher-ssh-fingerprint"
                           className="text-sm font-semibold"
                         >
-                          指纹
+                          {t("vault.dialogs.cipherForm.fields.sshFingerprint")}
                         </Label>
                         <Input
                           id="cipher-ssh-fingerprint"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder="SHA256:..."
+                          placeholder={t(
+                            "vault.dialogs.cipherForm.placeholders.sshFingerprint",
+                          )}
                           className="h-10 font-mono text-xs break-all w-full"
                         />
                       </div>
@@ -798,13 +855,13 @@ export function CipherFormDialog({
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor="cipher-notes" className="text-sm font-semibold">
-                  备注
+                  {t("vault.dialogs.cipherForm.fields.notes")}
                 </Label>
                 <Textarea
                   id="cipher-notes"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="添加备注信息..."
+                  placeholder={t("vault.dialogs.cipherForm.placeholders.notes")}
                   rows={4}
                   className="resize-none"
                 />
@@ -817,7 +874,9 @@ export function CipherFormDialog({
               <>
                 {field.state.value.length > 0 && (
                   <div className="space-y-3">
-                    <Label className="text-sm font-semibold">自定义字段</Label>
+                    <Label className="text-sm font-semibold">
+                      {t("vault.dialogs.cipherForm.fields.customFields")}
+                    </Label>
                     {field.state.value.map((customField, index) => (
                       <div
                         key={`custom-field-${index}`}
@@ -834,7 +893,9 @@ export function CipherFormDialog({
                               };
                               field.handleChange(updated);
                             }}
-                            placeholder="字段名"
+                            placeholder={t(
+                              "vault.dialogs.cipherForm.placeholders.customFieldName",
+                            )}
                             className="h-10 flex-1"
                           />
                           <Select
@@ -855,22 +916,30 @@ export function CipherFormDialog({
                               <SelectItem
                                 value={String(CUSTOM_FIELD_TYPE_TEXT)}
                               >
-                                文本
+                                {t(
+                                  "vault.dialogs.cipherForm.customFieldTypes.text",
+                                )}
                               </SelectItem>
                               <SelectItem
                                 value={String(CUSTOM_FIELD_TYPE_HIDDEN)}
                               >
-                                隐藏
+                                {t(
+                                  "vault.dialogs.cipherForm.customFieldTypes.hidden",
+                                )}
                               </SelectItem>
                               <SelectItem
                                 value={String(CUSTOM_FIELD_TYPE_BOOLEAN)}
                               >
-                                复选框
+                                {t(
+                                  "vault.dialogs.cipherForm.customFieldTypes.boolean",
+                                )}
                               </SelectItem>
                               <SelectItem
                                 value={String(CUSTOM_FIELD_TYPE_LINKED)}
                               >
-                                链接
+                                {t(
+                                  "vault.dialogs.cipherForm.customFieldTypes.linked",
+                                )}
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -901,11 +970,19 @@ export function CipherFormDialog({
                             }}
                           >
                             <SelectTrigger className="h-10 w-full">
-                              <SelectValue placeholder="选择值" />
+                              <SelectValue
+                                placeholder={t(
+                                  "vault.dialogs.cipherForm.placeholders.booleanValue",
+                                )}
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="true">是</SelectItem>
-                              <SelectItem value="false">否</SelectItem>
+                              <SelectItem value="true">
+                                {t("vault.detail.boolean.true")}
+                              </SelectItem>
+                              <SelectItem value="false">
+                                {t("vault.detail.boolean.false")}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
@@ -921,10 +998,16 @@ export function CipherFormDialog({
                             }}
                             placeholder={
                               customField.type === CUSTOM_FIELD_TYPE_HIDDEN
-                                ? "隐藏值"
+                                ? t(
+                                    "vault.dialogs.cipherForm.placeholders.hiddenValue",
+                                  )
                                 : customField.type === CUSTOM_FIELD_TYPE_LINKED
-                                  ? "链接地址"
-                                  : "字段值"
+                                  ? t(
+                                      "vault.dialogs.cipherForm.placeholders.linkValue",
+                                    )
+                                  : t(
+                                      "vault.dialogs.cipherForm.placeholders.customFieldValue",
+                                    )
                             }
                             type={
                               customField.type === CUSTOM_FIELD_TYPE_HIDDEN
@@ -951,7 +1034,7 @@ export function CipherFormDialog({
                   className="w-full h-10"
                 >
                   <Plus className="size-4" />
-                  添加自定义字段
+                  {t("vault.dialogs.cipherForm.actions.addCustomField")}
                 </Button>
               </>
             )}
@@ -965,7 +1048,7 @@ export function CipherFormDialog({
               disabled={isLoading}
               className="h-10"
             >
-              取消
+              {t("common.actions.cancel")}
             </Button>
             <form.Subscribe
               selector={(state) =>
@@ -981,12 +1064,14 @@ export function CipherFormDialog({
                   {isLoading ? (
                     <>
                       <LoaderCircle className="size-4 animate-spin" />
-                      {mode === "create" ? "创建中..." : "保存中..."}
+                      {mode === "create"
+                        ? t("vault.dialogs.cipherForm.actions.creating")
+                        : t("vault.dialogs.cipherForm.actions.saving")}
                     </>
                   ) : mode === "create" ? (
-                    "创建"
+                    t("vault.page.actions.create")
                   ) : (
-                    "保存"
+                    t("common.actions.save")
                   )}
                 </Button>
               )}

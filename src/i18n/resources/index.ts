@@ -13,9 +13,13 @@ export type TranslationResourceTree = Record<AppLocale, AppTranslationCatalog>;
 export const DEFAULT_TRANSLATION_NAMESPACE: TranslationNamespace = "common";
 
 export const translationResources = {
-  zh: zhTranslationCatalog,
-  en: enTranslationCatalog,
-} satisfies TranslationResourceTree & Resource;
+  zh: {
+    translation: zhTranslationCatalog,
+  },
+  en: {
+    translation: enTranslationCatalog,
+  },
+} satisfies Resource;
 
 export { TRANSLATION_NAMESPACES };
 export type { AppTranslationCatalog, TranslationNamespace };

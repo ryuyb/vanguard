@@ -24,21 +24,611 @@ export const enTranslationCatalog: AppTranslationCatalog = {
     },
   },
   auth: {
-    login: {},
-    unlock: {},
-    feedback: {},
+    login: {
+      title: "Sign in to Vanguard",
+      subtitle: "Enter your credentials to access your vault",
+      hero: {
+        badge: "Vanguard Vault",
+        title: "Welcome back, continue managing your vault",
+        description:
+          "Enter your server address, email, and master password to sign in and automatically prepare your vault.",
+        illustrationAlt: "Vault sign-in illustration",
+      },
+      form: {
+        serverUrl: {
+          label: "Server Address",
+          placeholder: "Select server address",
+          customOption: "Custom Address",
+          customPlaceholder: "https://vault.example.com",
+        },
+        email: {
+          label: "Email Address",
+          placeholder: "you@example.com",
+        },
+        masterPassword: {
+          label: "Master Password",
+          placeholder: "Enter master password",
+          showPassword: "Show password",
+          hidePassword: "Hide password",
+        },
+        twoFactor: {
+          title: "Two-Factor Authentication",
+          provider: {
+            label: "Authentication Method",
+            placeholder: "Select authentication method",
+            providers: {
+              "0": "Authenticator",
+              "1": "Email",
+              "2": "Duo",
+              "3": "YubiKey",
+              "5": "Remember Me",
+              "7": "WebAuthn",
+              "8": "Recovery Code",
+              unknown: "Provider {{provider}}",
+            },
+          },
+          token: {
+            label: "Two-Factor Code",
+            placeholder: "Enter verification code",
+          },
+          sendEmail: "Send Email Code",
+          sendingEmail: "Sending email code...",
+        },
+      },
+      actions: {
+        submit: "Sign In",
+        submitting: "Signing in...",
+        verifyAndContinue: "Verify and Continue",
+      },
+      states: {
+        checkingSession: "Checking session...",
+      },
+      validation: {
+        missingCredentials:
+          "Enter the server address, email, and master password first.",
+        invalidServerUrl:
+          "The server address is invalid. It must start with http:// or https://.",
+        invalidEmail:
+          "The email address looks invalid. Please check it and try again.",
+        incompleteTwoFactor:
+          "Enter a complete two-factor verification code before continuing.",
+        nonEmailProvider:
+          "The selected method is not email verification, so an email code cannot be sent.",
+        missingEmailCodeRequirements:
+          "Enter the server address, email, and master password before sending an email code.",
+      },
+      progress: {
+        verifyingAccount: "Verifying account...",
+        preparingVault: "Preparing your vault...",
+        unlockingLocalVault: "Unlocking local vault...",
+        syncingLatestData: "Syncing latest data...",
+        firstSync: "Performing initial vault sync...",
+        finishingUnlock: "Finishing unlock...",
+      },
+      messages: {
+        loginFailed: "Sign in failed. Please try again later.",
+        twoFactorPrompt:
+          "Two-factor authentication is required. Enter the code to continue (available methods: {{providers}}).",
+        unknownTwoFactorProvider: "unknown method",
+        emailCodeSent:
+          "An email verification code was sent. Check your inbox, then enter it to continue signing in.",
+      },
+    },
+    unlock: {
+      title: "Unlock Vanguard",
+      subtitle: "Enter your credentials to access your vault",
+      hero: {
+        badge: "Vault Unlock",
+        title: "Session locked, please enter master password to unlock",
+        description:
+          "Enter your master password to unlock and continue securely accessing your vault.",
+        illustrationAlt: "Vault locked illustration",
+      },
+      form: {
+        account: {
+          label: "Account",
+          unknown: "Unknown",
+        },
+        server: {
+          label: "Server",
+          unknown: "Unknown",
+        },
+        pin: {
+          label: "PIN Code",
+          placeholder: "Enter PIN to unlock",
+        },
+        masterPassword: {
+          label: "Master Password",
+          placeholder: "Enter master password to unlock",
+          showPassword: "Show password",
+          hidePassword: "Hide password",
+        },
+      },
+      actions: {
+        unlock: "Unlock",
+        unlocking: "Unlocking...",
+        unlockWithPin: "Unlock with PIN",
+        unlockingWithPin: "Unlocking...",
+        switchToMasterPassword: "Use Master Password",
+        switchToPin: "Use PIN",
+        biometric: "Use Biometric",
+        biometricVerifying: "Verifying...",
+        logout: "Sign Out",
+        loggingOut: "Signing out...",
+        goToLogin: "Go to Sign In",
+      },
+      states: {
+        checkingSession: "Checking session status...",
+        unlocked: "Vault unlocked, redirecting...",
+        needsLogin: {
+          title: "Sign In Required",
+          description: "No session available to unlock, please sign in first.",
+        },
+        biometricUnavailable: {
+          title: "Biometric Unavailable",
+          description:
+            "No local data available for unlocking on this device. Please unlock with password and complete sync first.",
+        },
+      },
+      validation: {
+        sessionNotLocked:
+          "The current session is not locked, so it cannot be unlocked.",
+        missingMasterPassword: "Enter your master password.",
+        pinNotEnabled:
+          "PIN unlock is not enabled for this account. Use your master password instead.",
+        missingPin: "Enter your PIN.",
+        sessionNotLockedBiometric:
+          "The current session is not locked, so biometric unlock is unavailable.",
+      },
+      messages: {
+        unlockFailed: "Unlock failed. Please try again later.",
+      },
+    },
+    feedback: {
+      login: {
+        error: "Sign In Failed",
+        success: "Sign In Successful",
+        twoFactorRequired: "Two-Factor Authentication Required",
+      },
+      unlock: {
+        error: "Verification Failed",
+      },
+    },
   },
   vault: {
     settings: {},
-    page: {},
-    dialogs: {},
-    detail: {},
-    feedback: {},
+    page: {
+      user: {
+        notSignedIn: "Not signed in",
+        unknownService: "Unknown service",
+      },
+      actions: {
+        create: "Create",
+        rename: "Rename",
+        delete: "Delete",
+        edit: "Edit",
+        settings: "Settings",
+        lock: "Lock",
+        locking: "Locking...",
+        logout: "Log Out",
+        loggingOut: "Logging out...",
+      },
+      cipher: {
+        create: "Create item",
+        untitled: "Untitled item",
+      },
+      filters: {
+        ariaLabel: "Filter items",
+        types: {
+          all: "All types",
+          login: "Login",
+          card: "Card",
+          identity: "Identity",
+          note: "Note",
+          sshKey: "SSH key",
+        },
+      },
+      folders: {
+        title: "Folders",
+        untitledFolder: "Untitled folder",
+        expandFolder: "Expand folder",
+        collapseFolder: "Collapse folder",
+      },
+      menus: {
+        allItems: "All Items",
+        favorites: "Favorites",
+        trash: "Trash",
+        noFolder: "No Folder",
+        unknownFolder: "Unknown folder",
+      },
+      search: {
+        placeholder: "Search vault",
+        inlinePlaceholder: "Search in {{menu}}",
+        close: "Close search",
+      },
+      sort: {
+        ariaLabel: "Sort items",
+        byLabel: "Sort by",
+        by: {
+          title: "Title",
+          created: "Created date",
+          modified: "Modified date",
+        },
+        directionLabel: "Order",
+        direction: {
+          alphaAsc: "A to Z",
+          alphaDesc: "Z to A",
+          newestFirst: "Newest first",
+          oldestFirst: "Oldest first",
+        },
+      },
+      states: {
+        loading: "Loading vault...",
+        loadError: "Failed to load vault data.",
+        emptyFiltered: "No items match the current filters.",
+        loadingCipherDetail: "Loading item details...",
+      },
+    },
+    dialogs: {
+      folder: {
+        createTitle: "Create folder",
+        createDescription: "Create a new folder to organize your items.",
+        createSubFolderTitle: "Create subfolder",
+        createSubFolderDescription:
+          "Create a subfolder under {{parentFolderName}}.",
+        renameTitle: "Rename folder",
+        renameDescription: "Update the folder name.",
+        fullPathLabel: "Full path:",
+        folderNameLabel: "Folder name",
+        subFolderNameLabel: "Subfolder name",
+        folderNamePlaceholder: "Enter folder name",
+        subFolderNamePlaceholder: "Enter subfolder name",
+        processing: "Processing...",
+      },
+      deleteFolder: {
+        title: "Delete folder",
+        descriptionPrefix: "Are you sure you want to delete",
+        descriptionSuffix: "?",
+        descriptionHint:
+          "Items in this folder will not be deleted, but they will no longer belong to this folder.",
+        deleting: "Deleting...",
+      },
+      deleteCipher: {
+        title: "Delete item",
+        descriptionPrefix: "Are you sure you want to delete",
+        descriptionSuffix: "?",
+        deleting: "Deleting...",
+      },
+      cipherForm: {
+        createTitle: "Create item",
+        createDescription: "Add a new item to your vault.",
+        editTitle: "Edit item",
+        editDescription: "Update item details.",
+        fields: {
+          type: "Type",
+          name: "Name",
+          folder: "Folder",
+          username: "Username",
+          password: "Password",
+          totp: "TOTP",
+          uris: "Website URLs",
+          cardholderName: "Cardholder name",
+          cardNumber: "Card number",
+          cardBrand: "Card brand",
+          expMonth: "Expiration month",
+          expYear: "Expiration year",
+          securityCode: "Security code",
+          sshPrivateKey: "SSH private key",
+          sshPublicKey: "SSH public key",
+          sshFingerprint: "SSH fingerprint",
+          notes: "Notes",
+          customFields: "Custom fields",
+        },
+        placeholders: {
+          name: "Enter item name",
+          username: "Enter username",
+          password: "Enter password",
+          totp: "Enter TOTP secret",
+          uri: "https://example.com",
+          notes: "Add notes",
+          cardholderName: "Name on card",
+          cardBrand: "Select card brand",
+          cardNumber: "1234 5678 9012 3456",
+          month: "Month",
+          year: "Year",
+          securityCode: "CVV/CVC",
+          sshPrivateKey: "-----BEGIN OPENSSH PRIVATE KEY-----",
+          sshPublicKey: "ssh-rsa AAAA...",
+          sshFingerprint: "SHA256:...",
+          customFieldName: "Field name",
+          customFieldValue: "Field value",
+          hiddenValue: "Hidden value",
+          linkValue: "Linked value",
+          booleanValue: "Select true or false",
+        },
+        types: {
+          login: "Login",
+          note: "Secure note",
+          card: "Card",
+          sshKey: "SSH key",
+        },
+        brands: {
+          visa: "Visa",
+          mastercard: "Mastercard",
+          americanExpress: "American Express",
+          discover: "Discover",
+          jcb: "JCB",
+          unionPay: "UnionPay",
+          other: "Other",
+        },
+        customFieldTypes: {
+          text: "Text",
+          hidden: "Hidden",
+          boolean: "Boolean",
+          linked: "Linked",
+        },
+        actions: {
+          addUri: "Add URL",
+          addCustomField: "Add custom field",
+          creating: "Creating...",
+          saving: "Saving...",
+        },
+        validation: {
+          nameRequired: "Name is required.",
+        },
+        noFolder: "No folder",
+      },
+      settings: {
+        title: "Vault settings",
+        description:
+          "Manage general preferences and security behavior for your vault.",
+        sections: {
+          general: "General",
+          security: "Security",
+        },
+        general: {
+          title: "General",
+          description: "Set appearance and basic behavior preferences.",
+          launchOnLogin: "Launch app on login",
+          showWebsiteIcon: "Show website icon",
+          shortcuts: {
+            title: "Keyboard shortcuts",
+            quickAccess: "Quick access shortcut",
+            lock: "Lock vault shortcut",
+            unset: "Not set",
+            inputHint: "Press keys to record shortcut",
+            clear: "Clear",
+            clearQuickAccess: "Clear quick access shortcut",
+            clearLock: "Clear lock shortcut",
+            keys: {
+              space: "Space",
+              esc: "Esc",
+              up: "Up",
+              down: "Down",
+              left: "Left",
+              right: "Right",
+            },
+          },
+        },
+        security: {
+          unlock: {
+            title: "Unlock",
+            description: "Configure unlock methods.",
+          },
+          biometric: {
+            label: "Biometric unlock",
+            enabledHint: "Use device biometric authentication to unlock.",
+            checkingHint: "Checking biometric availability...",
+          },
+          pin: {
+            label: "PIN unlock",
+            enabledHint: "Use a PIN to unlock quickly.",
+            unsupportedHint: "PIN unlock is not available on this device.",
+          },
+          requireMasterPassword: "Require master password after",
+          autoLock: {
+            title: "Auto-lock",
+            description: "Automatically lock your vault after inactivity.",
+          },
+          lockOnSleep: "Lock when device sleeps",
+          idleLockDelay: "Lock after idle time",
+          clipboard: {
+            title: "Clipboard",
+            description: "Control how copied secrets are cleared.",
+            clearAfter: "Clear clipboard after",
+          },
+        },
+        placeholders: {
+          language: "Select language",
+          requireMasterPassword: "Select when to require master password",
+          autoLockIdle: "Select idle lock delay",
+          clipboardClear: "Select clipboard clear delay",
+        },
+        options: {
+          requireMasterPassword: {
+            "1d": "1 day",
+            "7d": "7 days",
+            "14d": "14 days",
+            "30d": "30 days",
+            never: "Never",
+          },
+          autoLockIdle: {
+            "1m": "1 minute",
+            "2m": "2 minutes",
+            "5m": "5 minutes",
+            "10m": "10 minutes",
+            "15m": "15 minutes",
+            "30m": "30 minutes",
+            "1h": "1 hour",
+            "4h": "4 hours",
+            "8h": "8 hours",
+            never: "Never",
+          },
+          clipboardClear: {
+            "10s": "10 seconds",
+            "20s": "20 seconds",
+            "30s": "30 seconds",
+            "1m": "1 minute",
+            "2m": "2 minutes",
+            "5m": "5 minutes",
+            never: "Never",
+          },
+        },
+        pinDialog: {
+          title: "Enable PIN unlock",
+          description:
+            "Set a PIN for quick unlock. Keep it memorable and secure.",
+          pinPlaceholder: "Enter PIN",
+          enabling: "Enabling...",
+        },
+        errors: {
+          loadBiometricStatus: "Failed to load biometric status.",
+          loadPinStatus: "Failed to load PIN status.",
+          loadSecuritySettings: "Failed to load security settings.",
+          enableBiometric: "Failed to enable biometric unlock.",
+          disableBiometric: "Failed to disable biometric unlock.",
+          enablePin: "Failed to enable PIN unlock.",
+          disablePin: "Failed to disable PIN unlock.",
+          pinRequired: "PIN is required.",
+        },
+      },
+    },
+    detail: {
+      unknown: "Unknown",
+      fields: {
+        username: "Username",
+        password: "Password",
+        oneTimePassword: "One-time password",
+        passkey: "Passkey",
+        organization: "Organization",
+        uris: "URLs",
+        notes: "Notes",
+        customFields: "Custom fields",
+      },
+      actions: {
+        showPassword: "Show password",
+        hidePassword: "Hide password",
+        showFieldValue: "Show field value",
+        hideFieldValue: "Hide field value",
+      },
+      boolean: {
+        true: "True",
+        false: "False",
+      },
+      customFields: {
+        unnamedField: "Unnamed field",
+        emptyValue: "(empty)",
+      },
+      passkey: {
+        createdAt: "Created on {{date}}",
+      },
+      timeline: {
+        lastEdited: "Last edited",
+        created: "Created",
+        passwordUpdated: "Password updated",
+        passkeyCreated: "Passkey created",
+        archived: "Archived",
+        deleted: "Deleted",
+        lastEditedWithValue: "Last edited: {{date}}",
+        empty: "No timeline data available.",
+      },
+      totp: {
+        countdownAria: "TOTP countdown",
+        countdownTitle: "Time remaining for current TOTP code",
+      },
+    },
+    feedback: {
+      loadError: "Failed to load vault data. Please try again.",
+      copiedToClipboard: "Copied to clipboard",
+      iconAlt: "{{name}} icon",
+      iconAltFallback: "Vault item icon",
+      folder: {
+        createSuccess: {
+          title: "Folder created",
+          description: '"{{name}}" has been created.',
+        },
+        createError: {
+          title: "Failed to create folder",
+          description: "Unable to create folder. Please try again.",
+        },
+        renameSuccess: {
+          title: "Folder renamed",
+          description: 'Folder renamed to "{{name}}".',
+        },
+        renameError: {
+          title: "Failed to rename folder",
+          description: "Unable to rename folder. Please try again.",
+        },
+        deleteSuccess: {
+          title: "Folder deleted",
+          description: '"{{name}}" has been deleted.',
+        },
+        deleteError: {
+          title: "Failed to delete folder",
+          description: "Unable to delete folder. Please try again.",
+        },
+      },
+      cipher: {
+        createSuccess: {
+          title: "Item created",
+          description: '"{{name}}" has been created.',
+        },
+        createError: {
+          title: "Failed to create item",
+          description: "Unable to create item. Please try again.",
+        },
+        saveSuccess: {
+          title: "Item saved",
+          description: '"{{name}}" has been updated.',
+        },
+        saveError: {
+          title: "Failed to save item",
+          description: "Unable to save item. Please try again.",
+        },
+        deleteSuccess: {
+          title: "Item deleted",
+          description: '"{{name}}" has been deleted.',
+        },
+        deleteError: {
+          title: "Failed to delete item",
+          description: "Unable to delete item. Please try again.",
+        },
+      },
+    },
   },
   spotlight: {
-    search: {},
-    hints: {},
-    actions: {},
+    search: {
+      ariaLabel: "Search",
+      placeholder: "Search vault...",
+      detailRegionLabel: "Cipher detail",
+      states: {
+        noResults: {
+          title: "No matching items",
+          description: "Try another keyword.",
+        },
+      },
+    },
+    hints: {
+      copyUsername: "Copy Username",
+      copyPassword: "Copy Password",
+      moreActions: "More Actions",
+      backToResults: "Back to Results",
+      select: "Select",
+      openShortcut: "Open quick access",
+      close: "Close",
+    },
+    actions: {
+      copyUsername: "Copy Username",
+      copyPassword: "Copy Password",
+      copyTotp: "Copy TOTP",
+    },
+    items: {
+      untitledCipher: "Untitled Cipher",
+      defaultSubtitle: "Vault item",
+    },
+    states: {
+      unknownError: "Unknown error",
+    },
   },
   errors: {
     common: {

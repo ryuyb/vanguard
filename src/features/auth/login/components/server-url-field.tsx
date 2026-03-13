@@ -1,4 +1,5 @@
 import { Globe } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   InputGroup,
   InputGroupAddon,
@@ -32,10 +33,12 @@ export function ServerUrlField({
   onServerUrlOptionChange,
   onCustomBaseUrlChange,
 }: ServerUrlFieldProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-2.5">
       <Label htmlFor="base-url" className="text-sm font-medium text-slate-700">
-        服务器地址
+        {t("auth.login.form.serverUrl.label")}
       </Label>
       <Select
         value={serverUrlOption}
@@ -43,7 +46,9 @@ export function ServerUrlField({
         disabled={isSubmitting}
       >
         <SelectTrigger id="base-url" className="h-12 w-full bg-white">
-          <SelectValue placeholder="选择服务地址" />
+          <SelectValue
+            placeholder={t("auth.login.form.serverUrl.placeholder")}
+          />
         </SelectTrigger>
         <SelectContent>
           {SERVER_URL_OPTIONS.map((option) => (
@@ -51,7 +56,9 @@ export function ServerUrlField({
               {option.label}
             </SelectItem>
           ))}
-          <SelectItem value={CUSTOM_SERVER_URL_OPTION}>自定义地址</SelectItem>
+          <SelectItem value={CUSTOM_SERVER_URL_OPTION}>
+            {t("auth.login.form.serverUrl.customOption")}
+          </SelectItem>
         </SelectContent>
       </Select>
 
@@ -64,7 +71,7 @@ export function ServerUrlField({
             id="base-url-custom"
             type="url"
             autoComplete="url"
-            placeholder="https://vault.example.com"
+            placeholder={t("auth.login.form.serverUrl.customPlaceholder")}
             value={customBaseUrl}
             onChange={(event) => onCustomBaseUrlChange(event.target.value)}
             disabled={isSubmitting}

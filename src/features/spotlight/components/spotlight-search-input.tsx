@@ -1,6 +1,7 @@
 import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 import type { KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 
 type SpotlightSearchInputProps = {
@@ -14,6 +15,8 @@ export function SpotlightSearchInput({
   onQueryChange,
   onKeyDown,
 }: SpotlightSearchInputProps) {
+  const { t } = useTranslation();
+
   return (
     <InputGroup className="h-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-3 shadow-sm transition-colors focus-within:border-blue-300 focus-within:bg-white has-[[data-slot=input-group-control]:focus-visible]:ring-0">
       <CommandPrimitive.Input
@@ -25,8 +28,8 @@ export function SpotlightSearchInput({
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
-        placeholder="搜索密码库..."
-        aria-label="Search"
+        placeholder={t("spotlight.search.placeholder")}
+        aria-label={t("spotlight.search.ariaLabel")}
         onKeyDown={onKeyDown}
       />
       <InputGroupAddon

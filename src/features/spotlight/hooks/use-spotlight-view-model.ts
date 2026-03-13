@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { SpotlightItem } from "@/features/spotlight/types";
 
 type UseSpotlightViewModelParams = {
-  isLoadingVault: boolean;
   vaultItems: SpotlightItem[];
 };
 
@@ -19,7 +18,6 @@ type UseSpotlightViewModelResult = {
 };
 
 export function useSpotlightViewModel({
-  isLoadingVault,
   vaultItems,
 }: UseSpotlightViewModelParams): UseSpotlightViewModelResult {
   const [query, setQuery] = useState("");
@@ -46,7 +44,7 @@ export function useSpotlightViewModel({
   }, [detailItemId, visibleItems]);
 
   const hasVisibleResults = visibleItems.length > 0;
-  const shouldShowResults = (isLoadingVault && hasQuery) || hasVisibleResults;
+  const shouldShowResults = hasQuery;
 
   useEffect(() => {
     if (!hasVisibleResults) {

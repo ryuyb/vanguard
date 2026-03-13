@@ -1,5 +1,6 @@
 import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { commands, type VaultCipherDetailDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -28,9 +29,13 @@ const CUSTOM_FIELD_TYPE_BOOLEAN = 2;
 function TotpCountdownRing({
   remaining,
   total = 30,
+  ariaLabel,
+  title,
 }: {
   remaining: number;
   total?: number;
+  ariaLabel: string;
+  title: string;
 }) {
   const percentage = (remaining / total) * 100;
   const circumference = 2 * Math.PI * 6; // 半径为 6
@@ -49,9 +54,9 @@ function TotpCountdownRing({
         width="16"
         height="16"
         className="transform -rotate-90"
-        aria-label="TOTP 倒计时"
+        aria-label={ariaLabel}
       >
-        <title>TOTP 倒计时进度</title>
+        <title>{title}</title>
         {/* 背景圆环 */}
         <circle
           cx="8"
@@ -179,6 +184,7 @@ export function CipherDetailPanel({
   iconUrl: iconUrlProp,
   iconServer,
 }: CipherDetailPanelProps) {
+  const { t } = useTranslation();
   const { copyField } = useCipherFieldCopy(cipher.id);
   const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher, iconServer);
   const username = firstNonEmptyText(
@@ -204,7 +210,8 @@ export function CipherDetailPanel({
   >(new Set());
   const notes = firstNonEmptyText(cipher.notes, cipher.data?.notes);
   const organizationId = cipher.organizationId;
-  const lastEditedAt = toDisplayDate(cipher.revisionDate) ?? "未知";
+  const lastEditedAt =
+    toDisplayDate(cipher.revisionDate) ?? t("vault.detail.unknown");
   const passwordRevisionDate = firstNonEmptyText(
     cipher.login?.passwordRevisionDate,
     cipher.data?.passwordRevisionDate,
@@ -227,8 +234,10 @@ export function CipherDetailPanel({
         continue;
       }
 
-      const normalizedName = name || "Unnamed field";
-      const normalizedValue = value || "—";
+      const normalizedName =
+        name || t("vault.detail.customFields.unnamedField");
+      const normalizedValue =
+        value || t("vault.detail.customFields.emptyValue");
       const fieldType = field.type ?? CUSTOM_FIELD_TYPE_TEXT;
       const linkedId = field.linkedId ?? null;
       const dedupeKey = `${normalizedName}\u0000${normalizedValue}\u0000${fieldType}\u0000${linkedId ?? ""}`;
@@ -288,20 +297,35 @@ export function CipherDetailPanel({
   })();
   const passkeyCreationDate = passkeyCreationTimestamp
     ? new Date(passkeyCreationTimestamp).toLocaleString()
-    : "未知";
+    : t("vault.detail.unknown");
   const passkeyDetailValue = passkeyCreationDate
-    ? `创建于 ${passkeyCreationDate}`
+    ? t("vault.detail.passkey.createdAt", { date: passkeyCreationDate })
     : null;
   const timelineEvents = [
-    { label: "最后编辑", date: toDate(cipher.revisionDate) },
-    { label: "创建", date: toDate(cipher.creationDate) },
-    { label: "密码更新", date: toDate(passwordRevisionDate) },
     {
-      label: "Passkey 创建",
+      label: t("vault.detail.timeline.lastEdited"),
+      date: toDate(cipher.revisionDate),
+    },
+    {
+      label: t("vault.detail.timeline.created"),
+      date: toDate(cipher.creationDate),
+    },
+    {
+      label: t("vault.detail.timeline.passwordUpdated"),
+      date: toDate(passwordRevisionDate),
+    },
+    {
+      label: t("vault.detail.timeline.passkeyCreated"),
       date: toDateFromTimestamp(passkeyCreationTimestamp),
     },
-    { label: "归档", date: toDate(cipher.archivedDate) },
-    { label: "删除", date: toDate(cipher.deletedDate) },
+    {
+      label: t("vault.detail.timeline.archived"),
+      date: toDate(cipher.archivedDate),
+    },
+    {
+      label: t("vault.detail.timeline.deleted"),
+      date: toDate(cipher.deletedDate),
+    },
   ]
     .filter((event): event is { label: string; date: Date } =>
       Boolean(event.date),
@@ -403,7 +427,7 @@ export function CipherDetailPanel({
           </CipherIcon>
           <div className="min-w-0 flex-1">
             <h2 className="m-0 truncate leading-tight text-xl font-bold text-slate-900">
-              {cipher.name ?? "Untitled cipher"}
+              {cipher.name ?? t("vault.page.cipher.untitled")}
             </h2>
           </div>
         </div>
@@ -420,7 +444,7 @@ export function CipherDetailPanel({
                 onClick={() => copyField("username")}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Username
+                  {t("vault.detail.fields.username")}
                 </div>
                 <div className="mt-2 text-sm font-medium text-slate-900">
                   {username}
@@ -435,7 +459,7 @@ export function CipherDetailPanel({
                 onClick={() => copyField("password")}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Password
+                  {t("vault.detail.fields.password")}
                 </div>
                 <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
                   <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
@@ -449,8 +473,16 @@ export function CipherDetailPanel({
                       e.stopPropagation();
                       setIsPasswordVisible((visible) => !visible);
                     }}
-                    aria-label={isPasswordVisible ? "隐藏密码" : "显示密码"}
-                    title={isPasswordVisible ? "隐藏密码" : "显示密码"}
+                    aria-label={
+                      isPasswordVisible
+                        ? t("vault.detail.actions.hidePassword")
+                        : t("vault.detail.actions.showPassword")
+                    }
+                    title={
+                      isPasswordVisible
+                        ? t("vault.detail.actions.hidePassword")
+                        : t("vault.detail.actions.showPassword")
+                    }
                   >
                     {isPasswordVisible ? (
                       <EyeOff className="size-4 text-slate-600" />
@@ -469,7 +501,7 @@ export function CipherDetailPanel({
                 onClick={() => copyField("totp")}
               >
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  One-time password
+                  {t("vault.detail.fields.oneTimePassword")}
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="font-mono text-sm font-bold text-slate-900 tracking-wider">
@@ -480,15 +512,17 @@ export function CipherDetailPanel({
                         {oneTimePasswordCode.slice(3)}
                       </>
                     ) : oneTimePasswordFailed ? (
-                      "Unavailable"
+                      t("common.states.unavailable")
                     ) : (
-                      "Loading..."
+                      t("common.states.loading")
                     )}
                   </div>
                   {oneTimePasswordRemaining != null && oneTimePasswordCode && (
                     <TotpCountdownRing
                       remaining={oneTimePasswordRemaining}
                       total={30}
+                      ariaLabel={t("vault.detail.totp.countdownAria")}
+                      title={t("vault.detail.totp.countdownTitle")}
                     />
                   )}
                 </div>
@@ -498,7 +532,7 @@ export function CipherDetailPanel({
             {hasPasskey && (
               <div className="group px-3.5 py-3 hover:bg-slate-50 transition-colors last:rounded-b-lg">
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Passkey
+                  {t("vault.detail.fields.passkey")}
                 </div>
                 <div className="mt-2 text-sm font-medium text-slate-900">
                   {passkeyDetailValue}
@@ -508,10 +542,16 @@ export function CipherDetailPanel({
           </div>
         )}
 
-        <DetailField label="Org" value={organizationId} />
+        <DetailField
+          label={t("vault.detail.fields.organization")}
+          value={organizationId}
+        />
 
         {uniqueUris.length > 0 && (
-          <DetailField label="URIs" contentClassName="overflow-hidden">
+          <DetailField
+            label={t("vault.detail.fields.uris")}
+            contentClassName="overflow-hidden"
+          >
             <div className="min-w-0 w-full space-y-1 overflow-hidden">
               {uniqueUris.map((uri, index) => (
                 <button
@@ -538,7 +578,7 @@ export function CipherDetailPanel({
             {notes && (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Notes
+                  {t("vault.detail.fields.notes")}
                 </div>
                 <button
                   type="button"
@@ -555,7 +595,7 @@ export function CipherDetailPanel({
             {customFields.length > 0 && (
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  Custom fields
+                  {t("vault.detail.fields.customFields")}
                 </div>
                 <div className="space-y-2.5">
                   {customFields.map((field, index) => {
@@ -568,9 +608,9 @@ export function CipherDetailPanel({
                     const normalizedValue = field.value.toLowerCase();
                     const booleanValue =
                       normalizedValue === "true"
-                        ? "是"
+                        ? t("vault.detail.boolean.true")
                         : normalizedValue === "false"
-                          ? "否"
+                          ? t("vault.detail.boolean.false")
                           : field.value;
                     const displayValue = isHiddenType
                       ? hiddenValue
@@ -615,9 +655,15 @@ export function CipherDetailPanel({
                                 });
                               }}
                               aria-label={
-                                isRevealed ? "隐藏字段值" : "显示字段值"
+                                isRevealed
+                                  ? t("vault.detail.actions.hideFieldValue")
+                                  : t("vault.detail.actions.showFieldValue")
                               }
-                              title={isRevealed ? "隐藏字段值" : "显示字段值"}
+                              title={
+                                isRevealed
+                                  ? t("vault.detail.actions.hideFieldValue")
+                                  : t("vault.detail.actions.showFieldValue")
+                              }
                             >
                               {isRevealed ? (
                                 <EyeOff className="size-4 text-slate-600" />
@@ -661,7 +707,9 @@ export function CipherDetailPanel({
               className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition-all hover:bg-slate-100 hover:shadow-md"
             >
               <span className="text-sm font-semibold text-slate-700">
-                最后编辑 {lastEditedAt}
+                {t("vault.detail.timeline.lastEditedWithValue", {
+                  date: lastEditedAt,
+                })}
               </span>
               <ChevronDown
                 className={[
@@ -691,7 +739,9 @@ export function CipherDetailPanel({
                 ))}
               </ol>
             ) : (
-              <div className="text-sm text-slate-500">暂无可显示的时间线。</div>
+              <div className="text-sm text-slate-500">
+                {t("vault.detail.timeline.empty")}
+              </div>
             )}
           </CollapsibleContent>
         </Collapsible>

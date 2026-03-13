@@ -51,6 +51,8 @@ export interface AppTranslationCatalog {
     search: TranslationDictionary;
     hints: TranslationDictionary;
     actions: TranslationDictionary;
+    items: TranslationDictionary;
+    states: TranslationDictionary;
   };
   errors: {
     common: TranslationDictionary;

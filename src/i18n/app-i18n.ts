@@ -5,10 +5,7 @@ import {
   FALLBACK_APP_LOCALE,
   resolveAppLocale,
 } from "./locales";
-import {
-  DEFAULT_TRANSLATION_NAMESPACE,
-  translationResources,
-} from "./resources";
+import { translationResources } from "./resources";
 import { loadSavedLocale, saveLocale } from "./storage";
 
 export const appI18n = createInstance();
@@ -23,7 +20,7 @@ export async function initializeAppI18n(initialLocale?: string): Promise<void> {
   await appI18n.use(initReactI18next).init({
     lng: locale,
     fallbackLng: FALLBACK_APP_LOCALE,
-    defaultNS: DEFAULT_TRANSLATION_NAMESPACE,
+    defaultNS: "translation",
     resources: translationResources,
     interpolation: {
       escapeValue: false,

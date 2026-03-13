@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { commands, type RestoreAuthStateResponseDto } from "@/bindings";
 import type { UnlockFeedback } from "@/features/auth/unlock/types";
+import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
 import { loadUnlockCapabilities } from "./load-unlock-capabilities";
 import {
@@ -139,14 +140,17 @@ export function useUnlockFlow({
     ) {
       setFeedback({
         kind: "error",
-        text: "当前会话不是锁定状态，无法执行解锁。",
+        text: appI18n.t("auth.unlock.validation.sessionNotLocked"),
       });
       return;
     }
 
     const trimmedPassword = masterPassword.trim();
     if (!trimmedPassword) {
-      setFeedback({ kind: "error", text: "请输入 master password。" });
+      setFeedback({
+        kind: "error",
+        text: appI18n.t("auth.unlock.validation.missingMasterPassword"),
+      });
       return;
     }
 
@@ -180,7 +184,7 @@ export function useUnlockFlow({
     ) {
       setFeedback({
         kind: "error",
-        text: "当前会话不是锁定状态，无法执行解锁。",
+        text: appI18n.t("auth.unlock.validation.sessionNotLocked"),
       });
       return;
     }
@@ -188,14 +192,17 @@ export function useUnlockFlow({
     if (!capabilities.pinEnabled) {
       setFeedback({
         kind: "error",
-        text: "当前账号未启用 PIN 解锁，请使用 master password 解锁。",
+        text: appI18n.t("auth.unlock.validation.pinNotEnabled"),
       });
       return;
     }
 
     const trimmedPin = pin.trim();
     if (!trimmedPin) {
-      setFeedback({ kind: "error", text: "请输入 PIN。" });
+      setFeedback({
+        kind: "error",
+        text: appI18n.t("auth.unlock.validation.missingPin"),
+      });
       return;
     }
 
@@ -227,7 +234,7 @@ export function useUnlockFlow({
     ) {
       setFeedback({
         kind: "error",
-        text: "当前会话不是锁定状态，无法执行生物识别解锁。",
+        text: appI18n.t("auth.unlock.validation.sessionNotLockedBiometric"),
       });
       return;
     }

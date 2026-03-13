@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import type { SpotlightItem } from "@/features/spotlight/types";
 
@@ -10,6 +11,8 @@ export function SpotlightFooterHints({
   hasVisibleResults,
   detailItem,
 }: SpotlightFooterHintsProps) {
+  const { t } = useTranslation();
+
   if (hasVisibleResults) {
     return (
       <>
@@ -20,7 +23,7 @@ export function SpotlightFooterHints({
                 <Kbd className="bg-slate-200 text-slate-700">⌘</Kbd>
                 <Kbd className="bg-slate-200 text-slate-700">C</Kbd>
               </KbdGroup>
-              复制 用户名
+              {t("spotlight.hints.copyUsername")}
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
               <KbdGroup>
@@ -28,7 +31,7 @@ export function SpotlightFooterHints({
                 <Kbd className="bg-slate-200 text-slate-700">⇧</Kbd>
                 <Kbd className="bg-slate-200 text-slate-700">C</Kbd>
               </KbdGroup>
-              复制 密码
+              {t("spotlight.hints.copyPassword")}
             </span>
           </>
         )}
@@ -36,7 +39,9 @@ export function SpotlightFooterHints({
           <Kbd className="bg-slate-200 text-slate-700">
             {detailItem ? "←" : "→"}
           </Kbd>
-          {detailItem ? "返回结果" : "更多操作"}
+          {detailItem
+            ? t("spotlight.hints.backToResults")
+            : t("spotlight.hints.moreActions")}
         </span>
         {detailItem ? (
           <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
@@ -44,7 +49,7 @@ export function SpotlightFooterHints({
               <Kbd className="bg-slate-200 text-slate-700">↑</Kbd>
               <Kbd className="bg-slate-200 text-slate-700">↓</Kbd>
             </KbdGroup>
-            选择
+            {t("spotlight.hints.select")}
           </span>
         ) : null}
       </>
@@ -59,11 +64,11 @@ export function SpotlightFooterHints({
           <Kbd className="bg-slate-200 text-slate-700">⌃</Kbd>
           <Kbd className="bg-slate-200 text-slate-700">Space</Kbd>
         </KbdGroup>
-        Open quick access
+        {t("spotlight.hints.openShortcut")}
       </span>
       <span className="inline-flex items-center gap-1 text-[11px] leading-none text-slate-600">
         <Kbd className="bg-slate-200 text-slate-700">Esc</Kbd>
-        Close
+        {t("spotlight.hints.close")}
       </span>
     </>
   );

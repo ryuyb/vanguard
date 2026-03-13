@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { commands } from "@/bindings";
-import { DETAIL_ACTIONS } from "@/features/spotlight/constants";
+import { getDetailActions } from "@/features/spotlight/constants";
 import type { DetailAction, SpotlightItem } from "@/features/spotlight/types";
 import { errorHandler } from "@/lib/error-handler";
 
@@ -64,10 +64,11 @@ export function useSpotlightDetailActions({
   }, [detailItem]);
 
   const detailActions = useMemo(() => {
+    const actions = getDetailActions();
     if (!detailHasTotp) {
-      return DETAIL_ACTIONS.filter((action) => !action.requiresTotp);
+      return actions.filter((action) => !action.requiresTotp);
     }
-    return DETAIL_ACTIONS;
+    return actions;
   }, [detailHasTotp]);
 
   useEffect(() => {

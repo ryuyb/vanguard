@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SyncCipher, VaultCipherDetailDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,6 +112,7 @@ function CipherRowObserver({
 }
 
 export function VaultPage({ navigateTo }: VaultPageProps) {
+  const { t } = useTranslation();
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
   // 文件夹操作状态
@@ -237,14 +239,18 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       folderActions.createFolder.mutate(fullName, {
         onSuccess: () => {
           setIsFolderDialogOpen(false);
-          toast.success("创建成功", {
-            description: `文件夹 "${name}" 已创建`,
+          toast.success(t("vault.feedback.folder.createSuccess.title"), {
+            description: t("vault.feedback.folder.createSuccess.description", {
+              name,
+            }),
           });
         },
         onError: (error) => {
-          toast.error("创建失败", {
+          toast.error(t("vault.feedback.folder.createError.title"), {
             description:
-              error instanceof Error ? error.message : "创建文件夹时发生错误",
+              error instanceof Error
+                ? error.message
+                : t("vault.feedback.folder.createError.description"),
           });
         },
       });
@@ -254,16 +260,21 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         {
           onSuccess: () => {
             setIsFolderDialogOpen(false);
-            toast.success("重命名成功", {
-              description: `文件夹已重命名为 "${name}"`,
+            toast.success(t("vault.feedback.folder.renameSuccess.title"), {
+              description: t(
+                "vault.feedback.folder.renameSuccess.description",
+                {
+                  name,
+                },
+              ),
             });
           },
           onError: (error) => {
-            toast.error("重命名失败", {
+            toast.error(t("vault.feedback.folder.renameError.title"), {
               description:
                 error instanceof Error
                   ? error.message
-                  : "重命名文件夹时发生错误",
+                  : t("vault.feedback.folder.renameError.description"),
             });
           },
         },
@@ -276,8 +287,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       folderActions.deleteFolder.mutate(selectedFolderId, {
         onSuccess: () => {
           setIsDeleteDialogOpen(false);
-          toast.success("删除成功", {
-            description: `文件夹 "${selectedFolderName}" 已删除`,
+          toast.success(t("vault.feedback.folder.deleteSuccess.title"), {
+            description: t("vault.feedback.folder.deleteSuccess.description", {
+              name: selectedFolderName,
+            }),
           });
           // 如果删除的是当前选中的文件夹,切换到 All Items
           if (selectedMenuId === selectedFolderId) {
@@ -285,9 +298,11 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
           }
         },
         onError: (error) => {
-          toast.error("删除失败", {
+          toast.error(t("vault.feedback.folder.deleteError.title"), {
             description:
-              error instanceof Error ? error.message : "删除文件夹时发生错误",
+              error instanceof Error
+                ? error.message
+                : t("vault.feedback.folder.deleteError.description"),
           });
         },
       });
@@ -318,14 +333,18 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       cipherMutations.createCipher.mutate(cipher, {
         onSuccess: () => {
           setIsCipherFormOpen(false);
-          toast.success("创建成功", {
-            description: `项目 "${cipher.name}" 已创建`,
+          toast.success(t("vault.feedback.cipher.createSuccess.title"), {
+            description: t("vault.feedback.cipher.createSuccess.description", {
+              name: cipher.name ?? t("vault.page.cipher.untitled"),
+            }),
           });
         },
         onError: (error) => {
-          toast.error("创建失败", {
+          toast.error(t("vault.feedback.cipher.createError.title"), {
             description:
-              error instanceof Error ? error.message : "创建项目时发生错误",
+              error instanceof Error
+                ? error.message
+                : t("vault.feedback.cipher.createError.description"),
           });
         },
       });
@@ -335,14 +354,18 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         {
           onSuccess: () => {
             setIsCipherFormOpen(false);
-            toast.success("保存成功", {
-              description: `项目 "${cipher.name}" 已更新`,
+            toast.success(t("vault.feedback.cipher.saveSuccess.title"), {
+              description: t("vault.feedback.cipher.saveSuccess.description", {
+                name: cipher.name ?? t("vault.page.cipher.untitled"),
+              }),
             });
           },
           onError: (error) => {
-            toast.error("保存失败", {
+            toast.error(t("vault.feedback.cipher.saveError.title"), {
               description:
-                error instanceof Error ? error.message : "保存项目时发生错误",
+                error instanceof Error
+                  ? error.message
+                  : t("vault.feedback.cipher.saveError.description"),
             });
           },
         },
@@ -355,14 +378,18 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       cipherMutations.deleteCipher.mutate(selectedCipherIdForDelete, {
         onSuccess: () => {
           setIsDeleteCipherDialogOpen(false);
-          toast.success("删除成功", {
-            description: `项目 "${selectedCipherNameForDelete}" 已删除`,
+          toast.success(t("vault.feedback.cipher.deleteSuccess.title"), {
+            description: t("vault.feedback.cipher.deleteSuccess.description", {
+              name: selectedCipherNameForDelete,
+            }),
           });
         },
         onError: (error) => {
-          toast.error("删除失败", {
+          toast.error(t("vault.feedback.cipher.deleteError.title"), {
             description:
-              error instanceof Error ? error.message : "删除项目时发生错误",
+              error instanceof Error
+                ? error.message
+                : t("vault.feedback.cipher.deleteError.description"),
           });
         },
       });
@@ -388,7 +415,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               <Input
                 ref={searchInputRef}
                 type="search"
-                placeholder="搜索名称、ID..."
+                placeholder={t("vault.page.search.placeholder")}
                 value={headerSearchQuery}
                 onChange={(event) => setHeaderSearchQuery(event.target.value)}
                 className="h-9 pl-9 text-sm border-slate-200 bg-slate-50/50 focus:bg-white transition-colors"
@@ -437,7 +464,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     }}
                   >
                     <Settings />
-                    设置
+                    {t("vault.page.actions.settings")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     disabled={isHeaderActionBusy}
@@ -476,13 +503,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       <section className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-4">
         {pageState === "loading" && (
           <div className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm border border-slate-200">
-            正在加载 vault 数据...
+            {t("vault.page.states.loading")}
           </div>
         )}
 
         {pageState === "error" && (
           <div className="rounded-xl bg-white px-4 py-3 text-sm text-red-700 shadow-sm border border-red-200">
-            {errorText || "读取 vault 数据失败。"}
+            {errorText || t("vault.page.states.loadError")}
           </div>
         )}
 
@@ -515,7 +542,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                 : "text-slate-400",
                             ].join(" ")}
                           />
-                          All items
+                          {t("vault.page.menus.allItems")}
                         </span>
                         <span
                           className={[
@@ -554,7 +581,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                 : "text-slate-400",
                             ].join(" ")}
                           />
-                          Favorites
+                          {t("vault.page.menus.favorites")}
                         </span>
                         <span
                           className={[
@@ -589,7 +616,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                 : "text-slate-400",
                             ].join(" ")}
                           />
-                          Trash
+                          {t("vault.page.menus.trash")}
                         </span>
                         <span
                           className={[
@@ -606,7 +633,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
 
                     <div className="mt-4 mb-2 flex items-center justify-between px-3">
                       <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        文件夹
+                        {t("vault.page.folders.title")}
                       </h3>
                       <Button
                         type="button"
@@ -616,7 +643,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         className="h-6 px-2 text-xs"
                       >
                         <FolderPlus className="size-3.5" />
-                        新建
+                        {t("vault.page.actions.create")}
                       </Button>
                     </div>
 
@@ -654,7 +681,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                               : "text-slate-700 hover:bg-slate-50",
                           ].join(" ")}
                         >
-                          <span className="truncate">无文件夹</span>
+                          <span className="truncate">
+                            {t("vault.page.menus.noFolder")}
+                          </span>
                           <span
                             className={[
                               "text-xs font-semibold",
@@ -686,8 +715,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                             type="button"
                             variant="ghost"
                             className="h-8 justify-start gap-1 rounded-md px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[state=open]:bg-slate-100"
-                            aria-label="筛选类型"
-                            title="筛选类型"
+                            aria-label={t("vault.page.filters.ariaLabel")}
+                            title={t("vault.page.filters.ariaLabel")}
                           >
                             <span>{toTypeFilterLabel(typeFilter)}</span>
                             <ChevronDown className="size-3.5 text-slate-400" />
@@ -701,22 +730,22 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                             }
                           >
                             <DropdownMenuRadioItem value="all">
-                              All types
+                              {t("vault.page.filters.types.all")}
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="login">
-                              Login
+                              {t("vault.page.filters.types.login")}
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="card">
-                              Card
+                              {t("vault.page.filters.types.card")}
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="identify">
-                              Identify
+                              {t("vault.page.filters.types.identity")}
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="note">
-                              Note
+                              {t("vault.page.filters.types.note")}
                             </DropdownMenuRadioItem>
                             <DropdownMenuRadioItem value="ssh_key">
-                              SSH key
+                              {t("vault.page.filters.types.sshKey")}
                             </DropdownMenuRadioItem>
                           </DropdownMenuRadioGroup>
                         </DropdownMenuContent>
@@ -745,7 +774,12 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                 setIsInlineSearchOpen(false);
                               }
                             }}
-                            placeholder={`在 ${selectedMenuName} 中查找`}
+                            placeholder={t(
+                              "vault.page.search.inlinePlaceholder",
+                              {
+                                menu: selectedMenuName,
+                              },
+                            )}
                             className="h-8 bg-white text-xs border-slate-200"
                           />
                         </motion.div>
@@ -758,8 +792,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       type="button"
                       variant="ghost"
                       className="size-8 px-0"
-                      aria-label="新建项目"
-                      title="新建项目"
+                      aria-label={t("vault.page.cipher.create")}
+                      title={t("vault.page.cipher.create")}
                       onClick={handleCreateCipher}
                     >
                       <Plus className="size-4" />
@@ -770,13 +804,17 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       className="size-8 px-0"
                       aria-label={
                         isInlineSearchOpen
-                          ? "关闭搜索"
-                          : `在 ${selectedMenuName} 中查找`
+                          ? t("vault.page.search.close")
+                          : t("vault.page.search.inlinePlaceholder", {
+                              menu: selectedMenuName,
+                            })
                       }
                       title={
                         isInlineSearchOpen
-                          ? "关闭搜索"
-                          : `在 ${selectedMenuName} 中查找`
+                          ? t("vault.page.search.close")
+                          : t("vault.page.search.inlinePlaceholder", {
+                              menu: selectedMenuName,
+                            })
                       }
                       onClick={() => {
                         if (isInlineSearchOpen) {
@@ -819,14 +857,16 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           type="button"
                           variant="ghost"
                           className="size-8 px-0"
-                          aria-label="排序"
-                          title="排序"
+                          aria-label={t("vault.page.sort.ariaLabel")}
+                          title={t("vault.page.sort.ariaLabel")}
                         >
                           <ArrowUpDown className="size-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+                        <DropdownMenuLabel>
+                          {t("vault.page.sort.byLabel")}
+                        </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuRadioGroup
                           value={sortBy}
@@ -835,17 +875,19 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           }
                         >
                           <DropdownMenuRadioItem value="title">
-                            标题
+                            {t("vault.page.sort.by.title")}
                           </DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="created">
-                            创建日期
+                            {t("vault.page.sort.by.created")}
                           </DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="modified">
-                            修改日期
+                            {t("vault.page.sort.by.modified")}
                           </DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel>排序方向</DropdownMenuLabel>
+                        <DropdownMenuLabel>
+                          {t("vault.page.sort.directionLabel")}
+                        </DropdownMenuLabel>
                         <DropdownMenuRadioGroup
                           value={sortDirection}
                           onValueChange={(value) =>
@@ -855,19 +897,19 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           {sortBy === "title" ? (
                             <>
                               <DropdownMenuRadioItem value="asc">
-                                按字母顺序
+                                {t("vault.page.sort.direction.alphaAsc")}
                               </DropdownMenuRadioItem>
                               <DropdownMenuRadioItem value="desc">
-                                字母倒序
+                                {t("vault.page.sort.direction.alphaDesc")}
                               </DropdownMenuRadioItem>
                             </>
                           ) : (
                             <>
                               <DropdownMenuRadioItem value="desc">
-                                最新的在前
+                                {t("vault.page.sort.direction.newestFirst")}
                               </DropdownMenuRadioItem>
                               <DropdownMenuRadioItem value="asc">
-                                最早的在前
+                                {t("vault.page.sort.direction.oldestFirst")}
                               </DropdownMenuRadioItem>
                             </>
                           )}
@@ -906,7 +948,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     )}
                     {filteredCiphers.length === 0 && (
                       <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600">
-                        当前筛选下没有 cipher。
+                        {t("vault.page.states.emptyFiltered")}
                       </div>
                     )}
                   </div>
@@ -925,7 +967,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     {selectedCipherId && isCipherDetailLoading && (
                       <div className="flex items-center gap-2 text-sm text-slate-700 bg-white rounded-lg border border-slate-200 px-3 py-2">
                         <LoaderCircle className="size-4 animate-spin text-blue-600" />
-                        正在加载 cipher 详情...
+                        {t("vault.page.states.loadingCipherDetail")}
                       </div>
                     )}
 
@@ -962,7 +1004,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                   }
                                 >
                                   <Edit2 className="size-4" />
-                                  编辑
+                                  {t("vault.page.actions.edit")}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
@@ -970,12 +1012,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                   onSelect={() =>
                                     handleDeleteCipher(
                                       selectedCipherDetail.id,
-                                      selectedCipherDetail.name ?? "Untitled",
+                                      selectedCipherDetail.name ??
+                                        t("vault.page.cipher.untitled"),
                                     )
                                   }
                                 >
                                   <Trash2 className="size-4" />
-                                  删除
+                                  {t("vault.page.actions.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>

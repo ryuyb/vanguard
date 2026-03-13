@@ -1,4 +1,5 @@
 import { LoaderCircle, Send, ShieldCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -31,24 +32,29 @@ export function TwoFactorSection({
   onTokenChange,
   onSendEmailCode,
 }: TwoFactorSectionProps) {
+  const { t } = useTranslation();
   const isDisabled = isSubmitting || state.isSendingEmailCode;
 
   return (
     <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/80 p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
         <ShieldCheck className="size-4" />
-        二步验证
+        {t("auth.login.form.twoFactor.title")}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="two-factor-provider">验证方式</Label>
+        <Label htmlFor="two-factor-provider">
+          {t("auth.login.form.twoFactor.provider.label")}
+        </Label>
         <Select
           value={state.selectedProvider}
           onValueChange={onProviderChange}
           disabled={isDisabled}
         >
           <SelectTrigger id="two-factor-provider" className="w-full bg-white">
-            <SelectValue placeholder="选择验证方式" />
+            <SelectValue
+              placeholder={t("auth.login.form.twoFactor.provider.placeholder")}
+            />
           </SelectTrigger>
           <SelectContent>
             {state.providers.map((provider) => (
@@ -61,7 +67,9 @@ export function TwoFactorSection({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="two-factor-token">二步验证码</Label>
+        <Label htmlFor="two-factor-token">
+          {t("auth.login.form.twoFactor.token.label")}
+        </Label>
         <InputGroup>
           <InputGroupAddon>
             <ShieldCheck className="text-slate-500" />
@@ -71,7 +79,7 @@ export function TwoFactorSection({
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            placeholder="输入验证码"
+            placeholder={t("auth.login.form.twoFactor.token.placeholder")}
             value={state.token}
             onChange={(event) => onTokenChange(event.target.value)}
             disabled={isDisabled}
@@ -92,8 +100,8 @@ export function TwoFactorSection({
           )}
           {!state.isSendingEmailCode && <Send />}
           {state.isSendingEmailCode
-            ? "正在发送邮箱验证码..."
-            : "发送邮箱验证码"}
+            ? t("auth.login.form.twoFactor.sendingEmail")
+            : t("auth.login.form.twoFactor.sendEmail")}
         </Button>
       )}
     </div>
