@@ -180,11 +180,12 @@ fn resolve_auth_state_path<R: Runtime, M: Manager<R>>(
             .map_err(|error| AppError::InternalUnexpected {
                 message: format!("failed to resolve app data dir: {error}"),
             })?;
-    std::fs::create_dir_all(&app_data_dir).map_err(|error| AppError::InternalUnexpected {
+    let auth_states_dir = app_data_dir.join("auth-states");
+    std::fs::create_dir_all(&auth_states_dir).map_err(|error| AppError::InternalUnexpected {
         message: format!(
-            "failed to create app data dir {}: {error}",
-            app_data_dir.display()
+            "failed to create auth states dir {}: {error}",
+            auth_states_dir.display()
         ),
     })?;
-    Ok(app_data_dir.join("auth-state.json"))
+    Ok(auth_states_dir)
 }

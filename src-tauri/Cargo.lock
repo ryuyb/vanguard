@@ -5684,6 +5684,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
  "tauri-specta",
+ "tempfile",
  "tokio",
  "tokio-tungstenite",
  "totp-rs",

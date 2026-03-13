@@ -24,14 +24,13 @@ const MAX_SYNC_POLL_INTERVAL_SECONDS: u64 = 120;
 const DEFAULT_LOCALE: &str = "zh";
 const SUPPORTED_LOCALES: &[&str] = &["zh", "en"];
 const DEFAULT_REQUIRE_MASTER_PASSWORD_INTERVAL: &str = "never";
-const SUPPORTED_REQUIRE_MASTER_PASSWORD_INTERVALS: &[&str] =
-    &["1d", "7d", "14d", "30d", "never"];
+const SUPPORTED_REQUIRE_MASTER_PASSWORD_INTERVALS: &[&str] = &["1d", "7d", "14d", "30d", "never"];
 const DEFAULT_IDLE_AUTO_LOCK_DELAY: &str = "never";
-const SUPPORTED_IDLE_AUTO_LOCK_DELAYS: &[&str] =
-    &["1m", "2m", "5m", "10m", "15m", "30m", "1h", "4h", "8h", "never"];
+const SUPPORTED_IDLE_AUTO_LOCK_DELAYS: &[&str] = &[
+    "1m", "2m", "5m", "10m", "15m", "30m", "1h", "4h", "8h", "never",
+];
 const DEFAULT_CLIPBOARD_CLEAR_DELAY: &str = "never";
-const SUPPORTED_CLIPBOARD_CLEAR_DELAYS: &[&str] =
-    &["10s", "20s", "30s", "1m", "2m", "5m", "never"];
+const SUPPORTED_CLIPBOARD_CLEAR_DELAYS: &[&str] = &["10s", "20s", "30s", "1m", "2m", "5m", "never"];
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -197,5 +196,99 @@ fn validate_clipboard_clear_delay(value: &str) -> String {
         value.to_string()
     } else {
         DEFAULT_CLIPBOARD_CLEAR_DELAY.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_locale_accepts_supported_values() {
+        assert_eq!(validate_locale("zh"), "zh");
+        assert_eq!(validate_locale("en"), "en");
+    }
+
+    #[test]
+    fn validate_locale_rejects_unsupported_values() {
+        assert_eq!(validate_locale("fr"), DEFAULT_LOCALE);
+        assert_eq!(validate_locale("invalid"), DEFAULT_LOCALE);
+        assert_eq!(validate_locale(""), DEFAULT_LOCALE);
+    }
+
+    #[test]
+    fn validate_require_master_password_interval_accepts_supported_values() {
+        assert_eq!(validate_require_master_password_interval("1d"), "1d");
+        assert_eq!(validate_require_master_password_interval("7d"), "7d");
+        assert_eq!(validate_require_master_password_interval("14d"), "14d");
+        assert_eq!(validate_require_master_password_interval("30d"), "30d");
+        assert_eq!(validate_require_master_password_interval("never"), "never");
+    }
+
+    #[test]
+    fn validate_require_master_password_interval_rejects_unsupported_values() {
+        assert_eq!(
+            validate_require_master_password_interval("2d"),
+            DEFAULT_REQUIRE_MASTER_PASSWORD_INTERVAL
+        );
+        assert_eq!(
+            validate_require_master_password_interval("invalid"),
+            DEFAULT_REQUIRE_MASTER_PASSWORD_INTERVAL
+        );
+    }
+
+    #[test]
+    fn validate_idle_auto_lock_delay_accepts_supported_values() {
+        assert_eq!(validate_idle_auto_lock_delay("1m"), "1m");
+        assert_eq!(validate_idle_auto_lock_delay("5m"), "5m");
+        assert_eq!(validate_idle_auto_lock_delay("1h"), "1h");
+        assert_eq!(validate_idle_auto_lock_delay("never"), "never");
+    }
+
+    #[test]
+    fn validate_idle_auto_lock_delay_rejects_unsupported_values() {
+        assert_eq!(
+            validate_idle_auto_lock_delay("3m"),
+            DEFAULT_IDLE_AUTO_LOCK_DELAY
+        );
+        assert_eq!(
+            validate_idle_auto_lock_delay("invalid"),
+            DEFAULT_IDLE_AUTO_LOCK_DELAY
+        );
+    }
+
+    #[test]
+    fn validate_clipboard_clear_delay_accepts_supported_values() {
+        assert_eq!(validate_clipboard_clear_delay("10s"), "10s");
+        assert_eq!(validate_clipboard_clear_delay("1m"), "1m");
+        assert_eq!(validate_clipboard_clear_delay("never"), "never");
+    }
+
+    #[test]
+    fn validate_clipboard_clear_delay_rejects_unsupported_values() {
+        assert_eq!(
+            validate_clipboard_clear_delay("15s"),
+            DEFAULT_CLIPBOARD_CLEAR_DELAY
+        );
+        assert_eq!(
+            validate_clipboard_clear_delay("invalid"),
+            DEFAULT_CLIPBOARD_CLEAR_DELAY
+        );
+    }
+
+    #[test]
+    fn clamp_sync_poll_interval_keeps_valid_values() {
+        assert_eq!(clamp_sync_poll_interval(60), 60);
+        assert_eq!(clamp_sync_poll_interval(30), 30);
+        assert_eq!(clamp_sync_poll_interval(120), 120);
+    }
+
+    #[test]
+    fn clamp_sync_poll_interval_clamps_out_of_range_values() {
+        assert_eq!(clamp_sync_poll_interval(10), MIN_SYNC_POLL_INTERVAL_SECONDS);
+        assert_eq!(
+            clamp_sync_poll_interval(200),
+            MAX_SYNC_POLL_INTERVAL_SECONDS
+        );
     }
 }
