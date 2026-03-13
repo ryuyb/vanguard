@@ -34,6 +34,7 @@ import {
   sortFolders,
   toAvatarText,
 } from "@/features/vault/utils";
+import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
 import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
 
@@ -53,8 +54,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [sortBy, setSortBy] = useState<CipherSortBy>("modified");
   const [sortDirection, setSortDirection] =
     useState<CipherSortDirection>("desc");
-  const [userEmail, setUserEmail] = useState("未登录");
-  const [userBaseUrl, setUserBaseUrl] = useState("未知服务");
+  const [userEmail, setUserEmail] = useState(
+    appI18n.t("vault.page.user.notSignedIn"),
+  );
+  const [userBaseUrl, setUserBaseUrl] = useState(
+    appI18n.t("vault.page.user.unknownService"),
+  );
   const [iconServer, setIconServer] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
@@ -123,13 +128,17 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       if (restore.status === "error") {
         setPageState("error");
         errorHandler.handle(restore.error);
-        setUserEmail("未登录");
-        setUserBaseUrl("未知服务");
+        setUserEmail(appI18n.t("vault.page.user.notSignedIn"));
+        setUserBaseUrl(appI18n.t("vault.page.user.unknownService"));
         return;
       }
 
-      setUserEmail(restore.data.email ?? "未登录");
-      setUserBaseUrl(restore.data.baseUrl ?? "未知服务");
+      setUserEmail(
+        restore.data.email ?? appI18n.t("vault.page.user.notSignedIn"),
+      );
+      setUserBaseUrl(
+        restore.data.baseUrl ?? appI18n.t("vault.page.user.unknownService"),
+      );
 
       const iconServerResult = await commands.vaultGetIconServer();
       if (iconServerResult.status === "ok") {
@@ -392,20 +401,20 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
   const selectedMenuName = useMemo(() => {
     if (selectedMenuId === ALL_ITEMS_ID) {
-      return "All items";
+      return appI18n.t("vault.page.menus.allItems");
     }
     if (selectedMenuId === FAVORITES_ID) {
-      return "Favorites";
+      return appI18n.t("vault.page.menus.favorites");
     }
     if (selectedMenuId === TRASH_ID) {
-      return "Trash";
+      return appI18n.t("vault.page.menus.trash");
     }
     if (selectedMenuId === NO_FOLDER_ID) {
-      return "无文件夹";
+      return appI18n.t("vault.page.menus.noFolder");
     }
     return (
       sortedFolders.find((folder) => folder.id === selectedMenuId)?.name ??
-      "Unknown folder"
+      appI18n.t("vault.page.menus.unknownFolder")
     );
   }, [selectedMenuId, sortedFolders]);
 
@@ -426,8 +435,12 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
   const avatarText = useMemo(() => toAvatarText(userEmail), [userEmail]);
   const isHeaderActionBusy = isLocking || isLoggingOut || isRefreshing;
-  const lockLabel = isLocking ? "锁定中..." : "锁定";
-  const logoutLabel = isLoggingOut ? "登出中..." : "登出";
+  const lockLabel = isLocking
+    ? appI18n.t("vault.page.actions.locking")
+    : appI18n.t("vault.page.actions.lock");
+  const logoutLabel = isLoggingOut
+    ? appI18n.t("vault.page.actions.loggingOut")
+    : appI18n.t("vault.page.actions.logout");
 
   return {
     avatarText,

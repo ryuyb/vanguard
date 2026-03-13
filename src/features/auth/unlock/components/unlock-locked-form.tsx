@@ -7,6 +7,7 @@ import {
   LogOut,
 } from "lucide-react";
 import type { FormEventHandler } from "react";
+import { useTranslation } from "react-i18next";
 import type { RestoreAuthStateResponseDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -75,6 +76,7 @@ export function UnlockLockedForm({
   showPassword,
   unlockMethod,
 }: UnlockLockedFormProps) {
+  const { t } = useTranslation();
   const isActionBlocked =
     isUnlocking || isPinUnlocking || isBiometricUnlocking || isLoggingOut;
   const isPinMode = unlockMethod === "pin";
@@ -83,15 +85,19 @@ export function UnlockLockedForm({
     <div className="space-y-6">
       <div className="space-y-2 rounded-xl border border-slate-200/60 bg-slate-50/50 px-4 py-3.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-slate-500">账户</span>
+          <span className="font-medium text-slate-500">
+            {t("auth.unlock.form.account.label")}
+          </span>
           <span className="text-slate-700">
-            {restoreState?.email ?? "unknown"}
+            {restoreState?.email ?? t("auth.unlock.form.account.unknown")}
           </span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-slate-500">服务器</span>
+          <span className="font-medium text-slate-500">
+            {t("auth.unlock.form.server.label")}
+          </span>
           <span className="text-slate-700">
-            {restoreState?.baseUrl ?? "unknown"}
+            {restoreState?.baseUrl ?? t("auth.unlock.form.server.unknown")}
           </span>
         </div>
       </div>
@@ -103,7 +109,7 @@ export function UnlockLockedForm({
               htmlFor="unlock-pin"
               className="text-sm font-medium text-slate-700"
             >
-              PIN 码
+              {t("auth.unlock.form.pin.label")}
             </Label>
             <InputGroup>
               <InputGroupAddon>
@@ -114,7 +120,7 @@ export function UnlockLockedForm({
                 type="password"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="输入 PIN 解锁"
+                placeholder={t("auth.unlock.form.pin.placeholder")}
                 value={pin}
                 onChange={(event) => onPinChange(event.target.value)}
                 disabled={isActionBlocked}
@@ -128,7 +134,7 @@ export function UnlockLockedForm({
               htmlFor="unlock-master-password"
               className="text-sm font-medium text-slate-700"
             >
-              主密码
+              {t("auth.unlock.form.masterPassword.label")}
             </Label>
             <InputGroup>
               <InputGroupAddon>
@@ -138,7 +144,7 @@ export function UnlockLockedForm({
                 id="unlock-master-password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
-                placeholder="输入主密码解锁"
+                placeholder={t("auth.unlock.form.masterPassword.placeholder")}
                 value={masterPassword}
                 onChange={(event) => onMasterPasswordChange(event.target.value)}
                 disabled={isActionBlocked}
@@ -152,7 +158,11 @@ export function UnlockLockedForm({
                   className="text-slate-400 hover:text-slate-700 transition-colors"
                   onClick={onToggleShowPassword}
                   disabled={isActionBlocked}
-                  aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                  aria-label={
+                    showPassword
+                      ? t("auth.unlock.form.masterPassword.hidePassword")
+                      : t("auth.unlock.form.masterPassword.showPassword")
+                  }
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -178,11 +188,11 @@ export function UnlockLockedForm({
           )}
           {isPinMode
             ? isPinUnlocking
-              ? "正在解锁..."
-              : "使用 PIN 解锁"
+              ? t("auth.unlock.actions.unlockingWithPin")
+              : t("auth.unlock.actions.unlockWithPin")
             : isUnlocking
-              ? "正在解锁..."
-              : "解锁"}
+              ? t("auth.unlock.actions.unlocking")
+              : t("auth.unlock.actions.unlock")}
         </Button>
       </form>
 
@@ -194,7 +204,9 @@ export function UnlockLockedForm({
           disabled={isActionBlocked}
           onClick={isPinMode ? onShowMasterPasswordUnlock : onShowPinUnlock}
         >
-          {isPinMode ? "改用主密码解锁" : "改用 PIN 解锁"}
+          {isPinMode
+            ? t("auth.unlock.actions.switchToMasterPassword")
+            : t("auth.unlock.actions.switchToPin")}
         </Button>
       )}
 
@@ -212,15 +224,19 @@ export function UnlockLockedForm({
           ) : (
             <Fingerprint className="h-5 w-5" />
           )}
-          {isBiometricUnlocking ? "正在验证..." : "使用生物识别"}
+          {isBiometricUnlocking
+            ? t("auth.unlock.actions.biometricVerifying")
+            : t("auth.unlock.actions.biometric")}
         </Button>
       )}
 
       {biometricSupported && biometricEnabled && !canBiometricUnlock && (
         <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3 text-sm text-amber-900">
-          <p className="font-medium">生物识别不可用</p>
+          <p className="font-medium">
+            {t("auth.unlock.states.biometricUnavailable.title")}
+          </p>
           <p className="mt-1 text-amber-800">
-            当前设备还没有可用于解锁的本地数据，请先用密码解锁并完成同步。
+            {t("auth.unlock.states.biometricUnavailable.description")}
           </p>
         </div>
       )}
@@ -238,7 +254,9 @@ export function UnlockLockedForm({
           ) : (
             <LogOut className="h-4 w-4" />
           )}
-          {isLoggingOut ? "正在登出..." : "登出账户"}
+          {isLoggingOut
+            ? t("auth.unlock.actions.loggingOut")
+            : t("auth.unlock.actions.logout")}
         </Button>
       </div>
     </div>

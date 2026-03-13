@@ -1,4 +1,5 @@
 import { ChevronRight, Edit2, Folder, FolderPlus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Collapsible,
   CollapsibleContent,
@@ -39,6 +40,7 @@ export function FolderTreeMenuItem({
   onDeleteFolder,
   onCreateSubFolder,
 }: FolderTreeMenuItemProps) {
+  const { t } = useTranslation();
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedNodeKeys.has(node.key);
   const isSelected = node.folderId != null && selectedMenuId === node.folderId;
@@ -87,7 +89,11 @@ export function FolderTreeMenuItem({
               <button
                 type="button"
                 className="flex size-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
-                aria-label={isExpanded ? "collapse folder" : "expand folder"}
+                aria-label={
+                  isExpanded
+                    ? t("vault.page.folders.collapseFolder")
+                    : t("vault.page.folders.expandFolder")
+                }
               >
                 <ChevronRight
                   className={[
@@ -118,7 +124,7 @@ export function FolderTreeMenuItem({
                   className="gap-2"
                 >
                   <FolderPlus className="size-4" />
-                  <span>新建子文件夹</span>
+                  <span>{t("vault.dialogs.folder.createSubFolderTitle")}</span>
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
@@ -130,7 +136,7 @@ export function FolderTreeMenuItem({
                   className="gap-2"
                 >
                   <Edit2 className="size-4" />
-                  <span>重命名</span>
+                  <span>{t("vault.page.actions.rename")}</span>
                 </ContextMenuItem>
                 <ContextMenuItem
                   onClick={() => {
@@ -141,7 +147,7 @@ export function FolderTreeMenuItem({
                   className="gap-2 text-red-600 focus:text-red-600"
                 >
                   <Trash2 className="size-4" />
-                  <span>删除</span>
+                  <span>{t("vault.page.actions.delete")}</span>
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>

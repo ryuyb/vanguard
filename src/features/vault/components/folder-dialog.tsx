@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ export function FolderDialog({
   onConfirm,
   isLoading = false,
 }: FolderDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
 
   useEffect(() => {
@@ -54,23 +56,25 @@ export function FolderDialog({
           <DialogHeader>
             <DialogTitle>
               {isCreatingSubFolder
-                ? "新建子文件夹"
+                ? t("vault.dialogs.folder.createSubFolderTitle")
                 : mode === "create"
-                  ? "新建文件夹"
-                  : "重命名文件夹"}
+                  ? t("vault.dialogs.folder.createTitle")
+                  : t("vault.dialogs.folder.renameTitle")}
             </DialogTitle>
             <DialogDescription>
               {isCreatingSubFolder
-                ? `在 "${parentFolderName}" 下创建子文件夹`
+                ? t("vault.dialogs.folder.createSubFolderDescription", {
+                    parentFolderName,
+                  })
                 : mode === "create"
-                  ? "创建一个新文件夹来组织你的密码"
-                  : "为文件夹输入新名称"}
+                  ? t("vault.dialogs.folder.createDescription")
+                  : t("vault.dialogs.folder.renameDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {isCreatingSubFolder && (
               <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                完整路径:{" "}
+                {t("vault.dialogs.folder.fullPathLabel")}{" "}
                 <strong>
                   {parentFolderName}/{name || "..."}
                 </strong>
@@ -78,14 +82,18 @@ export function FolderDialog({
             )}
             <div className="grid gap-2">
               <Label htmlFor="folder-name">
-                {isCreatingSubFolder ? "子文件夹名称" : "文件夹名称"}
+                {isCreatingSubFolder
+                  ? t("vault.dialogs.folder.subFolderNameLabel")
+                  : t("vault.dialogs.folder.folderNameLabel")}
               </Label>
               <Input
                 id="folder-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={
-                  isCreatingSubFolder ? "输入子文件夹名称" : "输入文件夹名称"
+                  isCreatingSubFolder
+                    ? t("vault.dialogs.folder.subFolderNamePlaceholder")
+                    : t("vault.dialogs.folder.folderNamePlaceholder")
                 }
                 autoFocus
                 disabled={isLoading}
@@ -99,10 +107,14 @@ export function FolderDialog({
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
-              取消
+              {t("common.actions.cancel")}
             </Button>
             <Button type="submit" disabled={!name.trim() || isLoading}>
-              {isLoading ? "处理中..." : mode === "create" ? "创建" : "重命名"}
+              {isLoading
+                ? t("vault.dialogs.folder.processing")
+                : mode === "create"
+                  ? t("vault.page.actions.create")
+                  : t("vault.page.actions.rename")}
             </Button>
           </DialogFooter>
         </form>

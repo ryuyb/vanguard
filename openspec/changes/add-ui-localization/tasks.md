@@ -18,10 +18,10 @@
 
 ## 4. Feature Copy Migration
 
-- [ ] 4.1 Update the vault general settings language selector to read and write the global locale preference
-- [ ] 4.2 Migrate auth login and unlock user-facing copy to translation keys
-- [ ] 4.3 Migrate vault page, dialogs, detail panels, and success/error toasts to translation keys
-- [ ] 4.4 Migrate Spotlight labels, hints, search states, and copy-action text to translation keys
+- [x] 4.1 Update the vault general settings language selector to read and write the global locale preference
+- [x] 4.2 Migrate auth login and unlock user-facing copy to translation keys
+- [x] 4.3 Migrate vault page, dialogs, detail panels, and success/error toasts to translation keys
+- [x] 4.4 Migrate Spotlight labels, hints, search states, and copy-action text to translation keys
 
 ## 5. Validation
 

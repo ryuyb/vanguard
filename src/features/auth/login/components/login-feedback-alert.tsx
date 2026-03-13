@@ -1,4 +1,5 @@
 import { AlertCircle, ShieldCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { LoginFeedback } from "@/features/auth/login/types";
 
 type LoginFeedbackAlertProps = {
@@ -6,6 +7,8 @@ type LoginFeedbackAlertProps = {
 };
 
 export function LoginFeedbackAlert({ feedback }: LoginFeedbackAlertProps) {
+  const { t } = useTranslation();
+
   if (feedback.kind === "idle") {
     return null;
   }
@@ -13,7 +16,7 @@ export function LoginFeedbackAlert({ feedback }: LoginFeedbackAlertProps) {
   const config = {
     error: {
       icon: AlertCircle,
-      title: "登录失败",
+      title: t("auth.feedback.login.error"),
       borderColor: "border-red-200/60",
       bgColor: "bg-red-50/50",
       iconColor: "text-red-600",
@@ -22,7 +25,7 @@ export function LoginFeedbackAlert({ feedback }: LoginFeedbackAlertProps) {
     },
     success: {
       icon: ShieldCheck,
-      title: "登录成功",
+      title: t("auth.feedback.login.success"),
       borderColor: "border-emerald-200/60",
       bgColor: "bg-emerald-50/50",
       iconColor: "text-emerald-600",
@@ -31,7 +34,7 @@ export function LoginFeedbackAlert({ feedback }: LoginFeedbackAlertProps) {
     },
     twoFactor: {
       icon: ShieldCheck,
-      title: "需要二步验证",
+      title: t("auth.feedback.login.twoFactorRequired"),
       borderColor: "border-blue-200/60",
       bgColor: "bg-blue-50/50",
       iconColor: "text-blue-600",

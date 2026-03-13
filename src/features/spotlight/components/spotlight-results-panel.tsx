@@ -1,4 +1,5 @@
 import { Command as CommandPrimitive } from "cmdk";
+import { useTranslation } from "react-i18next";
 import { CommandItem } from "@/components/ui/command";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,6 +39,8 @@ export function SpotlightResultsPanel({
   visibleItems,
   copiedItemId,
 }: SpotlightResultsPanelProps) {
+  const { t } = useTranslation();
+
   if (!shouldShowResults) {
     return null;
   }
@@ -54,7 +57,10 @@ export function SpotlightResultsPanel({
           ))}
         </div>
       ) : detailItem ? (
-        <section className="px-2 pt-3 pb-2.5" aria-label="Cipher detail">
+        <section
+          className="px-2 pt-3 pb-2.5"
+          aria-label={t("spotlight.search.detailRegionLabel")}
+        >
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
             <CipherIcon
               alt={toCipherIconAlt(detailItem.title)}
@@ -99,6 +105,17 @@ export function SpotlightResultsPanel({
                 </KbdGroup>
               </div>
             ))}
+          </div>
+        </section>
+      ) : hasQuery && visibleItems.length === 0 ? (
+        <section className="px-2 pt-3 pb-2.5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-slate-900">
+              {t("spotlight.search.states.noResults.title")}
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              {t("spotlight.search.states.noResults.description")}
+            </p>
           </div>
         </section>
       ) : (

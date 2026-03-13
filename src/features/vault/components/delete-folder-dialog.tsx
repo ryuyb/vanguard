@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { appI18n } from "@/i18n";
 
 type DeleteFolderDialogProps = {
   open: boolean;
@@ -28,17 +29,22 @@ export function DeleteFolderDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>确认删除文件夹</AlertDialogTitle>
+          <AlertDialogTitle>
+            {appI18n.t("vault.dialogs.deleteFolder.title")}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            确定要删除文件夹{" "}
-            <strong className="text-slate-900">"{folderName}"</strong> 吗？
+            {appI18n.t("vault.dialogs.deleteFolder.descriptionPrefix")}{" "}
+            <strong className="text-slate-900">"{folderName}"</strong>{" "}
+            {appI18n.t("vault.dialogs.deleteFolder.descriptionSuffix")}
             <br />
             <br />
-            文件夹中的密码不会被删除，它们将移动到"无文件夹"分类中。
+            {appI18n.t("vault.dialogs.deleteFolder.descriptionHint")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2">
-          <AlertDialogCancel disabled={isLoading}>取消</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>
+            {appI18n.t("common.actions.cancel")}
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
@@ -47,7 +53,9 @@ export function DeleteFolderDialog({
             disabled={isLoading}
             className="bg-red-600 hover:bg-red-700"
           >
-            {isLoading ? "删除中..." : "删除"}
+            {isLoading
+              ? appI18n.t("vault.dialogs.deleteFolder.deleting")
+              : appI18n.t("vault.page.actions.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CUSTOM_SERVER_URL_OPTION } from "@/features/auth/login/constants";
 import {
   canVaultUnlockAfterLogin,
+  formatTwoFactorProviders,
   isValidServerUrl,
   loginWithPassword,
   normalizeBaseUrl,
@@ -10,7 +11,6 @@ import {
   sendEmailLoginCode,
   syncVaultAfterLogin,
   toProviderId,
-  toProviderLabel,
   toServerUrlOption,
   unlockVaultAfterLogin,
 } from "@/features/auth/login/login-flow-helpers";
@@ -18,6 +18,7 @@ import type {
   LoginFeedback,
   TwoFactorState,
 } from "@/features/auth/login/types";
+import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
 
 type UseLoginFlowParams = {
@@ -155,28 +156,28 @@ export function useLoginFlow({
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
       setFeedback({
         kind: "error",
-        text: "请先填写服务地址、登录邮箱和主密码。",
+        text: appI18n.t("auth.login.validation.missingCredentials"),
       });
       return;
     }
     if (!isValidServerUrl(normalizedBaseUrl)) {
       setFeedback({
         kind: "error",
-        text: "服务地址格式不正确，请以 http:// 或 https:// 开头。",
+        text: appI18n.t("auth.login.validation.invalidServerUrl"),
       });
       return;
     }
     if (!trimmedEmail.includes("@")) {
       setFeedback({
         kind: "error",
-        text: "邮箱格式看起来不正确，请检查后重试。",
+        text: appI18n.t("auth.login.validation.invalidEmail"),
       });
       return;
     }
 
     setIsSubmitting(true);
     setFeedback({ kind: "idle" });
-    setSubmitProgressText("正在验证账号信息...");
+    setSubmitProgressText(appI18n.t("auth.login.progress.verifyingAccount"));
 
     try {
       const twoFactorProvider = twoFactorState
@@ -187,7 +188,7 @@ export function useLoginFlow({
       if (twoFactorState && (twoFactorProvider === null || !twoFactorToken)) {
         setFeedback({
           kind: "error",
-          text: "请输入完整的二步验证码后再继续。",
+          text: appI18n.t("auth.login.validation.incompleteTwoFactor"),
         });
         return;
       }
@@ -206,7 +207,7 @@ export function useLoginFlow({
       }
 
       if (result.data.status === "authenticated") {
-        setSubmitProgressText("正在准备你的密码库...");
+        setSubmitProgressText(appI18n.t("auth.login.progress.preparingVault"));
         setTwoFactorState(null);
 
         const canUnlockResult = await canVaultUnlockAfterLogin();
@@ -217,14 +218,18 @@ export function useLoginFlow({
         const canUnlock = canUnlockResult.data;
 
         if (canUnlock) {
-          setSubmitProgressText("正在解锁本地密码库...");
+          setSubmitProgressText(
+            appI18n.t("auth.login.progress.unlockingLocalVault"),
+          );
           const unlockResult = await unlockVaultAfterLogin(masterPassword);
           if (unlockResult.status === "error") {
             errorHandler.handle(unlockResult.error);
             return;
           }
 
-          setSubmitProgressText("正在同步最新数据...");
+          setSubmitProgressText(
+            appI18n.t("auth.login.progress.syncingLatestData"),
+          );
           const syncResult = await syncVaultAfterLogin();
           if (syncResult.status === "error") {
             setMasterPassword("");
@@ -237,14 +242,14 @@ export function useLoginFlow({
           return;
         }
 
-        setSubmitProgressText("正在首次同步密码库...");
+        setSubmitProgressText(appI18n.t("auth.login.progress.firstSync"));
         const syncResult = await syncVaultAfterLogin();
         if (syncResult.status === "error") {
           errorHandler.handle(syncResult.error);
           return;
         }
 
-        setSubmitProgressText("正在完成解锁...");
+        setSubmitProgressText(appI18n.t("auth.login.progress.finishingUnlock"));
         const unlockResult = await unlockVaultAfterLogin(masterPassword);
         if (unlockResult.status === "error") {
           errorHandler.handle(unlockResult.error);
@@ -273,7 +278,9 @@ export function useLoginFlow({
 
       setFeedback({
         kind: "twoFactor",
-        text: `需要二步验证，请输入验证码继续（可用方式：${providers.map(toProviderLabel).join("、") || "未知方式"}）。`,
+        text: appI18n.t("auth.login.messages.twoFactorPrompt", {
+          providers: formatTwoFactorProviders(providers),
+        }),
       });
     } catch (error) {
       errorHandler.handle(error);
@@ -290,7 +297,7 @@ export function useLoginFlow({
     if (twoFactorState.selectedProvider !== "1") {
       setFeedback({
         kind: "error",
-        text: "当前不是邮箱验证方式，无法发送邮件验证码。",
+        text: appI18n.t("auth.login.validation.nonEmailProvider"),
       });
       return;
     }
@@ -300,7 +307,7 @@ export function useLoginFlow({
     if (!normalizedBaseUrl || !trimmedEmail || !masterPassword) {
       setFeedback({
         kind: "error",
-        text: "发送验证码前，请先填写服务地址、登录邮箱和主密码。",
+        text: appI18n.t("auth.login.validation.missingEmailCodeRequirements"),
       });
       return;
     }
@@ -324,7 +331,7 @@ export function useLoginFlow({
 
       setFeedback({
         kind: "success",
-        text: "验证码已发送到邮箱，请查收后输入并继续登录。",
+        text: appI18n.t("auth.login.messages.emailCodeSent"),
       });
     } catch (error) {
       errorHandler.handle(error);

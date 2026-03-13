@@ -1,10 +1,19 @@
 import type { DetailAction } from "@/features/spotlight/types";
+import { appI18n } from "@/i18n";
 
-export const DETAIL_ACTIONS: readonly DetailAction[] = [
-  { label: "复制 用户名", shortcut: ["⌘", "C"], field: "username" },
-  { label: "复制 密码", shortcut: ["⌘", "⇧", "C"], field: "password" },
+export const getDetailActions = (): readonly DetailAction[] => [
   {
-    label: "复制 一次性密码",
+    label: appI18n.t("spotlight.actions.copyUsername"),
+    shortcut: ["⌘", "C"],
+    field: "username",
+  },
+  {
+    label: appI18n.t("spotlight.actions.copyPassword"),
+    shortcut: ["⌘", "⇧", "C"],
+    field: "password",
+  },
+  {
+    label: appI18n.t("spotlight.actions.copyTotp"),
     shortcut: ["⌘", "⌥", "C"],
     field: "totp",
     requiresTotp: true,

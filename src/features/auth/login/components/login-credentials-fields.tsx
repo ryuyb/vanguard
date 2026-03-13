@@ -1,4 +1,5 @@
 import { Eye, EyeOff, KeyRound, Mail } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -26,11 +27,13 @@ export function LoginCredentialsFields({
   onMasterPasswordChange,
   onToggleShowPassword,
 }: LoginCredentialsFieldsProps) {
+  const { t } = useTranslation();
+
   return (
     <>
       <div className="space-y-2.5">
         <Label htmlFor="email" className="text-sm font-medium text-slate-700">
-          邮箱地址
+          {t("auth.login.form.email.label")}
         </Label>
         <InputGroup>
           <InputGroupAddon>
@@ -40,7 +43,7 @@ export function LoginCredentialsFields({
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder={t("auth.login.form.email.placeholder")}
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
             disabled={isSubmitting}
@@ -54,7 +57,7 @@ export function LoginCredentialsFields({
           htmlFor="master-password"
           className="text-sm font-medium text-slate-700"
         >
-          主密码
+          {t("auth.login.form.masterPassword.label")}
         </Label>
         <InputGroup>
           <InputGroupAddon>
@@ -64,7 +67,7 @@ export function LoginCredentialsFields({
             id="master-password"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
-            placeholder="输入主密码"
+            placeholder={t("auth.login.form.masterPassword.placeholder")}
             value={masterPassword}
             onChange={(event) => onMasterPasswordChange(event.target.value)}
             disabled={isSubmitting}
@@ -78,7 +81,11 @@ export function LoginCredentialsFields({
               className="text-slate-400 hover:text-slate-700 transition-colors"
               onClick={onToggleShowPassword}
               disabled={isSubmitting}
-              aria-label={showPassword ? "隐藏密码" : "显示密码"}
+              aria-label={
+                showPassword
+                  ? t("auth.login.form.masterPassword.hidePassword")
+                  : t("auth.login.form.masterPassword.showPassword")
+              }
             >
               {showPassword ? (
                 <EyeOff className="h-5 w-5" />

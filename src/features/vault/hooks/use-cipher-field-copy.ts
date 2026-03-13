@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
+import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
 
 type CopyableField =
@@ -38,7 +39,7 @@ export function useCipherFieldCopy(cipherId: string) {
     if (result.status === "ok") {
       const fieldKey = JSON.stringify(field);
       setCopiedField(fieldKey);
-      toast.success("已复制到剪贴板");
+      toast.success(appI18n.t("vault.feedback.copiedToClipboard"));
       setTimeout(() => setCopiedField(null), 1500);
     } else {
       errorHandler.handle(result.error);

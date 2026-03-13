@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { KeyRound, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnlockLockedForm } from "@/features/auth/unlock/components";
@@ -15,6 +16,7 @@ export function UnlockPage({
   navigateToHome,
   navigateToVault,
 }: UnlockPageProps) {
+  const { t } = useTranslation();
   const {
     biometricEnabled,
     biometricSupported,
@@ -82,29 +84,33 @@ export function UnlockPage({
             </div>
             <div className="space-y-1 text-center">
               <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
-                解锁 Vanguard
+                {t("auth.unlock.title")}
               </CardTitle>
-              <p className="text-sm text-slate-600">输入凭据以访问你的密码库</p>
+              <p className="text-sm text-slate-600">
+                {t("auth.unlock.subtitle")}
+              </p>
             </div>
           </CardHeader>
           <CardContent className="pb-8">
             {isRestoring && (
               <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-sm text-slate-700">
                 <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" />
-                <span>正在检查会话状态...</span>
+                <span>{t("auth.unlock.states.checkingSession")}</span>
               </div>
             )}
 
             {!isRestoring && restoreState?.status === "needsLogin" && (
               <div className="space-y-4">
                 <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3.5 text-sm text-amber-900">
-                  <p className="font-medium">需要登录</p>
+                  <p className="font-medium">
+                    {t("auth.unlock.states.needsLogin.title")}
+                  </p>
                   <p className="mt-1 text-amber-800">
-                    当前没有可解锁的会话，请先登录。
+                    {t("auth.unlock.states.needsLogin.description")}
                   </p>
                 </div>
                 <Button asChild className="w-full" size="lg">
-                  <Link to="/">前往登录</Link>
+                  <Link to="/">{t("auth.unlock.actions.goToLogin")}</Link>
                 </Button>
               </div>
             )}
@@ -114,7 +120,7 @@ export function UnlockPage({
               isVaultUnlocked && (
                 <div className="flex items-center justify-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-6 text-sm text-emerald-700">
                   <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
-                  <span>密码库已解锁，正在跳转...</span>
+                  <span>{t("auth.unlock.states.unlocked")}</span>
                 </div>
               )}
 

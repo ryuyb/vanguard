@@ -1,4 +1,5 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +25,7 @@ export function DeleteCipherDialog({
   onConfirm,
   isLoading = false,
 }: DeleteCipherDialogProps) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -33,13 +35,13 @@ export function DeleteCipherDialog({
               <AlertTriangle className="size-5 text-red-600" />
             </div>
             <DialogTitle className="text-lg font-bold text-slate-900">
-              删除项目
+              {t("vault.dialogs.deleteCipher.title")}
             </DialogTitle>
           </div>
           <DialogDescription className="text-sm text-slate-600 pt-2">
-            确定要删除{" "}
+            {t("vault.dialogs.deleteCipher.descriptionPrefix")}{" "}
             <span className="font-semibold text-slate-900">"{cipherName}"</span>{" "}
-            吗？ 此操作无法撤销。
+            {t("vault.dialogs.deleteCipher.descriptionSuffix")}
           </DialogDescription>
         </DialogHeader>
 
@@ -51,7 +53,7 @@ export function DeleteCipherDialog({
             disabled={isLoading}
             className="h-10"
           >
-            取消
+            {t("common.actions.cancel")}
           </Button>
           <Button
             type="button"
@@ -63,10 +65,10 @@ export function DeleteCipherDialog({
             {isLoading ? (
               <>
                 <LoaderCircle className="size-4 animate-spin" />
-                删除中...
+                {t("vault.dialogs.deleteCipher.deleting")}
               </>
             ) : (
-              "删除"
+              t("vault.page.actions.delete")
             )}
           </Button>
         </DialogFooter>

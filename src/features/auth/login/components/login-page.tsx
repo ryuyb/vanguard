@@ -1,4 +1,5 @@
 import { KeyRound, LoaderCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,6 +15,7 @@ type LoginPageProps = {
 };
 
 export function LoginPage({ navigateToVault }: LoginPageProps) {
+  const { t } = useTranslation();
   const {
     canSubmit,
     customBaseUrl,
@@ -54,9 +56,11 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
             </div>
             <div className="space-y-1 text-center">
               <CardTitle className="text-2xl font-semibold tracking-tight text-slate-900">
-                登录 Vanguard
+                {t("auth.login.title")}
               </CardTitle>
-              <p className="text-sm text-slate-600">输入凭据以访问你的密码库</p>
+              <p className="text-sm text-slate-600">
+                {t("auth.login.subtitle")}
+              </p>
             </div>
           </CardHeader>
           <CardContent className="pb-8">
@@ -64,7 +68,7 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
               {isRestoringSession && (
                 <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-sm text-slate-700">
                   <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" />
-                  <span>正在检查会话...</span>
+                  <span>{t("auth.login.states.checkingSession")}</span>
                 </div>
               )}
 
@@ -108,10 +112,10 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
                   <LoaderCircle className="h-5 w-5 animate-spin" />
                 )}
                 {isSubmitting
-                  ? submitProgressText || "正在登录..."
+                  ? submitProgressText || t("auth.login.actions.submitting")
                   : twoFactorState
-                    ? "验证后继续"
-                    : "登录"}
+                    ? t("auth.login.actions.verifyAndContinue")
+                    : t("auth.login.actions.submit")}
               </Button>
             </form>
           </CardContent>

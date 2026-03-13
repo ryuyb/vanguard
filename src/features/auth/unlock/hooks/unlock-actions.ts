@@ -1,8 +1,9 @@
 import { commands } from "@/bindings";
 import { toErrorText } from "@/features/auth/shared/utils";
+import { appI18n } from "@/i18n";
 
 export function toUnlockErrorText(error: unknown): string {
-  return toErrorText(error, "解锁失败，请稍后重试。");
+  return toErrorText(error, appI18n.t("auth.unlock.messages.unlockFailed"));
 }
 
 export async function unlockWithMasterPassword(password: string) {

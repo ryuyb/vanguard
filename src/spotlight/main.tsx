@@ -39,7 +39,6 @@ function SpotlightApp() {
     shouldShowResults,
     visibleItems,
   } = useSpotlightViewModel({
-    isLoadingVault,
     vaultItems,
   });
 

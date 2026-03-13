@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { UnlockFeedback } from "@/features/auth/unlock/types";
 
 type UnlockFeedbackAlertProps = {
@@ -6,6 +7,8 @@ type UnlockFeedbackAlertProps = {
 };
 
 export function UnlockFeedbackAlert({ feedback }: UnlockFeedbackAlertProps) {
+  const { t } = useTranslation();
+
   if (feedback.kind === "idle") {
     return null;
   }
@@ -17,7 +20,9 @@ export function UnlockFeedbackAlert({ feedback }: UnlockFeedbackAlertProps) {
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
           <div className="flex-1">
-            <p className="font-medium text-red-900">验证失败</p>
+            <p className="font-medium text-red-900">
+              {t("auth.feedback.unlock.error")}
+            </p>
             <p className="mt-1 text-red-800">{feedback.text}</p>
           </div>
         </div>

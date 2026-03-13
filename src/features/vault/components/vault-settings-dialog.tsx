@@ -1,5 +1,6 @@
 import { Shield, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { commands } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toErrorText } from "@/features/auth/shared/utils";
+import {
+  APP_LOCALE_OPTIONS,
+  type AppLocale,
+  appI18n,
+  changeAppLocale,
+} from "@/i18n";
 
 type VaultSettingsDialogProps = {
   open: boolean;
@@ -26,7 +33,6 @@ type VaultSettingsDialogProps = {
 };
 
 type SettingsSection = "security" | "general";
-type LanguageOption = "zh" | "en";
 type RequireMasterPasswordOption = "1d" | "7d" | "14d" | "30d" | "never";
 type AutoLockIdleOption =
   | "1m"
@@ -48,61 +54,57 @@ type ClipboardClearOption =
   | "5m"
   | "never";
 
-const AUTO_LOCK_IDLE_OPTIONS: Array<{
-  value: AutoLockIdleOption;
-  label: string;
-}> = [
-  { value: "1m", label: "1 分钟" },
-  { value: "2m", label: "2 分钟" },
-  { value: "5m", label: "5 分钟" },
-  { value: "10m", label: "10 分钟" },
-  { value: "15m", label: "15 分钟" },
-  { value: "30m", label: "30 分钟" },
-  { value: "1h", label: "1 小时" },
-  { value: "4h", label: "4 小时" },
-  { value: "8h", label: "8 小时" },
-  { value: "never", label: "从不" },
+const AUTO_LOCK_IDLE_OPTIONS: AutoLockIdleOption[] = [
+  "1m",
+  "2m",
+  "5m",
+  "10m",
+  "15m",
+  "30m",
+  "1h",
+  "4h",
+  "8h",
+  "never",
 ];
 
-const REQUIRE_MASTER_PASSWORD_OPTIONS: Array<{
-  value: RequireMasterPasswordOption;
-  label: string;
-}> = [
-  { value: "1d", label: "1 天后" },
-  { value: "7d", label: "7 天后" },
-  { value: "14d", label: "14 天后" },
-  { value: "30d", label: "30 天后" },
-  { value: "never", label: "从不" },
+const REQUIRE_MASTER_PASSWORD_OPTIONS: RequireMasterPasswordOption[] = [
+  "1d",
+  "7d",
+  "14d",
+  "30d",
+  "never",
 ];
 
-const CLIPBOARD_CLEAR_OPTIONS: Array<{
-  value: ClipboardClearOption;
-  label: string;
-}> = [
-  { value: "10s", label: "10 秒" },
-  { value: "20s", label: "20 秒" },
-  { value: "30s", label: "30 秒" },
-  { value: "1m", label: "1 分钟" },
-  { value: "2m", label: "2 分钟" },
-  { value: "5m", label: "5 分钟" },
-  { value: "never", label: "从不" },
+const CLIPBOARD_CLEAR_OPTIONS: ClipboardClearOption[] = [
+  "10s",
+  "20s",
+  "30s",
+  "1m",
+  "2m",
+  "5m",
+  "never",
 ];
 
-const LANGUAGE_OPTIONS: Array<{ value: LanguageOption; label: string }> = [
-  { value: "zh", label: "中文" },
-  { value: "en", label: "英语" },
-];
-
-const QUICK_ACCESS_SHORTCUT = "⌃⇧Space";
+const QUICK_ACCESS_SHORTCUT = "⌃⇧␣";
 const LOCK_SHORTCUT = "⇧⌘L";
 
-function formatShortcutFromKeyboardEvent(event: {
-  key: string;
-  ctrlKey: boolean;
-  shiftKey: boolean;
-  altKey: boolean;
-  metaKey: boolean;
-}): string | null {
+function formatShortcutFromKeyboardEvent(
+  event: {
+    key: string;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    altKey: boolean;
+    metaKey: boolean;
+  },
+  labels: {
+    space: string;
+    esc: string;
+    up: string;
+    down: string;
+    left: string;
+    right: string;
+  },
+): string | null {
   if (
     event.key === "Shift" ||
     event.key === "Control" ||
@@ -127,13 +129,13 @@ function formatShortcutFromKeyboardEvent(event: {
   }
 
   const keyMap: Record<string, string> = {
-    " ": "Space",
-    Spacebar: "Space",
-    Escape: "Esc",
-    ArrowUp: "Up",
-    ArrowDown: "Down",
-    ArrowLeft: "Left",
-    ArrowRight: "Right",
+    " ": labels.space,
+    Spacebar: labels.space,
+    Escape: labels.esc,
+    ArrowUp: labels.up,
+    ArrowDown: labels.down,
+    ArrowLeft: labels.left,
+    ArrowRight: labels.right,
   };
   const keyLabel =
     keyMap[event.key] ??
@@ -146,9 +148,12 @@ export function VaultSettingsDialog({
   open,
   onOpenChange,
 }: VaultSettingsDialogProps) {
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("general");
-  const [language, setLanguage] = useState<LanguageOption>("zh");
+  const [language, setLanguage] = useState<AppLocale>(
+    appI18n.language as AppLocale,
+  );
   const [showWebsiteIcon, setShowWebsiteIcon] = useState(true);
   const [quickAccessShortcut, setQuickAccessShortcut] = useState(
     QUICK_ACCESS_SHORTCUT,
@@ -197,7 +202,10 @@ export function VaultSettingsDialog({
         setIsBiometricEnabled(biometricResult.data.enabled);
       } else {
         setErrorText(
-          toErrorText(biometricResult.error, "读取生物识别状态失败。"),
+          toErrorText(
+            biometricResult.error,
+            t("vault.dialogs.settings.errors.loadBiometricStatus"),
+          ),
         );
       }
 
@@ -205,14 +213,24 @@ export function VaultSettingsDialog({
         setIsPinSupported(pinResult.data.supported);
         setIsPinEnabled(pinResult.data.enabled);
       } else {
-        setErrorText(toErrorText(pinResult.error, "读取 PIN 状态失败。"));
+        setErrorText(
+          toErrorText(
+            pinResult.error,
+            t("vault.dialogs.settings.errors.loadPinStatus"),
+          ),
+        );
       }
     } catch (error) {
-      setErrorText(toErrorText(error, "读取安全设置失败，请稍后重试。"));
+      setErrorText(
+        toErrorText(
+          error,
+          t("vault.dialogs.settings.errors.loadSecuritySettings"),
+        ),
+      );
     } finally {
       setIsStatusLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!open) {
@@ -222,6 +240,7 @@ export function VaultSettingsDialog({
       return;
     }
     setActiveSection("general");
+    setLanguage(appI18n.language as AppLocale);
     void loadSecuritySettings();
   }, [loadSecuritySettings, open]);
 
@@ -240,6 +259,12 @@ export function VaultSettingsDialog({
     [isPinBusy],
   );
 
+  const onLanguageChange = useCallback((value: string) => {
+    const newLocale = value as AppLocale;
+    setLanguage(newLocale);
+    void changeAppLocale(newLocale);
+  }, []);
+
   const onBiometricCheckedChange = useCallback(
     async (checked: boolean) => {
       if (!isBiometricSupported || checked === isBiometricEnabled) {
@@ -256,7 +281,9 @@ export function VaultSettingsDialog({
           setErrorText(
             toErrorText(
               result.error,
-              checked ? "启用生物识别失败。" : "禁用生物识别失败。",
+              checked
+                ? t("vault.dialogs.settings.errors.enableBiometric")
+                : t("vault.dialogs.settings.errors.disableBiometric"),
             ),
           );
           return;
@@ -266,14 +293,16 @@ export function VaultSettingsDialog({
         setErrorText(
           toErrorText(
             error,
-            checked ? "启用生物识别失败。" : "禁用生物识别失败。",
+            checked
+              ? t("vault.dialogs.settings.errors.enableBiometric")
+              : t("vault.dialogs.settings.errors.disableBiometric"),
           ),
         );
       } finally {
         setIsBiometricBusy(false);
       }
     },
-    [isBiometricEnabled, isBiometricSupported],
+    [isBiometricEnabled, isBiometricSupported, t],
   );
 
   const onPinCheckedChange = useCallback(
@@ -294,25 +323,35 @@ export function VaultSettingsDialog({
       try {
         const disableResult = await commands.vaultDisablePinUnlock({});
         if (disableResult.status === "error") {
-          setErrorText(toErrorText(disableResult.error, "禁用 PIN 失败。"));
+          setErrorText(
+            toErrorText(
+              disableResult.error,
+              t("vault.dialogs.settings.errors.disablePin"),
+            ),
+          );
           return;
         }
         setIsPinEnabled(false);
       } catch (error) {
         setErrorText(
-          toErrorText(error, checked ? "启用 PIN 失败。" : "禁用 PIN 失败。"),
+          toErrorText(
+            error,
+            checked
+              ? t("vault.dialogs.settings.errors.enablePin")
+              : t("vault.dialogs.settings.errors.disablePin"),
+          ),
         );
       } finally {
         setIsPinBusy(false);
       }
     },
-    [isPinEnabled, isPinSupported],
+    [isPinEnabled, isPinSupported, t],
   );
 
   const onPinEnableSubmit = useCallback(async () => {
     const normalizedPin = pinInput.trim();
     if (!normalizedPin) {
-      setPinDialogError("PIN 不能为空。");
+      setPinDialogError(t("vault.dialogs.settings.errors.pinRequired"));
       return;
     }
 
@@ -325,7 +364,12 @@ export function VaultSettingsDialog({
         lockType: "persistent",
       });
       if (result.status === "error") {
-        setPinDialogError(toErrorText(result.error, "启用 PIN 失败。"));
+        setPinDialogError(
+          toErrorText(
+            result.error,
+            t("vault.dialogs.settings.errors.enablePin"),
+          ),
+        );
         return;
       }
 
@@ -333,11 +377,13 @@ export function VaultSettingsDialog({
       setIsPinDialogOpen(false);
       setPinInput("");
     } catch (error) {
-      setPinDialogError(toErrorText(error, "启用 PIN 失败。"));
+      setPinDialogError(
+        toErrorText(error, t("vault.dialogs.settings.errors.enablePin")),
+      );
     } finally {
       setIsPinBusy(false);
     }
-  }, [pinInput]);
+  }, [pinInput, t]);
 
   const onQuickAccessFocusCapture = useCallback(() => {
     quickAccessOriginalShortcutRef.current = quickAccessShortcut;
@@ -366,7 +412,14 @@ export function VaultSettingsDialog({
         return;
       }
 
-      const formatted = formatShortcutFromKeyboardEvent(event);
+      const formatted = formatShortcutFromKeyboardEvent(event, {
+        space: t("vault.dialogs.settings.general.shortcuts.keys.space"),
+        esc: t("vault.dialogs.settings.general.shortcuts.keys.esc"),
+        up: t("vault.dialogs.settings.general.shortcuts.keys.up"),
+        down: t("vault.dialogs.settings.general.shortcuts.keys.down"),
+        left: t("vault.dialogs.settings.general.shortcuts.keys.left"),
+        right: t("vault.dialogs.settings.general.shortcuts.keys.right"),
+      });
       if (!formatted) {
         return;
       }
@@ -375,7 +428,7 @@ export function VaultSettingsDialog({
       quickAccessCapturedRef.current = true;
       setQuickAccessShortcut(formatted);
     },
-    [],
+    [t],
   );
 
   const onLockFocusCapture = useCallback(() => {
@@ -405,7 +458,14 @@ export function VaultSettingsDialog({
         return;
       }
 
-      const formatted = formatShortcutFromKeyboardEvent(event);
+      const formatted = formatShortcutFromKeyboardEvent(event, {
+        space: t("vault.dialogs.settings.general.shortcuts.keys.space"),
+        esc: t("vault.dialogs.settings.general.shortcuts.keys.esc"),
+        up: t("vault.dialogs.settings.general.shortcuts.keys.up"),
+        down: t("vault.dialogs.settings.general.shortcuts.keys.down"),
+        left: t("vault.dialogs.settings.general.shortcuts.keys.left"),
+        right: t("vault.dialogs.settings.general.shortcuts.keys.right"),
+      });
       if (!formatted) {
         return;
       }
@@ -414,16 +474,16 @@ export function VaultSettingsDialog({
       lockCapturedRef.current = true;
       setLockShortcut(formatted);
     },
-    [],
+    [t],
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="grid h-170 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>设置</DialogTitle>
+          <DialogTitle>{t("vault.dialogs.settings.title")}</DialogTitle>
           <DialogDescription>
-            在这里管理 Vault 的相关偏好设置。更多设置项将逐步开放。
+            {t("vault.dialogs.settings.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -442,7 +502,7 @@ export function VaultSettingsDialog({
               >
                 <span className="inline-flex items-center gap-2">
                   <SlidersHorizontal className="size-4" />
-                  通用
+                  {t("vault.dialogs.settings.sections.general")}
                 </span>
               </button>
               <button
@@ -457,7 +517,7 @@ export function VaultSettingsDialog({
               >
                 <span className="inline-flex items-center gap-2">
                   <Shield className="size-4" />
-                  安全
+                  {t("vault.dialogs.settings.sections.security")}
                 </span>
               </button>
             </div>
@@ -466,9 +526,11 @@ export function VaultSettingsDialog({
           <section className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/70 p-3">
             {activeSection === "security" && (
               <>
-                <h3 className="text-sm font-medium text-slate-900">解锁</h3>
+                <h3 className="text-sm font-medium text-slate-900">
+                  {t("vault.dialogs.settings.security.unlock.title")}
+                </h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  配置快速解锁方式。
+                  {t("vault.dialogs.settings.security.unlock.description")}
                 </p>
 
                 <div className="mt-3 space-y-2">
@@ -479,12 +541,16 @@ export function VaultSettingsDialog({
                     >
                       <div className="space-y-0.5">
                         <div className="text-sm text-slate-900">
-                          通过生物识别解锁
+                          {t("vault.dialogs.settings.security.biometric.label")}
                         </div>
                         <div className="text-xs text-slate-600">
                           {isBiometricSupported
-                            ? "使用系统生物识别快速解锁。"
-                            : "正在检测生物识别可用性。"}
+                            ? t(
+                                "vault.dialogs.settings.security.biometric.enabledHint",
+                              )
+                            : t(
+                                "vault.dialogs.settings.security.biometric.checkingHint",
+                              )}
                         </div>
                       </div>
                       <input
@@ -510,12 +576,14 @@ export function VaultSettingsDialog({
                   >
                     <div className="space-y-0.5">
                       <div className="text-sm text-slate-900">
-                        通过 PIN 解锁
+                        {t("vault.dialogs.settings.security.pin.label")}
                       </div>
                       <div className="text-xs text-slate-600">
                         {isPinSupported
-                          ? "启用后可通过 PIN 快速解锁。"
-                          : "当前设备暂不支持 PIN 解锁。"}
+                          ? t("vault.dialogs.settings.security.pin.enabledHint")
+                          : t(
+                              "vault.dialogs.settings.security.pin.unsupportedHint",
+                            )}
                       </div>
                     </div>
                     <input
@@ -532,7 +600,9 @@ export function VaultSettingsDialog({
 
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="mb-2 text-sm text-slate-900">
-                      需要主密码
+                      {t(
+                        "vault.dialogs.settings.security.requireMasterPassword",
+                      )}
                     </div>
                     <Select
                       value={requireMasterPasswordAfter}
@@ -546,12 +616,18 @@ export function VaultSettingsDialog({
                         id="vault-setting-require-master-password"
                         className="w-full bg-white"
                       >
-                        <SelectValue placeholder="选择需要主密码的时间" />
+                        <SelectValue
+                          placeholder={t(
+                            "vault.dialogs.settings.placeholders.requireMasterPassword",
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {REQUIRE_MASTER_PASSWORD_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                          <SelectItem key={option} value={option}>
+                            {t(
+                              `vault.dialogs.settings.options.requireMasterPassword.${option}`,
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -560,10 +636,10 @@ export function VaultSettingsDialog({
                 </div>
 
                 <h3 className="mt-4 text-sm font-medium text-slate-900">
-                  自动锁定
+                  {t("vault.dialogs.settings.security.autoLock.title")}
                 </h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  配置设备状态或闲置时的自动锁定行为。
+                  {t("vault.dialogs.settings.security.autoLock.description")}
                 </p>
 
                 <div className="mt-3 space-y-2">
@@ -573,7 +649,7 @@ export function VaultSettingsDialog({
                   >
                     <div className="space-y-0.5">
                       <div className="text-sm text-slate-900">
-                        设备锁定或休眠时锁定
+                        {t("vault.dialogs.settings.security.lockOnSleep")}
                       </div>
                     </div>
                     <input
@@ -589,7 +665,7 @@ export function VaultSettingsDialog({
 
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="mb-2 text-sm text-slate-900">
-                      自动锁定需等待设备闲置
+                      {t("vault.dialogs.settings.security.idleLockDelay")}
                     </div>
                     <Select
                       value={autoLockIdleDelay}
@@ -601,12 +677,18 @@ export function VaultSettingsDialog({
                         id="vault-setting-auto-lock-idle-delay"
                         className="w-full bg-white"
                       >
-                        <SelectValue placeholder="选择闲置时长" />
+                        <SelectValue
+                          placeholder={t(
+                            "vault.dialogs.settings.placeholders.autoLockIdle",
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {AUTO_LOCK_IDLE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                          <SelectItem key={option} value={option}>
+                            {t(
+                              `vault.dialogs.settings.options.autoLockIdle.${option}`,
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -615,16 +697,18 @@ export function VaultSettingsDialog({
                 </div>
 
                 <h3 className="mt-4 text-sm font-medium text-slate-900">
-                  剪贴板
+                  {t("vault.dialogs.settings.security.clipboard.title")}
                 </h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  配置复制信息后的自动清理行为。
+                  {t("vault.dialogs.settings.security.clipboard.description")}
                 </p>
 
                 <div className="mt-3 space-y-2">
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="mb-2 text-sm text-slate-900">
-                      移除复制的信息
+                      {t(
+                        "vault.dialogs.settings.security.clipboard.clearAfter",
+                      )}
                     </div>
                     <Select
                       value={clipboardClearAfter}
@@ -636,12 +720,18 @@ export function VaultSettingsDialog({
                         id="vault-setting-clipboard-clear-after"
                         className="w-full bg-white"
                       >
-                        <SelectValue placeholder="选择清理时间" />
+                        <SelectValue
+                          placeholder={t(
+                            "vault.dialogs.settings.placeholders.clipboardClear",
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {CLIPBOARD_CLEAR_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                          <SelectItem key={option} value={option}>
+                            {t(
+                              `vault.dialogs.settings.options.clipboardClear.${option}`,
+                            )}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -659,9 +749,11 @@ export function VaultSettingsDialog({
 
             {activeSection === "general" && (
               <div className="flex h-full flex-col">
-                <h3 className="text-sm font-medium text-slate-900">通用</h3>
+                <h3 className="text-sm font-medium text-slate-900">
+                  {t("vault.dialogs.settings.general.title")}
+                </h3>
                 <p className="mt-1 text-xs text-slate-600">
-                  管理应用的通用偏好设置。
+                  {t("vault.dialogs.settings.general.description")}
                 </p>
                 <div className="mt-3 space-y-2">
                   <label
@@ -669,7 +761,9 @@ export function VaultSettingsDialog({
                     className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
                   >
                     <div className="space-y-0.5">
-                      <div className="text-sm text-slate-900">登录时启动</div>
+                      <div className="text-sm text-slate-900">
+                        {t("vault.dialogs.settings.general.launchOnLogin")}
+                      </div>
                     </div>
                     <input
                       id="vault-setting-launch-on-login"
@@ -687,7 +781,9 @@ export function VaultSettingsDialog({
                     className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
                   >
                     <div className="space-y-0.5">
-                      <div className="text-sm text-slate-900">显示网站图标</div>
+                      <div className="text-sm text-slate-900">
+                        {t("vault.dialogs.settings.general.showWebsiteIcon")}
+                      </div>
                     </div>
                     <input
                       id="vault-setting-show-website-icon"
@@ -701,21 +797,22 @@ export function VaultSettingsDialog({
                   </label>
 
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="mb-2 text-sm text-slate-900">语言</div>
-                    <Select
-                      value={language}
-                      onValueChange={(value) =>
-                        setLanguage(value as LanguageOption)
-                      }
-                    >
+                    <div className="mb-2 text-sm text-slate-900">
+                      {t("common.locale.label")}
+                    </div>
+                    <Select value={language} onValueChange={onLanguageChange}>
                       <SelectTrigger
                         id="vault-setting-language"
                         className="w-full bg-white"
                       >
-                        <SelectValue placeholder="选择语言" />
+                        <SelectValue
+                          placeholder={t(
+                            "vault.dialogs.settings.placeholders.language",
+                          )}
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {LANGUAGE_OPTIONS.map((option) => (
+                        {APP_LOCALE_OPTIONS.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -726,11 +823,15 @@ export function VaultSettingsDialog({
                 </div>
 
                 <h3 className="mt-4 text-sm font-medium text-slate-900">
-                  键盘快捷键
+                  {t("vault.dialogs.settings.general.shortcuts.title")}
                 </h3>
                 <div className="mt-3 space-y-2">
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="mb-2 text-sm text-slate-900">快速访问</div>
+                    <div className="mb-2 text-sm text-slate-900">
+                      {t(
+                        "vault.dialogs.settings.general.shortcuts.quickAccess",
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         value={quickAccessShortcut}
@@ -741,7 +842,13 @@ export function VaultSettingsDialog({
                         onBlur={onQuickAccessBlurCapture}
                         onKeyDown={onQuickAccessKeyDownCapture}
                         placeholder={
-                          isQuickAccessCapturing ? "输入键盘快捷键" : "未配置"
+                          isQuickAccessCapturing
+                            ? t(
+                                "vault.dialogs.settings.general.shortcuts.inputHint",
+                              )
+                            : t(
+                                "vault.dialogs.settings.general.shortcuts.unset",
+                              )
                         }
                         className={quickAccessShortcut ? "pr-8" : undefined}
                       />
@@ -751,8 +858,12 @@ export function VaultSettingsDialog({
                           variant="ghost"
                           size="icon-xs"
                           className="absolute top-1/2 right-1 -translate-y-1/2"
-                          aria-label="清空快速访问快捷键"
-                          title="清空"
+                          aria-label={t(
+                            "vault.dialogs.settings.general.shortcuts.clearQuickAccess",
+                          )}
+                          title={t(
+                            "vault.dialogs.settings.general.shortcuts.clear",
+                          )}
                           onClick={() => {
                             setQuickAccessShortcut("");
                           }}
@@ -763,7 +874,9 @@ export function VaultSettingsDialog({
                     </div>
                   </div>
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="mb-2 text-sm text-slate-900">锁定</div>
+                    <div className="mb-2 text-sm text-slate-900">
+                      {t("vault.dialogs.settings.general.shortcuts.lock")}
+                    </div>
                     <div className="relative">
                       <Input
                         value={lockShortcut}
@@ -774,7 +887,13 @@ export function VaultSettingsDialog({
                         onBlur={onLockBlurCapture}
                         onKeyDown={onLockKeyDownCapture}
                         placeholder={
-                          isLockCapturing ? "输入键盘快捷键" : "未配置"
+                          isLockCapturing
+                            ? t(
+                                "vault.dialogs.settings.general.shortcuts.inputHint",
+                              )
+                            : t(
+                                "vault.dialogs.settings.general.shortcuts.unset",
+                              )
                         }
                         className={lockShortcut ? "pr-8" : undefined}
                       />
@@ -784,8 +903,12 @@ export function VaultSettingsDialog({
                           variant="ghost"
                           size="icon-xs"
                           className="absolute top-1/2 right-1 -translate-y-1/2"
-                          aria-label="清空锁定快捷键"
-                          title="清空"
+                          aria-label={t(
+                            "vault.dialogs.settings.general.shortcuts.clearLock",
+                          )}
+                          title={t(
+                            "vault.dialogs.settings.general.shortcuts.clear",
+                          )}
                           onClick={() => {
                             setLockShortcut("");
                           }}
@@ -808,9 +931,11 @@ export function VaultSettingsDialog({
       <Dialog open={isPinDialogOpen} onOpenChange={onPinDialogOpenChange}>
         <DialogContent className="sm:max-w-sm" showCloseButton={!isPinBusy}>
           <DialogHeader>
-            <DialogTitle>启用 PIN 解锁</DialogTitle>
+            <DialogTitle>
+              {t("vault.dialogs.settings.pinDialog.title")}
+            </DialogTitle>
             <DialogDescription>
-              输入用于解锁 Vault 的 PIN，确认后将立即启用。
+              {t("vault.dialogs.settings.pinDialog.description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -827,7 +952,9 @@ export function VaultSettingsDialog({
                 type="password"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="请输入 PIN"
+                placeholder={t(
+                  "vault.dialogs.settings.pinDialog.pinPlaceholder",
+                )}
                 value={pinInput}
                 disabled={isPinBusy}
                 onChange={(event) => {
@@ -852,10 +979,12 @@ export function VaultSettingsDialog({
                 disabled={isPinBusy}
                 onClick={() => onPinDialogOpenChange(false)}
               >
-                取消
+                {t("common.actions.cancel")}
               </Button>
               <Button type="submit" disabled={isPinBusy}>
-                {isPinBusy ? "启用中..." : "确定"}
+                {isPinBusy
+                  ? t("vault.dialogs.settings.pinDialog.enabling")
+                  : t("common.actions.confirm")}
               </Button>
             </DialogFooter>
           </form>

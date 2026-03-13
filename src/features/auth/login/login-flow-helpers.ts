@@ -2,9 +2,9 @@ import { commands } from "@/bindings";
 import {
   CUSTOM_SERVER_URL_OPTION,
   SERVER_URL_OPTIONS,
-  TWO_FACTOR_PROVIDER_LABELS,
 } from "@/features/auth/login/constants";
 import { toErrorText } from "@/features/auth/shared/utils";
+import { appI18n } from "@/i18n";
 
 export function normalizeBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
@@ -28,7 +28,26 @@ export function isValidServerUrl(value: string): boolean {
 }
 
 export function toProviderLabel(provider: string): string {
-  return TWO_FACTOR_PROVIDER_LABELS[provider] ?? `Provider ${provider}`;
+  return appI18n.t(`auth.login.form.twoFactor.provider.providers.${provider}`, {
+    defaultValue: appI18n.t(
+      "auth.login.form.twoFactor.provider.providers.unknown",
+      {
+        provider,
+      },
+    ),
+  });
+}
+
+export function formatTwoFactorProviders(providers: string[]): string {
+  if (providers.length === 0) {
+    return appI18n.t("auth.login.messages.unknownTwoFactorProvider");
+  }
+
+  const labels = providers.map(toProviderLabel);
+  const separator = (appI18n.resolvedLanguage || "").startsWith("zh")
+    ? "、"
+    : ", ";
+  return labels.join(separator);
 }
 
 export function toProviderId(provider: string): number | null {
@@ -40,7 +59,7 @@ export function toProviderId(provider: string): number | null {
 }
 
 export function toLoginErrorText(error: unknown): string {
-  return toErrorText(error, "登录失败，请稍后重试。");
+  return toErrorText(error, appI18n.t("auth.login.messages.loginFailed"));
 }
 
 export async function restoreLoginHints() {
