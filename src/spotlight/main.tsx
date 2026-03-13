@@ -16,6 +16,7 @@ import {
   useSpotlightSession,
   useSpotlightViewModel,
 } from "@/features/spotlight";
+import { AppLocaleProvider, initializeAppI18n } from "@/i18n";
 import "@/main.css";
 
 function SpotlightApp() {
@@ -125,8 +126,16 @@ function SpotlightApp() {
 const spotlightRoot = document.getElementById("spotlight-root") as HTMLElement;
 spotlightRoot.classList.add("h-full", "w-full", "overflow-hidden");
 
-ReactDOM.createRoot(spotlightRoot).render(
-  <StrictMode>
-    <SpotlightApp />
-  </StrictMode>,
-);
+async function bootstrap() {
+  await initializeAppI18n();
+
+  ReactDOM.createRoot(spotlightRoot).render(
+    <StrictMode>
+      <AppLocaleProvider>
+        <SpotlightApp />
+      </AppLocaleProvider>
+    </StrictMode>,
+  );
+}
+
+void bootstrap();

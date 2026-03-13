@@ -6,9 +6,9 @@
 
 ## 2. App Bootstrapping
 
-- [ ] 2.1 Initialize the shared i18n instance and wrap `src/main.tsx` with the locale provider
-- [ ] 2.2 Reuse the same i18n bootstrap in `src/spotlight/main.tsx`
-- [ ] 2.3 Add locale persistence and rehydration so the current window updates immediately and other windows can restore the saved locale
+- [x] 2.1 Initialize the shared i18n instance and wrap `src/main.tsx` with the locale provider
+- [x] 2.2 Reuse the same i18n bootstrap in `src/spotlight/main.tsx`
+- [x] 2.3 Add locale persistence and rehydration so the current window updates immediately and other windows can restore the saved locale
 
 ## 3. Shared Utilities
 

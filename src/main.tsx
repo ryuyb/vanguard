@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "@/components/ui/sonner";
+import { AppLocaleProvider, initializeAppI18n } from "@/i18n";
 import { resolveSessionRoute } from "@/lib/route-session";
 import { routeTree } from "./routeTree.gen";
 
@@ -47,12 +48,20 @@ declare module "@tanstack/react-router" {
 
 const queryClient = new QueryClient();
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster position="top-right" richColors />
-    </QueryClientProvider>
-    <TanStackDevtools plugins={[formDevtoolsPlugin()]} />
-  </StrictMode>,
-);
+async function bootstrap() {
+  await initializeAppI18n();
+
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <StrictMode>
+      <AppLocaleProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+          <Toaster position="top-right" richColors />
+        </QueryClientProvider>
+      </AppLocaleProvider>
+      <TanStackDevtools plugins={[formDevtoolsPlugin()]} />
+    </StrictMode>,
+  );
+}
+
+void bootstrap();
