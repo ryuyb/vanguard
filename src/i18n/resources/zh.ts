@@ -207,6 +207,12 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       cipher: {
         create: "创建条目",
         untitled: "未命名条目",
+        contextMenu: {
+          view: "查看",
+          edit: "编辑",
+          clone: "克隆",
+        },
+        cloneSuffix: "副本",
       },
       filters: {
         ariaLabel: "筛选条目",

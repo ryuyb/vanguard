@@ -2,7 +2,9 @@ import {
   Archive,
   ArrowUpDown,
   ChevronDown,
+  Copy,
   Edit2,
+  Eye,
   Folder,
   FolderPlus,
   LoaderCircle,
@@ -20,8 +22,14 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SyncCipher, VaultCipherDetailDto } from "@/bindings";
+import { commands, type SyncCipher, type VaultCipherDetailDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -326,6 +334,20 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     setSelectedCipherIdForDelete(cipherId);
     setSelectedCipherNameForDelete(cipherName);
     setIsDeleteCipherDialogOpen(true);
+  };
+
+  const handleCloneCipher = async (cipherId: string) => {
+    const result = await commands.vaultGetCipherDetail({ cipherId });
+    if (result.status === "error") return;
+    const cloned = vaultCipherDetailToSyncCipher(result.data.cipher);
+    cloned.id = "";
+    const suffix = t("vault.page.cipher.cloneSuffix");
+    const baseName = cloned.name ?? t("vault.page.cipher.untitled");
+    cloned.name = `${baseName} - ${suffix}`;
+    if (cloned.data) cloned.data.name = cloned.name;
+    setCipherFormMode("create");
+    setSelectedCipherForEdit(cloned);
+    setIsCipherFormOpen(true);
   };
 
   const handleCipherFormConfirm = (cipher: SyncCipher) => {
@@ -928,21 +950,55 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           cipherId={cipher.id}
                           onVisibilityChange={setCipherRowVisible}
                         >
-                          <CipherRow
-                            cipher={cipher}
-                            iconLoadState={cipher.iconLoadState}
-                            onClick={() => {
-                              void loadCipherDetail(cipher.id);
-                            }}
-                            onIconError={() => {
-                              markCipherIconFallback(cipher.id);
-                            }}
-                            onIconLoad={() => {
-                              markCipherIconLoaded(cipher.id);
-                            }}
-                            selected={cipher.id === selectedCipherId}
-                            shouldLoadIcon={cipher.shouldLoadIcon}
-                          />
+                          <ContextMenu>
+                            <ContextMenuTrigger asChild>
+                              <div>
+                                <CipherRow
+                                  cipher={cipher}
+                                  iconLoadState={cipher.iconLoadState}
+                                  onClick={() => {
+                                    void loadCipherDetail(cipher.id);
+                                  }}
+                                  onIconError={() => {
+                                    markCipherIconFallback(cipher.id);
+                                  }}
+                                  onIconLoad={() => {
+                                    markCipherIconLoaded(cipher.id);
+                                  }}
+                                  selected={cipher.id === selectedCipherId}
+                                  shouldLoadIcon={cipher.shouldLoadIcon}
+                                />
+                              </div>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent className="w-44">
+                              <ContextMenuItem
+                                onSelect={() => {
+                                  void loadCipherDetail(cipher.id);
+                                }}
+                              >
+                                <Eye className="size-4" />
+                                {t("vault.page.cipher.contextMenu.view")}
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onSelect={async () => {
+                                  const result = await commands.vaultGetCipherDetail({ cipherId: cipher.id });
+                                  if (result.status === "error") return;
+                                  handleEditCipher(result.data.cipher);
+                                }}
+                              >
+                                <Edit2 className="size-4" />
+                                {t("vault.page.cipher.contextMenu.edit")}
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onSelect={() => {
+                                  void handleCloneCipher(cipher.id);
+                                }}
+                              >
+                                <Copy className="size-4" />
+                                {t("vault.page.cipher.contextMenu.clone")}
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
                         </CipherRowObserver>
                       ),
                     )}

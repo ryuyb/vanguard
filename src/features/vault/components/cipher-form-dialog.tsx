@@ -248,7 +248,7 @@ export function CipherFormDialog({
 
   useEffect(() => {
     if (open) {
-      if (mode === "edit" && initialCipher) {
+      if (initialCipher) {
         const existingUris =
           initialCipher.login?.uris ?? initialCipher.data?.uris ?? [];
         form.reset({

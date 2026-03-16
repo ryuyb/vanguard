@@ -216,6 +216,12 @@ export const enTranslationCatalog: AppTranslationCatalog = {
       cipher: {
         create: "Create item",
         untitled: "Untitled item",
+        contextMenu: {
+          view: "View",
+          edit: "Edit",
+          clone: "Clone",
+        },
+        cloneSuffix: "Copy",
       },
       filters: {
         ariaLabel: "Filter items",
