@@ -753,7 +753,7 @@ impl VaultwardenClient {
         base_url: &str,
         access_token: &str,
         cipher_id: &str,
-    ) -> VaultwardenResult<CipherResponse> {
+    ) -> VaultwardenResult<()> {
         let endpoint = format!("{}/delete", self.cipher_endpoint(base_url, cipher_id)?);
 
         let response = self
@@ -766,18 +766,16 @@ impl VaultwardenClient {
             .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
 
         let status = response.status().as_u16();
-        let body = response
-            .text()
-            .await
-            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
 
         if !(200..300).contains(&status) {
+            let body = response
+                .text()
+                .await
+                .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
             return Err(Self::api_error(status, body));
         }
 
-        serde_json::from_str(&body).map_err(|error| {
-            VaultwardenError::Decode(format!("failed to parse cipher response: {error}"))
-        })
+        Ok(())
     }
 
     fn validated_base_url(base_url: &str) -> VaultwardenResult<&str> {

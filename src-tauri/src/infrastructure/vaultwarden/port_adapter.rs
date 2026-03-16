@@ -310,15 +310,14 @@ impl RemoteVaultPort for VaultwardenRemotePort {
         &self,
         command: SoftDeleteCipherCommand,
     ) -> AppResult<CipherMutationResult> {
-        let response = self
-            .client
+        self.client
             .soft_delete_cipher(&command.base_url, &command.access_token, &command.cipher_id)
             .await
             .map_err(map_vaultwarden_error)?;
 
         Ok(CipherMutationResult {
-            cipher_id: response.id,
-            revision_date: response.revision_date,
+            cipher_id: command.cipher_id,
+            revision_date: String::new(),
         })
     }
 }
