@@ -618,11 +618,28 @@ fn load_active_persisted_auth_state(
     load_persisted_auth_state_from_disk(auth_states_dir, account_id)
 }
 
+fn sanitize_account_id_for_filename(account_id: &str) -> String {
+    account_id
+        .replace('%', "%25")
+        .replace('/', "%2F")
+        .replace(':', "%3A")
+        .replace('\\', "%5C")
+}
+
+fn unsanitize_account_id_from_filename(sanitized: &str) -> String {
+    sanitized
+        .replace("%5C", "\\")
+        .replace("%3A", ":")
+        .replace("%2F", "/")
+        .replace("%25", "%")
+}
+
 fn load_persisted_auth_state_from_disk(
     auth_states_dir: &Path,
     account_id: &str,
 ) -> AppResult<Option<PersistedAuthState>> {
-    let account_path = auth_states_dir.join(format!("{}.json", account_id));
+    let safe_name = sanitize_account_id_for_filename(account_id);
+    let account_path = auth_states_dir.join(format!("{}.json", safe_name));
     if !account_path.exists() {
         return Ok(None);
     }
@@ -649,7 +666,8 @@ fn persist_persisted_auth_state_to_disk(
     account_id: &str,
     value: Option<&PersistedAuthState>,
 ) -> AppResult<()> {
-    let account_path = auth_states_dir.join(format!("{}.json", account_id));
+    let safe_name = sanitize_account_id_for_filename(account_id);
+    let account_path = auth_states_dir.join(format!("{}.json", safe_name));
     match value {
         None => {
             if account_path.exists() {
@@ -778,8 +796,8 @@ fn list_remaining_account_ids(auth_states_dir: &Path) -> AppResult<Vec<String>> 
         if path.is_file() {
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
                 if file_name != "active.json" && file_name.ends_with(".json") {
-                    if let Some(account_id) = file_name.strip_suffix(".json") {
-                        account_ids.push(account_id.to_string());
+                    if let Some(sanitized_id) = file_name.strip_suffix(".json") {
+                        account_ids.push(unsanitize_account_id_from_filename(sanitized_id));
                     }
                 }
             }
