@@ -18,29 +18,23 @@ export function UnlockPage({
 }: UnlockPageProps) {
   const { t } = useTranslation();
   const {
+    form,
     biometricEnabled,
     biometricSupported,
     canBiometricUnlock,
-    canPinUnlock,
-    canUnlock,
     feedback,
+    isActionBlocked,
     isBiometricUnlocking,
     isLoggingOut,
     isPinUnlocking,
     isRestoring,
-    isUnlocking,
     isVaultUnlocked,
-    masterPassword,
     onBiometricUnlock,
     onLogout,
-    onMasterPasswordChange,
-    onPinChange,
     onPinUnlock,
     onShowMasterPasswordUnlock,
     onShowPinUnlock,
     onToggleShowPassword,
-    onUnlock,
-    pin,
     pinEnabled,
     restoreState,
     showPassword,
@@ -128,28 +122,22 @@ export function UnlockPage({
               restoreState?.status !== "needsLogin" &&
               !isVaultUnlocked && (
                 <UnlockLockedForm
+                  form={form}
                   restoreState={restoreState}
                   biometricSupported={biometricSupported}
                   biometricEnabled={biometricEnabled}
                   canBiometricUnlock={canBiometricUnlock}
-                  canPinUnlock={canPinUnlock}
-                  canUnlock={canUnlock}
                   feedback={feedback}
+                  isActionBlocked={isActionBlocked}
                   isBiometricUnlocking={isBiometricUnlocking}
                   isLoggingOut={isLoggingOut}
                   isPinUnlocking={isPinUnlocking}
-                  isUnlocking={isUnlocking}
-                  masterPassword={masterPassword}
                   onBiometricUnlock={onBiometricUnlock}
                   onLogout={onLogout}
-                  onMasterPasswordChange={onMasterPasswordChange}
-                  onPinChange={onPinChange}
                   onPinUnlock={onPinUnlock}
                   onShowMasterPasswordUnlock={onShowMasterPasswordUnlock}
                   onShowPinUnlock={onShowPinUnlock}
-                  onSubmit={onUnlock}
                   onToggleShowPassword={onToggleShowPassword}
-                  pin={pin}
                   pinEnabled={pinEnabled}
                   showPassword={showPassword}
                   unlockMethod={unlockMethod}
