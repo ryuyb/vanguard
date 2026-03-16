@@ -1,6 +1,6 @@
 import {
-  Archive,
   AlertTriangle,
+  Archive,
   ArrowUpDown,
   ChevronDown,
   Copy,
@@ -24,7 +24,11 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { commands, type SyncCipher, type VaultCipherDetailDto } from "@/bindings";
+import {
+  commands,
+  type SyncCipher,
+  type VaultCipherDetailDto,
+} from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -160,7 +164,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
 
   // 回收站操作状态
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
-  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
+  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] =
+    useState(false);
   const [trashActionCipherId, setTrashActionCipherId] = useState("");
   const [trashActionCipherName, setTrashActionCipherName] = useState("");
   const [isTrashActionLoading, setIsTrashActionLoading] = useState(false);
@@ -1000,7 +1005,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                 <>
                                   <ContextMenuItem
                                     onSelect={async () => {
-                                      const result = await commands.vaultGetCipherDetail({ cipherId: cipher.id });
+                                      const result =
+                                        await commands.vaultGetCipherDetail({
+                                          cipherId: cipher.id,
+                                        });
                                       if (result.status === "error") return;
                                       handleEditCipher(result.data.cipher);
                                     }}
@@ -1063,76 +1071,89 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden space-y-3">
                           {/* Cipher 操作栏 */}
                           {selectedMenuId !== TRASH_ID && (
-                          <div className="flex items-center justify-end gap-2 px-1">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 px-2"
+                            <div className="flex items-center justify-end gap-2 px-1">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2"
+                                  >
+                                    <MoreVertical className="size-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-44"
                                 >
-                                  <MoreVertical className="size-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
-                                <DropdownMenuItem
-                                  onSelect={() =>
-                                    handleEditCipher(selectedCipherDetail)
-                                  }
-                                >
-                                  <Edit2 className="size-4" />
-                                  {t("vault.page.actions.edit")}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onSelect={() =>
-                                    handleDeleteCipher(
-                                      selectedCipherDetail.id,
-                                      selectedCipherDetail.name ??
-                                        t("vault.page.cipher.untitled"),
-                                    )
-                                  }
-                                >
-                                  <Trash2 className="size-4" />
-                                  {t("vault.page.actions.delete")}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                                  <DropdownMenuItem
+                                    onSelect={() =>
+                                      handleEditCipher(selectedCipherDetail)
+                                    }
+                                  >
+                                    <Edit2 className="size-4" />
+                                    {t("vault.page.actions.edit")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onSelect={() =>
+                                      handleDeleteCipher(
+                                        selectedCipherDetail.id,
+                                        selectedCipherDetail.name ??
+                                          t("vault.page.cipher.untitled"),
+                                      )
+                                    }
+                                  >
+                                    <Trash2 className="size-4" />
+                                    {t("vault.page.actions.delete")}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           )}
                           {selectedMenuId === TRASH_ID && (
-                          <div className="flex items-center justify-end gap-2 px-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 px-3 text-xs"
-                              onClick={() => {
-                                setTrashActionCipherId(selectedCipherDetail.id);
-                                setTrashActionCipherName(selectedCipherDetail.name ?? t("vault.page.cipher.untitled"));
-                                setIsRestoreDialogOpen(true);
-                              }}
-                            >
-                              <RotateCcw className="size-3.5" />
-                              {t("vault.page.actions.restore")}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              className="h-8 px-3 text-xs"
-                              onClick={() => {
-                                setTrashActionCipherId(selectedCipherDetail.id);
-                                setTrashActionCipherName(selectedCipherDetail.name ?? t("vault.page.cipher.untitled"));
-                                setIsPermanentDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="size-3.5" />
-                              {t("vault.page.actions.permanentDelete")}
-                            </Button>
-                          </div>
+                            <div className="flex items-center justify-end gap-2 px-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 text-xs"
+                                onClick={() => {
+                                  setTrashActionCipherId(
+                                    selectedCipherDetail.id,
+                                  );
+                                  setTrashActionCipherName(
+                                    selectedCipherDetail.name ??
+                                      t("vault.page.cipher.untitled"),
+                                  );
+                                  setIsRestoreDialogOpen(true);
+                                }}
+                              >
+                                <RotateCcw className="size-3.5" />
+                                {t("vault.page.actions.restore")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-8 px-3 text-xs"
+                                onClick={() => {
+                                  setTrashActionCipherId(
+                                    selectedCipherDetail.id,
+                                  );
+                                  setTrashActionCipherName(
+                                    selectedCipherDetail.name ??
+                                      t("vault.page.cipher.untitled"),
+                                  );
+                                  setIsPermanentDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="size-3.5" />
+                                {t("vault.page.actions.permanentDelete")}
+                              </Button>
+                            </div>
                           )}
 
                           <CipherDetailPanel
@@ -1220,12 +1241,19 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
             </DialogTitle>
             <DialogDescription className="text-sm text-slate-600 pt-2">
               {t("vault.dialogs.restoreCipher.descriptionPrefix")}{" "}
-              <span className="font-semibold text-slate-900">"{trashActionCipherName}"</span>{" "}
+              <span className="font-semibold text-slate-900">
+                "{trashActionCipherName}"
+              </span>{" "}
               {t("vault.dialogs.restoreCipher.descriptionSuffix")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} disabled={isTrashActionLoading} className="h-10">
+            <Button
+              variant="outline"
+              onClick={() => setIsRestoreDialogOpen(false)}
+              disabled={isTrashActionLoading}
+              className="h-10"
+            >
               {t("common.actions.cancel")}
             </Button>
             <Button
@@ -1233,25 +1261,46 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               disabled={isTrashActionLoading}
               onClick={async () => {
                 setIsTrashActionLoading(true);
-                const result = await commands.restoreCipher({ cipherId: trashActionCipherId });
+                const result = await commands.restoreCipher({
+                  cipherId: trashActionCipherId,
+                });
                 setIsTrashActionLoading(false);
                 setIsRestoreDialogOpen(false);
                 if (result.status === "error") {
-                  toast.error(t("vault.feedback.cipher.restoreError.title"), { description: t("vault.feedback.cipher.restoreError.description") });
+                  toast.error(t("vault.feedback.cipher.restoreError.title"), {
+                    description: t(
+                      "vault.feedback.cipher.restoreError.description",
+                    ),
+                  });
                   return;
                 }
-                toast.success(t("vault.feedback.cipher.restoreSuccess.title"), { description: t("vault.feedback.cipher.restoreSuccess.description", { name: trashActionCipherName }) });
+                toast.success(t("vault.feedback.cipher.restoreSuccess.title"), {
+                  description: t(
+                    "vault.feedback.cipher.restoreSuccess.description",
+                    { name: trashActionCipherName },
+                  ),
+                });
                 void loadVaultData();
               }}
             >
-              {isTrashActionLoading ? (<><LoaderCircle className="size-4 animate-spin" />{t("vault.dialogs.restoreCipher.confirming")}</>) : t("vault.page.actions.restore")}
+              {isTrashActionLoading ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" />
+                  {t("vault.dialogs.restoreCipher.confirming")}
+                </>
+              ) : (
+                t("vault.page.actions.restore")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Permanent delete confirmation dialog */}
-      <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
+      <Dialog
+        open={isPermanentDeleteDialogOpen}
+        onOpenChange={setIsPermanentDeleteDialogOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-3">
@@ -1264,12 +1313,19 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
             </div>
             <DialogDescription className="text-sm text-slate-600 pt-2">
               {t("vault.dialogs.permanentDeleteCipher.descriptionPrefix")}{" "}
-              <span className="font-semibold text-slate-900">"{trashActionCipherName}"</span>{" "}
+              <span className="font-semibold text-slate-900">
+                "{trashActionCipherName}"
+              </span>{" "}
               {t("vault.dialogs.permanentDeleteCipher.descriptionSuffix")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsPermanentDeleteDialogOpen(false)} disabled={isTrashActionLoading} className="h-10">
+            <Button
+              variant="outline"
+              onClick={() => setIsPermanentDeleteDialogOpen(false)}
+              disabled={isTrashActionLoading}
+              className="h-10"
+            >
               {t("common.actions.cancel")}
             </Button>
             <Button
@@ -1278,18 +1334,42 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               disabled={isTrashActionLoading}
               onClick={async () => {
                 setIsTrashActionLoading(true);
-                const result = await commands.deleteCipher({ cipherId: trashActionCipherId });
+                const result = await commands.deleteCipher({
+                  cipherId: trashActionCipherId,
+                });
                 setIsTrashActionLoading(false);
                 setIsPermanentDeleteDialogOpen(false);
                 if (result.status === "error") {
-                  toast.error(t("vault.feedback.cipher.permanentDeleteError.title"), { description: t("vault.feedback.cipher.permanentDeleteError.description") });
+                  toast.error(
+                    t("vault.feedback.cipher.permanentDeleteError.title"),
+                    {
+                      description: t(
+                        "vault.feedback.cipher.permanentDeleteError.description",
+                      ),
+                    },
+                  );
                   return;
                 }
-                toast.success(t("vault.feedback.cipher.permanentDeleteSuccess.title"), { description: t("vault.feedback.cipher.permanentDeleteSuccess.description", { name: trashActionCipherName }) });
+                toast.success(
+                  t("vault.feedback.cipher.permanentDeleteSuccess.title"),
+                  {
+                    description: t(
+                      "vault.feedback.cipher.permanentDeleteSuccess.description",
+                      { name: trashActionCipherName },
+                    ),
+                  },
+                );
                 void loadVaultData();
               }}
             >
-              {isTrashActionLoading ? (<><LoaderCircle className="size-4 animate-spin" />{t("vault.dialogs.permanentDeleteCipher.confirming")}</>) : t("vault.page.actions.permanentDelete")}
+              {isTrashActionLoading ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" />
+                  {t("vault.dialogs.permanentDeleteCipher.confirming")}
+                </>
+              ) : (
+                t("vault.page.actions.permanentDelete")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

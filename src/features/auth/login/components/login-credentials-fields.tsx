@@ -7,25 +7,20 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
+import type { LoginForm } from "@/features/auth/login/hooks/use-login-flow";
 
 type LoginCredentialsFieldsProps = {
-  email: string;
-  masterPassword: string;
+  form: LoginForm;
   showPassword: boolean;
-  isSubmitting: boolean;
-  onEmailChange: (value: string) => void;
-  onMasterPasswordChange: (value: string) => void;
   onToggleShowPassword: () => void;
+  clearTwoFactorChallenge: () => void;
 };
 
 export function LoginCredentialsFields({
-  email,
-  masterPassword,
+  form,
   showPassword,
-  isSubmitting,
-  onEmailChange,
-  onMasterPasswordChange,
   onToggleShowPassword,
+  clearTwoFactorChallenge,
 }: LoginCredentialsFieldsProps) {
   const { t } = useTranslation();
 
@@ -35,21 +30,29 @@ export function LoginCredentialsFields({
         <Label htmlFor="email" className="text-sm font-medium text-slate-700">
           {t("auth.login.form.email.label")}
         </Label>
-        <InputGroup>
-          <InputGroupAddon>
-            <Mail className="h-5 w-5 text-slate-400" />
-          </InputGroupAddon>
-          <InputGroupInput
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder={t("auth.login.form.email.placeholder")}
-            value={email}
-            onChange={(event) => onEmailChange(event.target.value)}
-            disabled={isSubmitting}
-            className="h-12 text-base"
-          />
-        </InputGroup>
+        <form.Field name="email">
+          {(field) => (
+            <InputGroup>
+              <InputGroupAddon>
+                <Mail className="h-5 w-5 text-slate-400" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder={t("auth.login.form.email.placeholder")}
+                value={field.state.value}
+                onChange={(e) => {
+                  clearTwoFactorChallenge();
+                  field.handleChange(e.target.value);
+                }}
+                onBlur={field.handleBlur}
+                disabled={form.state.isSubmitting}
+                className="h-12 text-base"
+              />
+            </InputGroup>
+          )}
+        </form.Field>
       </div>
 
       <div className="space-y-2.5">
@@ -59,42 +62,50 @@ export function LoginCredentialsFields({
         >
           {t("auth.login.form.masterPassword.label")}
         </Label>
-        <InputGroup>
-          <InputGroupAddon>
-            <KeyRound className="h-5 w-5 text-slate-400" />
-          </InputGroupAddon>
-          <InputGroupInput
-            id="master-password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            placeholder={t("auth.login.form.masterPassword.placeholder")}
-            value={masterPassword}
-            onChange={(event) => onMasterPasswordChange(event.target.value)}
-            disabled={isSubmitting}
-            className="h-12 text-base"
-          />
-          <InputGroupAddon align="inline-end" className="px-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-slate-400 hover:text-slate-700 transition-colors"
-              onClick={onToggleShowPassword}
-              disabled={isSubmitting}
-              aria-label={
-                showPassword
-                  ? t("auth.login.form.masterPassword.hidePassword")
-                  : t("auth.login.form.masterPassword.showPassword")
-              }
-            >
-              {showPassword ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </Button>
-          </InputGroupAddon>
-        </InputGroup>
+        <form.Field name="masterPassword">
+          {(field) => (
+            <InputGroup>
+              <InputGroupAddon>
+                <KeyRound className="h-5 w-5 text-slate-400" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="master-password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder={t("auth.login.form.masterPassword.placeholder")}
+                value={field.state.value}
+                onChange={(e) => {
+                  clearTwoFactorChallenge();
+                  field.handleChange(e.target.value);
+                }}
+                onBlur={field.handleBlur}
+                disabled={form.state.isSubmitting}
+                className="h-12 text-base"
+              />
+              <InputGroupAddon align="inline-end" className="px-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-slate-400 hover:text-slate-700 transition-colors"
+                  onClick={onToggleShowPassword}
+                  disabled={form.state.isSubmitting}
+                  aria-label={
+                    showPassword
+                      ? t("auth.login.form.masterPassword.hidePassword")
+                      : t("auth.login.form.masterPassword.showPassword")
+                  }
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </Button>
+              </InputGroupAddon>
+            </InputGroup>
+          )}
+        </form.Field>
       </div>
     </>
   );

@@ -313,7 +313,7 @@ export function CipherFormDialog({
         });
       }
     }
-  }, [open, mode, initialCipher, folderId, form]);
+  }, [open, initialCipher, folderId, form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

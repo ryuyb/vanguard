@@ -17,29 +17,18 @@ type LoginPageProps = {
 export function LoginPage({ navigateToVault }: LoginPageProps) {
   const { t } = useTranslation();
   const {
-    canSubmit,
-    customBaseUrl,
-    email,
+    form,
     feedback,
     isRestoringSession,
-    isSubmitting,
-    masterPassword,
-    onCustomBaseUrlChange,
-    onEmailChange,
-    onMasterPasswordChange,
-    onSendEmailCode,
-    onServerUrlOptionChange,
-    onSubmit,
-    onToggleShowPassword,
-    onTwoFactorProviderChange,
-    onTwoFactorTokenChange,
-    serverUrlOption,
     showPassword,
     submitProgressText,
     twoFactorState,
-  } = useLoginFlow({
-    navigateToVault,
-  });
+    clearTwoFactorChallenge,
+    onSendEmailCode,
+    onToggleShowPassword,
+    onTwoFactorProviderChange,
+    onTwoFactorTokenChange,
+  } = useLoginFlow({ navigateToVault });
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
@@ -64,7 +53,14 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
             </div>
           </CardHeader>
           <CardContent className="pb-8">
-            <form className="space-y-5" onSubmit={onSubmit}>
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                form.handleSubmit();
+              }}
+            >
               {isRestoringSession && (
                 <div className="flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-6 text-sm text-slate-700">
                   <LoaderCircle className="h-5 w-5 animate-spin text-blue-600" />
@@ -73,27 +69,21 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
               )}
 
               <ServerUrlField
-                customBaseUrl={customBaseUrl}
-                serverUrlOption={serverUrlOption}
-                isSubmitting={isSubmitting}
-                onServerUrlOptionChange={onServerUrlOptionChange}
-                onCustomBaseUrlChange={onCustomBaseUrlChange}
+                form={form}
+                clearTwoFactorChallenge={clearTwoFactorChallenge}
               />
 
               <LoginCredentialsFields
-                email={email}
-                masterPassword={masterPassword}
+                form={form}
                 showPassword={showPassword}
-                isSubmitting={isSubmitting}
-                onEmailChange={onEmailChange}
-                onMasterPasswordChange={onMasterPasswordChange}
                 onToggleShowPassword={onToggleShowPassword}
+                clearTwoFactorChallenge={clearTwoFactorChallenge}
               />
 
               {twoFactorState && (
                 <TwoFactorSection
                   state={twoFactorState}
-                  isSubmitting={isSubmitting}
+                  isSubmitting={form.state.isSubmitting}
                   onProviderChange={onTwoFactorProviderChange}
                   onTokenChange={onTwoFactorTokenChange}
                   onSendEmailCode={onSendEmailCode}
@@ -102,21 +92,29 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
 
               <LoginFeedbackAlert feedback={feedback} />
 
-              <Button
-                type="submit"
-                size="lg"
-                className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
-                disabled={!canSubmit}
-              >
-                {isSubmitting && (
-                  <LoaderCircle className="h-5 w-5 animate-spin" />
+              <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
+                {([canSubmit, isSubmitting]) => (
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
+                    disabled={
+                      !canSubmit ||
+                      isRestoringSession ||
+                      (twoFactorState ? !twoFactorState.token.trim() : false)
+                    }
+                  >
+                    {isSubmitting && (
+                      <LoaderCircle className="h-5 w-5 animate-spin" />
+                    )}
+                    {isSubmitting
+                      ? submitProgressText || t("auth.login.actions.submitting")
+                      : twoFactorState
+                        ? t("auth.login.actions.verifyAndContinue")
+                        : t("auth.login.actions.submit")}
+                  </Button>
                 )}
-                {isSubmitting
-                  ? submitProgressText || t("auth.login.actions.submitting")
-                  : twoFactorState
-                    ? t("auth.login.actions.verifyAndContinue")
-                    : t("auth.login.actions.submit")}
-              </Button>
+              </form.Subscribe>
             </form>
           </CardContent>
         </Card>
