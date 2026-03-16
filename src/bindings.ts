@@ -292,6 +292,14 @@ async softDeleteCipher(request: SoftDeleteCipherRequestDto) : Promise<Result<Cip
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async restoreCipher(request: RestoreCipherRequestDto) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("restore_cipher", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -347,6 +355,7 @@ export type RenameFolderRequest = { folderId: string; newName: string }
 export type RestoreAuthStateRequestDto = Record<string, never>
 export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
+export type RestoreCipherRequestDto = { cipherId: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SoftDeleteCipherRequestDto = { cipherId: string }

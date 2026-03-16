@@ -11,11 +11,11 @@ use crate::application::use_cases::list_ciphers_use_case::ListCiphersUseCase;
 use crate::bootstrap::app_state::{AppState, VaultUserKey};
 use crate::interfaces::tauri::dto::cipher::{
     CipherMutationResponseDto, CreateCipherRequestDto, DeleteCipherRequestDto,
-    SoftDeleteCipherRequestDto, UpdateCipherRequestDto, VaultCipherDetailRequestDto,
-    VaultCipherDetailResponseDto, VaultCipherItemDto, VaultCipherTotpCodeRequestDto,
-    VaultCipherTotpCodeResponseDto, VaultCopyCipherFieldRequestDto,
-    VaultCopyCipherFieldResponseDto, VaultCopyFieldDto, VaultFolderItemDto,
-    VaultViewDataResponseDto,
+    RestoreCipherRequestDto, SoftDeleteCipherRequestDto, UpdateCipherRequestDto,
+    VaultCipherDetailRequestDto, VaultCipherDetailResponseDto, VaultCipherItemDto,
+    VaultCipherTotpCodeRequestDto, VaultCipherTotpCodeResponseDto,
+    VaultCopyCipherFieldRequestDto, VaultCopyCipherFieldResponseDto, VaultCopyFieldDto,
+    VaultFolderItemDto, VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::{AppError, ErrorPayload};
@@ -422,6 +422,42 @@ pub async fn soft_delete_cipher(
         cipher_id: result.cipher_id,
         revision_date: result.revision_date,
     })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn restore_cipher(
+    request: RestoreCipherRequestDto,
+    state: State<'_, AppState>,
+) -> Result<(), ErrorPayload> {
+    let account_id = state
+        .active_account_id()
+        .map_err(|error| log_command_error("restore_cipher", &error))?;
+
+    let session = state
+        .auth_session()
+        .map_err(|error| log_command_error("restore_cipher", &error))?
+        .ok_or_else(|| {
+            log_command_error(
+                "restore_cipher",
+                &AppError::ValidationRequired {
+                    field: "session".to_string(),
+                },
+            )
+        })?;
+
+    state
+        .restore_cipher_use_case()
+        .execute(
+            account_id,
+            session.base_url,
+            session.access_token,
+            request.cipher_id,
+        )
+        .await
+        .map_err(|error| log_command_error("restore_cipher", &error))?;
+
+    Ok(())
 }
 
 impl From<&VaultUserKey> for VaultUserKeyMaterial {

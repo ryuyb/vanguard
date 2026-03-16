@@ -5,9 +5,9 @@ use crate::application::dto::auth::{
     SendEmailLoginCommand, SessionInfo, VerifyEmailTokenCommand,
 };
 use crate::application::dto::sync::{
-    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RevisionDateQuery,
-    SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand, SyncVaultPayload,
-    UpdateCipherCommand,
+    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RestoreCipherCommand,
+    RevisionDateQuery, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
+    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand,
 };
 use crate::support::result::AppResult;
 
@@ -56,4 +56,6 @@ pub trait RemoteVaultPort: Send + Sync {
         &self,
         command: SoftDeleteCipherCommand,
     ) -> AppResult<CipherMutationResult>;
+
+    async fn restore_cipher(&self, command: RestoreCipherCommand) -> AppResult<()>;
 }

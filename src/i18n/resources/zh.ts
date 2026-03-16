@@ -203,6 +203,9 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         locking: "正在锁定...",
         logout: "登出",
         loggingOut: "正在登出...",
+        restore: "恢复",
+        restoring: "恢复中...",
+        permanentDelete: "彻底删除",
       },
       cipher: {
         create: "创建条目",
@@ -294,6 +297,18 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         descriptionPrefix: "确定要删除",
         descriptionSuffix: "吗？",
         deleting: "删除中...",
+      },
+      restoreCipher: {
+        title: "恢复条目",
+        descriptionPrefix: "确定要恢复",
+        descriptionSuffix: "吗？",
+        confirming: "恢复中...",
+      },
+      permanentDeleteCipher: {
+        title: "彻底删除条目",
+        descriptionPrefix: "确定要彻底删除",
+        descriptionSuffix: "吗？此操作不可撤销。",
+        confirming: "删除中...",
       },
       cipherForm: {
         createTitle: "创建条目",
@@ -587,6 +602,22 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         deleteError: {
           title: "删除条目失败",
           description: "无法删除条目，请重试。",
+        },
+        restoreSuccess: {
+          title: "条目已恢复",
+          description: "已恢复\u201c{{name}}\u201d。",
+        },
+        restoreError: {
+          title: "恢复条目失败",
+          description: "无法恢复条目，请重试。",
+        },
+        permanentDeleteSuccess: {
+          title: "条目已彻底删除",
+          description: "已彻底删除\u201c{{name}}\u201d。",
+        },
+        permanentDeleteError: {
+          title: "彻底删除条目失败",
+          description: "无法彻底删除条目，请重试。",
         },
       },
     },

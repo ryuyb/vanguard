@@ -212,6 +212,9 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         locking: "Locking...",
         logout: "Log Out",
         loggingOut: "Logging out...",
+        restore: "Restore",
+        restoring: "Restoring...",
+        permanentDelete: "Delete permanently",
       },
       cipher: {
         create: "Create item",
@@ -304,6 +307,18 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         descriptionPrefix: "Are you sure you want to delete",
         descriptionSuffix: "?",
         deleting: "Deleting...",
+      },
+      restoreCipher: {
+        title: "Restore item",
+        descriptionPrefix: "Are you sure you want to restore",
+        descriptionSuffix: "?",
+        confirming: "Restoring...",
+      },
+      permanentDeleteCipher: {
+        title: "Permanently delete item",
+        descriptionPrefix: "Are you sure you want to permanently delete",
+        descriptionSuffix: "? This action cannot be undone.",
+        confirming: "Deleting...",
       },
       cipherForm: {
         createTitle: "Create item",
@@ -599,6 +614,22 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         deleteError: {
           title: "Failed to delete item",
           description: "Unable to delete item. Please try again.",
+        },
+        restoreSuccess: {
+          title: "Item restored",
+          description: '"{{name}}" has been restored.',
+        },
+        restoreError: {
+          title: "Failed to restore item",
+          description: "Unable to restore item. Please try again.",
+        },
+        permanentDeleteSuccess: {
+          title: "Item permanently deleted",
+          description: '"{{name}}" has been permanently deleted.',
+        },
+        permanentDeleteError: {
+          title: "Failed to permanently delete item",
+          description: "Unable to permanently delete item. Please try again.",
         },
       },
     },
