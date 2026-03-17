@@ -3,6 +3,7 @@ use specta::Type;
 use tauri::AppHandle;
 
 use crate::bootstrap::config::AppConfig;
+use crate::interfaces::tauri::desktop::tray::TrayFeature;
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
 
@@ -103,6 +104,8 @@ pub fn config_update_app_config(
         )
     })?;
 
+    let locale_changed = request.locale.is_some();
+
     if let Some(locale) = request.locale {
         store.set("locale".to_string(), json!(locale));
     }
@@ -151,6 +154,11 @@ pub fn config_update_app_config(
             },
         )
     })?;
+
+    // 如果语言设置发生变化,更新托盘菜单
+    if locale_changed {
+        TrayFeature::update_menu(&app_handle);
+    }
 
     let config = AppConfig::load(&app_handle)
         .map_err(|error| log_command_error("config_update_app_config", error))?;

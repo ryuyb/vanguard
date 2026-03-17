@@ -4,6 +4,7 @@ mod monitor;
 mod spotlight;
 pub mod tray;
 mod tray_click_snapshot;
+mod tray_i18n;
 mod window_placement;
 
 use main_window::MainWindowFeature;

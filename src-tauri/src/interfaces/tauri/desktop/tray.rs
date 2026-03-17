@@ -3,6 +3,7 @@ use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::bootstrap::app_state::AppState;
+use crate::bootstrap::config::AppConfig;
 use crate::interfaces::tauri::desktop::constants::{
     TRAY_ICON_ID, TRAY_MENU_LOCK_ACCELERATOR, TRAY_MENU_LOCK_ID,
     TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR, TRAY_MENU_OPEN_QUICK_ACCESS_ID,
@@ -13,6 +14,7 @@ use crate::interfaces::tauri::desktop::spotlight::SpotlightFeature;
 use crate::interfaces::tauri::desktop::tray_click_snapshot::{
     TrayClickSnapshot, TrayClickSnapshotStore,
 };
+use crate::interfaces::tauri::desktop::tray_i18n::{TrayLocale, TrayMenuTexts};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TrayMenuAction {
@@ -40,8 +42,8 @@ impl TrayMenuAction {
 pub struct TrayFeature;
 
 impl TrayFeature {
-    /// 更新托盘菜单中锁定按钮的启用状态
-    pub fn update_lock_menu_state<R: Runtime>(app_handle: &AppHandle<R>) {
+    /// 更新托盘菜单(包括语言和锁定状态)
+    pub fn update_menu<R: Runtime>(app_handle: &AppHandle<R>) {
         // 检查是否已解锁
         let is_unlocked = app_handle
             .try_state::<AppState>()
@@ -59,6 +61,11 @@ impl TrayFeature {
                 let _ = tray.set_menu(Some(new_menu));
             }
         }
+    }
+
+    /// 更新托盘菜单中锁定按钮的启用状态
+    pub fn update_lock_menu_state<R: Runtime>(app_handle: &AppHandle<R>) {
+        Self::update_menu(app_handle);
     }
 
     pub(super) fn install<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<()> {
@@ -94,17 +101,25 @@ impl TrayFeature {
         manager: &impl Manager<R>,
         lock_enabled: bool,
     ) -> tauri::Result<Menu<R>> {
+        // 从配置中读取语言设置
+        let locale = AppConfig::load(manager)
+            .ok()
+            .map(|config| TrayLocale::from_locale_str(&config.locale))
+            .unwrap_or(TrayLocale::Zh);
+
+        let texts = TrayMenuTexts::get(locale);
+
         let open_vanguard = MenuItem::with_id(
             manager,
             TRAY_MENU_OPEN_VANGUARD_ID,
-            "打开 Vanguard",
+            texts.open_vanguard,
             true,
             None::<&str>,
         )?;
         let open_quick_access = MenuItem::with_id(
             manager,
             TRAY_MENU_OPEN_QUICK_ACCESS_ID,
-            "打开快速访问",
+            texts.open_quick_access,
             true,
             Some(TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR),
         )?;
@@ -112,13 +127,18 @@ impl TrayFeature {
         let lock = MenuItem::with_id(
             manager,
             TRAY_MENU_LOCK_ID,
-            "锁定",
+            texts.lock,
             lock_enabled,
             Some(TRAY_MENU_LOCK_ACCELERATOR),
         )?;
-        let settings =
-            MenuItem::with_id(manager, TRAY_MENU_SETTINGS_ID, "设置", true, None::<&str>)?;
-        let quit = MenuItem::with_id(manager, TRAY_MENU_QUIT_ID, "退出", true, None::<&str>)?;
+        let settings = MenuItem::with_id(
+            manager,
+            TRAY_MENU_SETTINGS_ID,
+            texts.settings,
+            true,
+            None::<&str>,
+        )?;
+        let quit = MenuItem::with_id(manager, TRAY_MENU_QUIT_ID, texts.quit, true, None::<&str>)?;
 
         Menu::with_items(
             manager,
