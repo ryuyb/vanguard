@@ -85,12 +85,30 @@ impl TrayFeature {
                 Self::handle_menu_event(app_handle, &event);
             });
 
-        if let Some(default_icon) = app.default_window_icon().cloned() {
+        // 使用专门的托盘图标(22x22,适合macOS托盘)
+        if let Ok(tray_icon) = Self::load_tray_icon() {
+            tray_builder = tray_builder.icon(tray_icon);
+        } else if let Some(default_icon) = app.default_window_icon().cloned() {
+            // 降级方案:使用窗口图标
             tray_builder = tray_builder.icon(default_icon);
         }
 
         let _ = tray_builder.build(app)?;
         Ok(())
+    }
+
+    fn load_tray_icon() -> Result<tauri::image::Image<'static>, Box<dyn std::error::Error>> {
+        // 加载并解码托盘图标
+        let icon_bytes = include_bytes!("../../../../icons/tray-icon.png");
+        let img = image::load_from_memory(icon_bytes)?;
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+
+        Ok(tauri::image::Image::new_owned(
+            rgba.into_raw(),
+            width,
+            height,
+        ))
     }
 
     fn build_menu<R: Runtime>(app: &tauri::App<R>) -> tauri::Result<Menu<R>> {

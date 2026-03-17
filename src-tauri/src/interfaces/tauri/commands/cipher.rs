@@ -13,9 +13,9 @@ use crate::interfaces::tauri::dto::cipher::{
     CipherMutationResponseDto, CreateCipherRequestDto, DeleteCipherRequestDto,
     RestoreCipherRequestDto, SoftDeleteCipherRequestDto, UpdateCipherRequestDto,
     VaultCipherDetailRequestDto, VaultCipherDetailResponseDto, VaultCipherItemDto,
-    VaultCipherTotpCodeRequestDto, VaultCipherTotpCodeResponseDto,
-    VaultCopyCipherFieldRequestDto, VaultCopyCipherFieldResponseDto, VaultCopyFieldDto,
-    VaultFolderItemDto, VaultViewDataResponseDto,
+    VaultCipherTotpCodeRequestDto, VaultCipherTotpCodeResponseDto, VaultCopyCipherFieldRequestDto,
+    VaultCopyCipherFieldResponseDto, VaultCopyFieldDto, VaultFolderItemDto,
+    VaultViewDataResponseDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::support::error::{AppError, ErrorPayload};

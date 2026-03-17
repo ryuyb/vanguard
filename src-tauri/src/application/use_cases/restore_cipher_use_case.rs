@@ -75,8 +75,7 @@ impl RestoreCipherUseCase {
                 .await?;
         }
 
-        self.event_port
-            .emit_cipher_updated(&account_id, &cipher_id);
+        self.event_port.emit_cipher_updated(&account_id, &cipher_id);
 
         Ok(())
     }

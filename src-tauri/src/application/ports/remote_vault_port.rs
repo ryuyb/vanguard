@@ -6,8 +6,8 @@ use crate::application::dto::auth::{
 };
 use crate::application::dto::sync::{
     CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RestoreCipherCommand,
-    RevisionDateQuery, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
-    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand,
+    RevisionDateQuery, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand,
+    SyncVaultPayload, UpdateCipherCommand,
 };
 use crate::support::result::AppResult;
 
