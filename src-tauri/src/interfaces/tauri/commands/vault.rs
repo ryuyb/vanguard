@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::application::dto::vault::{EnablePinUnlockCommand, UnlockVaultCommand};
 use crate::application::use_cases::master_password_unlock_use_case::MasterPasswordUnlockUseCase;
@@ -91,6 +91,7 @@ pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, Error
 #[tauri::command]
 #[specta::specta]
 pub async fn vault_unlock(
+    app_handle: AppHandle,
     state: State<'_, AppState>,
     request: VaultUnlockRequestDto,
 ) -> Result<(), ErrorPayload> {
@@ -137,6 +138,10 @@ pub async fn vault_unlock(
             );
         }
     }
+
+    // 更新托盘菜单状态
+    #[cfg(desktop)]
+    crate::interfaces::tauri::desktop::tray::TrayFeature::update_lock_menu_state(&app_handle);
 
     Ok(())
 }
@@ -251,6 +256,7 @@ pub async fn vault_disable_pin_unlock(
 #[tauri::command]
 #[specta::specta]
 pub async fn vault_lock(
+    app_handle: AppHandle,
     state: State<'_, AppState>,
     _request: VaultLockRequestDto,
 ) -> Result<(), ErrorPayload> {
@@ -259,7 +265,13 @@ pub async fn vault_lock(
         state.biometric_unlock_port(),
     )
     .lock(&*state)
-    .map_err(|error| log_command_error("vault_lock", &error))
+    .map_err(|error| log_command_error("vault_lock", &error))?;
+
+    // 更新托盘菜单状态
+    #[cfg(desktop)]
+    crate::interfaces::tauri::desktop::tray::TrayFeature::update_lock_menu_state(&app_handle);
+
+    Ok(())
 }
 
 impl From<VaultUnlockMethodDto> for UnlockMethod {

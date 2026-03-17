@@ -2,7 +2,7 @@ mod constants;
 mod main_window;
 mod monitor;
 mod spotlight;
-mod tray;
+pub mod tray;
 mod tray_click_snapshot;
 mod window_placement;
 
