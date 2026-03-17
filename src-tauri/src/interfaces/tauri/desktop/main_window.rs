@@ -1,4 +1,4 @@
-use tauri::{ActivationPolicy, Manager, Runtime};
+use tauri::{Manager, Runtime};
 
 use crate::interfaces::tauri::desktop::constants::MAIN_WINDOW_LABEL;
 use crate::interfaces::tauri::desktop::window_placement::WindowPlacementPolicy;
@@ -24,12 +24,10 @@ impl MainWindowFeature {
                 api.prevent_close();
 
                 #[cfg(target_os = "macos")]
-                if let Err(error) =
-                    app_handle_for_events.set_activation_policy(ActivationPolicy::Accessory)
-                {
+                if let Err(error) = app_handle_for_events.set_dock_visibility(false) {
                     log::warn!(
                         target: "vanguard::tray",
-                        "failed to set activation policy to accessory on hide: {error}"
+                        "failed to hide dock icon: {error}"
                     );
                 }
 
@@ -53,10 +51,10 @@ impl MainWindowFeature {
 
     fn open<R: Runtime>(app_handle: &tauri::AppHandle<R>, prefer_tray_snapshot: bool) {
         #[cfg(target_os = "macos")]
-        if let Err(error) = app_handle.set_activation_policy(ActivationPolicy::Regular) {
+        if let Err(error) = app_handle.set_dock_visibility(true) {
             log::warn!(
                 target: "vanguard::tray",
-                "failed to set activation policy to regular on restore: {error}"
+                "failed to show dock icon: {error}"
             );
         }
 
