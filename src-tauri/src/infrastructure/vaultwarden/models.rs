@@ -734,7 +734,7 @@ pub struct CipherResponse {
 pub struct RegisterRequest {
     pub email: String,
     pub name: Option<String>,
-    pub receive_marketing_emails: bool
+    pub receive_marketing_emails: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
