@@ -14,11 +14,16 @@ import { toast } from "@/lib/toast";
 
 export type RegistrationForm = ReturnType<typeof useRegistrationFlow>["form"];
 
-export function useRegistrationFlow() {
+type UseRegistrationFlowOptions = {
+  onRegistrationComplete?: () => Promise<void>;
+};
+
+export function useRegistrationFlow(options?: UseRegistrationFlowOptions) {
   const [feedback, setFeedback] = useState<RegistrationFeedbackState>({
     kind: "idle",
   });
   const [submitProgressText, setSubmitProgressText] = useState("");
+  const [isFinishingRegistration, setIsFinishingRegistration] = useState(false);
 
   const form = useForm({
     defaultValues: registerFormDefaults,
@@ -68,10 +73,12 @@ export function useRegistrationFlow() {
             email,
           });
         } else if (data.outcome === "directRegistration") {
-          // Phase 2 placeholder: direct registration with token
+          // Store token and show password setup form
           setFeedback({
-            kind: "directRegistration",
-            text: appI18n.t("errors.internal.notImplemented.description"),
+            kind: "passwordSetup",
+            token: data.token,
+            email,
+            name,
           });
         }
       } catch (error) {
@@ -84,5 +91,67 @@ export function useRegistrationFlow() {
 
   const resetFeedback = () => setFeedback({ kind: "idle" });
 
-  return { form, feedback, resetFeedback, submitProgressText };
+  const finishRegistration = async (
+    password: string,
+    passwordHint?: string,
+  ) => {
+    if (feedback.kind !== "passwordSetup") {
+      return;
+    }
+
+    const { token, email, name } = feedback;
+
+    setIsFinishingRegistration(true);
+    setSubmitProgressText(appI18n.t("auth.register.progress.creatingAccount"));
+
+    try {
+      // Get base URL from form
+      const effectiveBaseUrl =
+        form.state.values.serverUrlOption === CUSTOM_SERVER_URL_OPTION
+          ? form.state.values.customBaseUrl
+          : form.state.values.serverUrlOption;
+      const baseUrl = normalizeBaseUrl(effectiveBaseUrl);
+
+      // Call register_finish command
+      const result = await commands.authRegisterFinish({
+        baseUrl,
+        email,
+        name,
+        masterPassword: password,
+        masterPasswordHint: passwordHint || null,
+        token,
+        kdf: 0, // PBKDF2
+        kdfIterations: 600000,
+        kdfMemory: null,
+        kdfParallelism: null,
+      });
+
+      if (result.status === "error") {
+        errorHandler.handle(result.error);
+        return;
+      }
+
+      // Registration and auto-login successful
+      setSubmitProgressText(appI18n.t("auth.register.progress.loginSuccess"));
+
+      // Navigate to vault
+      if (options?.onRegistrationComplete) {
+        await options.onRegistrationComplete();
+      }
+    } catch (error) {
+      errorHandler.handle(error);
+    } finally {
+      setIsFinishingRegistration(false);
+      setSubmitProgressText("");
+    }
+  };
+
+  return {
+    form,
+    feedback,
+    resetFeedback,
+    submitProgressText,
+    finishRegistration,
+    isFinishingRegistration,
+  };
 }

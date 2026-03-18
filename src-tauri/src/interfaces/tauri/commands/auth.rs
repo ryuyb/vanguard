@@ -332,11 +332,10 @@ pub async fn auth_register_finish(
     // Step 2: Call register/finish API
     let api_request = RegisterFinishRequest {
         email: command.email.clone(),
-        name: command.name.clone(),
         master_password_hash: keys.master_password_hash,
         master_password_hint: command.master_password_hint,
-        key: keys.encrypted_symmetric_key,
-        keys: RegisterKeys {
+        user_symmetric_key: keys.encrypted_symmetric_key,
+        user_asymmetric_keys: RegisterKeys {
             public_key: keys.public_key_b64,
             encrypted_private_key: keys.encrypted_private_key,
         },
@@ -344,7 +343,7 @@ pub async fn auth_register_finish(
         kdf_iterations: command.kdf_iterations,
         kdf_memory: command.kdf_memory,
         kdf_parallelism: command.kdf_parallelism,
-        token: Some(command.token),
+        email_verification_token: Some(command.token),
     };
 
     state

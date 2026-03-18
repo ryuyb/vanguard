@@ -234,6 +234,10 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         finishRegistration: "Finish Registration",
         finishing: "Finishing registration...",
       },
+      passwordSetup: {
+        title: "Set Master Password",
+        subtitle: "Create master password for {{email}}",
+      },
       emailVerification: {
         title: "Check Your Email",
         description:
@@ -260,6 +264,7 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         generatingKeys: "Generating encryption keys...",
         finishingRegistration: "Finishing registration...",
         loggingIn: "Signing in...",
+        loginSuccess: "Sign in successful",
       },
       messages: {
         registrationDisabled: {

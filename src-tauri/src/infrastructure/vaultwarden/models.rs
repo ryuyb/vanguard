@@ -747,16 +747,25 @@ pub struct RegisterResponse {
 #[serde(rename_all = "camelCase")]
 pub struct RegisterFinishRequest {
     pub email: String,
-    pub name: String,
     pub master_password_hash: String,
+    #[serde(serialize_with = "serialize_hint_as_empty_string")]
     pub master_password_hint: Option<String>,
-    pub key: String,
-    pub keys: RegisterKeys,
+    pub user_symmetric_key: String,
+    pub user_asymmetric_keys: RegisterKeys,
     pub kdf: i32,
     pub kdf_iterations: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kdf_memory: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kdf_parallelism: Option<i32>,
-    pub token: Option<String>,
+    pub email_verification_token: Option<String>,
+}
+
+fn serialize_hint_as_empty_string<S>(value: &Option<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(value.as_deref().unwrap_or(""))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

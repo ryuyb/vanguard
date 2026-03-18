@@ -224,6 +224,10 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         finishRegistration: "完成注册",
         finishing: "正在完成注册...",
       },
+      passwordSetup: {
+        title: "设置主密码",
+        subtitle: "为 {{email}} 创建主密码",
+      },
       emailVerification: {
         title: "检查您的电子邮箱",
         description:
@@ -249,6 +253,7 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         generatingKeys: "正在生成加密密钥...",
         finishingRegistration: "正在完成注册...",
         loggingIn: "正在登录...",
+        loginSuccess: "登录成功",
       },
       messages: {
         registrationDisabled: {

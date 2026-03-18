@@ -11,6 +11,14 @@ function Register() {
   const navigateToLogin = useCallback(async () => {
     await navigate({ to: "/" });
   }, [navigate]);
+  const navigateToVault = useCallback(async () => {
+    await navigate({ to: "/vault" });
+  }, [navigate]);
 
-  return <RegisterPage navigateToLogin={navigateToLogin} />;
+  return (
+    <RegisterPage
+      navigateToLogin={navigateToLogin}
+      navigateToVault={navigateToVault}
+    />
+  );
 }

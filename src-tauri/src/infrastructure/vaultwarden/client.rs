@@ -281,10 +281,9 @@ impl VaultwardenClient {
         match status {
             200 => {
                 // Direct registration with token
-                let parsed = serde_json::from_str::<super::models::RegisterResponse>(&body)
-                    .map_err(|error| {
-                        VaultwardenError::Decode(format!("invalid register response: {error}"))
-                    })?;
+                // The response body is a plain JWT token string, not a JSON object
+                let token = body.trim().trim_matches('"').to_string();
+                let parsed = super::models::RegisterResponse { token: Some(token) };
                 Ok((status, Some(parsed)))
             }
             204 => {
