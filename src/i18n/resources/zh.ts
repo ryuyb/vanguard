@@ -175,6 +175,90 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         unlockFailed: "解锁失败,请稍后重试。",
       },
     },
+    register: {
+      title: "创建 Vanguard 账户",
+      subtitle: "注册新账户以开始使用密码库",
+      hero: {
+        badge: "账户注册",
+        title: "创建新账户,开始管理你的密码",
+        description: "输入服务器地址和邮箱信息,即可创建新的密码库账户。",
+        illustrationAlt: "账户注册插图",
+      },
+      form: {
+        serverUrl: {
+          label: "服务器地址",
+          placeholder: "选择服务地址",
+          customOption: "自定义地址",
+          customPlaceholder: "https://vault.example.com",
+        },
+        email: {
+          label: "邮箱地址",
+          placeholder: "you@example.com",
+        },
+        name: {
+          label: "姓名",
+          placeholder: "输入你的姓名",
+        },
+        masterPassword: {
+          label: "主密码",
+          placeholder: "创建主密码",
+          showPassword: "显示密码",
+          hidePassword: "隐藏密码",
+        },
+        confirmPassword: {
+          label: "确认密码",
+          placeholder: "再次输入主密码",
+        },
+        passwordHint: {
+          label: "密码提示（可选）",
+          placeholder: "帮助你记住密码的提示",
+        },
+      },
+      actions: {
+        submit: "创建账户",
+        submitting: "正在创建账户...",
+        backToLogin: "返回登录",
+        finishRegistration: "完成注册",
+        finishing: "正在完成注册...",
+      },
+      validation: {
+        missingServerUrl: "请输入服务器地址。",
+        invalidServerUrl: "服务器地址格式不正确,请以 http:// 或 https:// 开头。",
+        missingEmail: "请输入邮箱地址。",
+        invalidEmail: "邮箱格式看起来不正确,请检查后重试。",
+        missingName: "请输入姓名。",
+        missingPassword: "请输入主密码。",
+        passwordTooShort: "主密码至少需要 8 个字符。",
+        passwordMismatch: "两次输入的密码不一致。",
+      },
+      progress: {
+        creatingAccount: "正在创建账户...",
+        sendingVerification: "正在发送验证邮件...",
+        generatingKeys: "正在生成加密密钥...",
+        finishingRegistration: "正在完成注册...",
+        loggingIn: "正在登录...",
+      },
+      messages: {
+        registrationDisabled: {
+          title: "注册已关闭",
+          description: "该服务器不允许新用户注册,请联系管理员。",
+        },
+        emailVerificationRequired: {
+          title: "需要邮箱验证",
+          description:
+            "验证邮件已发送到你的邮箱,请查收并点击邮件中的链接完成注册。完成后请返回登录页面登录。",
+        },
+        registrationFailed: "注册失败,请稍后重试。",
+        passwordStrength: {
+          weak: "弱",
+          fair: "一般",
+          good: "良好",
+          strong: "强",
+        },
+        passwordCompromised: "该密码已在数据泄露中出现,建议使用其他密码。",
+        checkingPassword: "正在检查密码安全性...",
+      },
+    },
     feedback: {
       login: {
         error: "登录失败",
@@ -183,6 +267,10 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       },
       unlock: {
         error: "验证失败",
+      },
+      register: {
+        error: "注册失败",
+        success: "注册成功",
       },
     },
   },

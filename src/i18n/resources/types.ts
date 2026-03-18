@@ -38,6 +38,7 @@ export interface AppTranslationCatalog {
   auth: {
     login: TranslationDictionary;
     unlock: TranslationDictionary;
+    register: TranslationDictionary;
     feedback: TranslationDictionary;
   };
   vault: {
