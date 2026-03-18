@@ -71,7 +71,7 @@ impl VaultwardenEndpoints {
     }
 
     pub fn register_finish(base_url: &str) -> String {
-        format!("{}/api/accounts/register/finish", normalize_base(base_url))
+        format!("{}/identity/accounts/register/finish", normalize_base(base_url))
     }
 }
 
