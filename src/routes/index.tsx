@@ -18,6 +18,14 @@ function Index() {
   const navigateToVault = useCallback(async () => {
     await navigate({ to: "/vault" });
   }, [navigate]);
+  const navigateToRegister = useCallback(async () => {
+    await navigate({ to: "/register" });
+  }, [navigate]);
 
-  return <LoginPage navigateToVault={navigateToVault} />;
+  return (
+    <LoginPage
+      navigateToVault={navigateToVault}
+      navigateToRegister={navigateToRegister}
+    />
+  );
 }

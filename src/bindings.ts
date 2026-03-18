@@ -45,6 +45,14 @@ async authLogout(request: LogoutRequestDto) : Promise<Result<null, ErrorPayload>
     else return { status: "error", error: e  as any };
 }
 },
+async authSendVerificationEmail(request: SendVerificationEmailRequestDto) : Promise<Result<SendVerificationEmailResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("auth_send_verification_email", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async configGetAppConfig() : Promise<Result<AppConfigDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("config_get_app_config") };
@@ -357,6 +365,8 @@ export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; a
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
 export type RestoreCipherRequestDto = { cipherId: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
+export type SendVerificationEmailRequestDto = { baseUrl: string; email: string; name: string | null }
+export type SendVerificationEmailResponseDto = { outcome: "disabled"; message: string } | { outcome: "emailVerificationRequired" } | { outcome: "directRegistration"; token: string }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SoftDeleteCipherRequestDto = { cipherId: string }
 export type SyncAttachment = { id: string; key: string | null; file_name: string | null; size: string | null; size_name: string | null; url: string | null; object: string | null }

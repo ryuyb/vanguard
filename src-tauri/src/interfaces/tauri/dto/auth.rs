@@ -134,3 +134,21 @@ pub struct WebauthnAllowCredentialDto {
 pub struct WebauthnRequestExtensionsDto {
     pub appid: Option<String>,
 }
+
+// Registration DTOs
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SendVerificationEmailRequestDto {
+    pub base_url: String,
+    pub email: String,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(tag = "outcome", rename_all = "camelCase")]
+pub enum SendVerificationEmailResponseDto {
+    Disabled { message: String },
+    EmailVerificationRequired,
+    DirectRegistration { token: String },
+}

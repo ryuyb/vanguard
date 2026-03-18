@@ -2,11 +2,13 @@ use tauri::State;
 
 use crate::application::dto::auth::{PasswordLoginOutcome, SessionInfo};
 use crate::bootstrap::app_state::AppState;
+use crate::infrastructure::vaultwarden::registration_adapter::VaultwardenRegistrationAdapter;
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
     LogoutRequestDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
     RestoreAuthStateRequestDto, RestoreAuthStateResponseDto, RestoreAuthStateStatusDto,
-    SendEmailLoginRequestDto, VerifyEmailTokenRequestDto,
+    SendEmailLoginRequestDto, SendVerificationEmailRequestDto, SendVerificationEmailResponseDto,
+    VerifyEmailTokenRequestDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::interfaces::tauri::session;
@@ -265,4 +267,37 @@ pub async fn auth_logout(
         .clear_all_auth_state()
         .map_err(|error| log_command_error("auth_logout", error))?;
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_send_verification_email(
+    state: State<'_, AppState>,
+    request: SendVerificationEmailRequestDto,
+) -> Result<SendVerificationEmailResponseDto, ErrorPayload> {
+    use crate::application::dto::auth::{RegistrationOutcome, SendVerificationEmailCommand};
+
+    let adapter = VaultwardenRegistrationAdapter::new(state.vaultwarden_client().clone());
+    let command = SendVerificationEmailCommand {
+        base_url: request.base_url,
+        email: request.email,
+        name: request.name,
+    };
+
+    let outcome = adapter
+        .send_verification_email(command)
+        .await
+        .map_err(|error| log_command_error("auth_send_verification_email", error))?;
+
+    Ok(match outcome {
+        RegistrationOutcome::Disabled { message } => {
+            SendVerificationEmailResponseDto::Disabled { message }
+        }
+        RegistrationOutcome::EmailVerificationRequired => {
+            SendVerificationEmailResponseDto::EmailVerificationRequired
+        }
+        RegistrationOutcome::DirectRegistration { token } => {
+            SendVerificationEmailResponseDto::DirectRegistration { token }
+        }
+    })
 }
