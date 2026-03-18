@@ -1,4 +1,4 @@
-import { UserPlus, LoaderCircle } from "lucide-react";
+import { LoaderCircle, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,13 +55,14 @@ export function RegisterPage({ navigateToLogin }: RegisterPageProps) {
                     type="submit"
                     size="lg"
                     className="h-12 w-full bg-emerald-600 text-base font-medium hover:bg-emerald-700 transition-colors"
-                    disabled={isSubmitting || feedback.kind === "emailSent" || feedback.kind === "disabled"}
+                    disabled={isSubmitting || feedback.kind === "emailSent"}
                   >
                     {isSubmitting && (
                       <LoaderCircle className="h-5 w-5 animate-spin" />
                     )}
                     {isSubmitting
-                      ? submitProgressText || t("auth.register.actions.submitting")
+                      ? submitProgressText ||
+                        t("auth.register.actions.submitting")
                       : t("auth.register.actions.submit")}
                   </Button>
                 )}

@@ -31,7 +31,10 @@ export function RegisterForm({ form }: RegisterFormProps) {
     <>
       {/* Server URL */}
       <div className="space-y-2.5">
-        <Label htmlFor="reg-base-url" className="text-sm font-medium text-slate-700">
+        <Label
+          htmlFor="reg-base-url"
+          className="text-sm font-medium text-slate-700"
+        >
           {t("auth.register.form.serverUrl.label")}
         </Label>
         <form.Field name="serverUrlOption">
@@ -41,8 +44,13 @@ export function RegisterForm({ form }: RegisterFormProps) {
                 value={field.state.value}
                 onValueChange={field.handleChange}
               >
-                <SelectTrigger id="reg-base-url" className="h-12 w-full bg-white">
-                  <SelectValue placeholder={t("auth.register.form.serverUrl.placeholder")} />
+                <SelectTrigger
+                  id="reg-base-url"
+                  className="h-12 w-full bg-white"
+                >
+                  <SelectValue
+                    placeholder={t("auth.register.form.serverUrl.placeholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {SERVER_URL_OPTIONS.map((option) => (
@@ -74,7 +82,9 @@ export function RegisterForm({ form }: RegisterFormProps) {
                         id="reg-base-url-custom"
                         type="url"
                         autoComplete="url"
-                        placeholder={t("auth.register.form.serverUrl.customPlaceholder")}
+                        placeholder={t(
+                          "auth.register.form.serverUrl.customPlaceholder",
+                        )}
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
                         onBlur={field.handleBlur}
@@ -92,7 +102,10 @@ export function RegisterForm({ form }: RegisterFormProps) {
 
       {/* Email */}
       <div className="space-y-2.5">
-        <Label htmlFor="reg-email" className="text-sm font-medium text-slate-700">
+        <Label
+          htmlFor="reg-email"
+          className="text-sm font-medium text-slate-700"
+        >
           {t("auth.register.form.email.label")}
         </Label>
         <form.Field name="email">
@@ -121,7 +134,10 @@ export function RegisterForm({ form }: RegisterFormProps) {
 
       {/* Name */}
       <div className="space-y-2.5">
-        <Label htmlFor="reg-name" className="text-sm font-medium text-slate-700">
+        <Label
+          htmlFor="reg-name"
+          className="text-sm font-medium text-slate-700"
+        >
           {t("auth.register.form.name.label")}
         </Label>
         <form.Field name="name">

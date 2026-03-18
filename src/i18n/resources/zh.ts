@@ -226,7 +226,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       },
       validation: {
         missingServerUrl: "请输入服务器地址。",
-        invalidServerUrl: "服务器地址格式不正确,请以 http:// 或 https:// 开头。",
+        invalidServerUrl:
+          "服务器地址格式不正确,请以 http:// 或 https:// 开头。",
         missingEmail: "请输入邮箱地址。",
         invalidEmail: "邮箱格式看起来不正确,请检查后重试。",
         missingName: "请输入姓名。",

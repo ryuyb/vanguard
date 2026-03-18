@@ -10,11 +10,14 @@ import {
 import type { RegistrationFeedbackState } from "@/features/auth/register/types";
 import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
+import { toast } from "@/lib/toast";
 
 export type RegistrationForm = ReturnType<typeof useRegistrationFlow>["form"];
 
 export function useRegistrationFlow() {
-  const [feedback, setFeedback] = useState<RegistrationFeedbackState>({ kind: "idle" });
+  const [feedback, setFeedback] = useState<RegistrationFeedbackState>({
+    kind: "idle",
+  });
   const [submitProgressText, setSubmitProgressText] = useState("");
 
   const form = useForm({
@@ -30,7 +33,9 @@ export function useRegistrationFlow() {
       const name = value.name.trim();
 
       setFeedback({ kind: "idle" });
-      setSubmitProgressText(appI18n.t("auth.register.progress.sendingVerification"));
+      setSubmitProgressText(
+        appI18n.t("auth.register.progress.sendingVerification"),
+      );
 
       try {
         const result = await commands.authSendVerificationEmail({
@@ -47,14 +52,22 @@ export function useRegistrationFlow() {
         const data = result.data;
 
         if (data.outcome === "disabled") {
-          setFeedback({
-            kind: "disabled",
-            text: data.message || appI18n.t("auth.register.messages.registrationDisabled.description"),
-          });
+          toast.warning(
+            appI18n.t("auth.register.messages.registrationDisabled.title"),
+            {
+              description:
+                data.message ||
+                appI18n.t(
+                  "auth.register.messages.registrationDisabled.description",
+                ),
+            },
+          );
         } else if (data.outcome === "emailVerificationRequired") {
           setFeedback({
             kind: "emailSent",
-            text: appI18n.t("auth.register.messages.emailVerificationRequired.description"),
+            text: appI18n.t(
+              "auth.register.messages.emailVerificationRequired.description",
+            ),
           });
         } else if (data.outcome === "directRegistration") {
           // Phase 2 placeholder: direct registration with token
