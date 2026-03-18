@@ -1,4 +1,5 @@
 pub mod cipher_encryption;
+pub mod crypto;
 pub mod dto;
 pub mod policy;
 pub mod ports;

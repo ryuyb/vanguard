@@ -1,17 +1,9 @@
-use aes::Aes256;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
 use base64::Engine;
-use cbc::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
-use hmac::{Hmac, Mac};
-use rand::RngExt;
-use sha2::Sha256;
 
+use crate::application::crypto::encryption;
 use crate::application::dto::vault::VaultUserKeyMaterial;
 use crate::support::error::AppError;
-
-type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
-type Aes256CbcEncryptor = cbc::Encryptor<Aes256>;
-type HmacSha256 = Hmac<Sha256>;
 
 pub fn decrypt_optional_field(
     value: Option<String>,
@@ -127,19 +119,27 @@ pub fn decrypt_cipher_bytes(value: &str, key: &VaultUserKeyMaterial) -> Result<V
     match enc_type {
         0 => {
             let parts = split_cipher_payload(payload, 2)?;
-            decrypt_aes_cbc(
-                &decode_base64_flexible(parts[0], "cipher.iv")?,
-                &decode_base64_flexible(parts[1], "cipher.data")?,
-                &key.enc_key,
-            )
+            let iv = decode_base64_flexible(parts[0], "cipher.iv")?;
+            let ct = decode_base64_flexible(parts[1], "cipher.data")?;
+            // Type 0: AES-CBC without MAC — use raw decrypt
+            encryption::decrypt_aes_cbc_raw(&iv, &ct, &key.enc_key).map_err(wrap_validation_error)
         }
         2 => {
             let parts = split_cipher_payload(payload, 3)?;
             let iv = decode_base64_flexible(parts[0], "cipher.iv")?;
             let ciphertext = decode_base64_flexible(parts[1], "cipher.data")?;
             let mac = decode_base64_flexible(parts[2], "cipher.mac")?;
-            verify_mac(&iv, &ciphertext, &mac, key.mac_key.as_deref())?;
-            decrypt_aes_cbc(&iv, &ciphertext, &key.enc_key)
+            let mac_key = key
+                .mac_key
+                .as_deref()
+                .ok_or_else(|| AppError::ValidationFieldError {
+                    field: "unknown".to_string(),
+                    message: "mac key required for encryption type 2".to_string(),
+                })?;
+            encryption::verify_hmac(&iv, &ciphertext, &mac, mac_key)
+                .map_err(wrap_validation_error)?;
+            encryption::decrypt_aes_cbc_raw(&iv, &ciphertext, &key.enc_key)
+                .map_err(wrap_validation_error)
         }
         _ => Err(AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -195,60 +195,6 @@ pub fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKeyMaterial, AppEr
     parse_user_key(text)
 }
 
-fn split_cipher_payload(payload: &str, expected: usize) -> Result<Vec<&str>, AppError> {
-    let parts: Vec<&str> = payload.split('|').collect();
-    if parts.len() != expected || parts.iter().any(|part| part.trim().is_empty()) {
-        return Err(AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "cipher string payload shape is invalid".to_string(),
-        });
-    }
-    Ok(parts)
-}
-
-fn verify_mac(
-    iv: &[u8],
-    ciphertext: &[u8],
-    mac: &[u8],
-    mac_key: Option<&[u8]>,
-) -> Result<(), AppError> {
-    let mac_key = mac_key.ok_or_else(|| AppError::ValidationFieldError {
-        field: "unknown".to_string(),
-        message: "mac key required for encryption type 2".to_string(),
-    })?;
-    let mut signer =
-        HmacSha256::new_from_slice(mac_key).map_err(|error| AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: format!("invalid mac key: {error}"),
-        })?;
-    signer.update(iv);
-    signer.update(ciphertext);
-    signer
-        .verify_slice(mac)
-        .map_err(|_| AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "cipher string mac verification failed".to_string(),
-        })?;
-    Ok(())
-}
-
-fn decrypt_aes_cbc(iv: &[u8], ciphertext: &[u8], enc_key: &[u8]) -> Result<Vec<u8>, AppError> {
-    let mut buffer = ciphertext.to_vec();
-    let decryptor = Aes256CbcDecryptor::new_from_slices(enc_key, iv).map_err(|error| {
-        AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: format!("invalid aes key/iv: {error}"),
-        }
-    })?;
-    let plaintext = decryptor
-        .decrypt_padded_mut::<Pkcs7>(&mut buffer)
-        .map_err(|_| AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "ciphertext decryption failed".to_string(),
-        })?;
-    Ok(plaintext.to_vec())
-}
-
 /// Encrypts a string using AES-256-CBC with HMAC-SHA256 (encryption type 2)
 /// Returns a CipherString in the format: "2.iv|ciphertext|mac"
 pub fn encrypt_cipher_string(
@@ -264,65 +210,54 @@ pub fn encrypt_cipher_bytes(
     plaintext: &[u8],
     key: &VaultUserKeyMaterial,
 ) -> Result<String, AppError> {
-    // Generate random IV (16 bytes for AES-256-CBC)
-    let mut iv = [0u8; 16];
-    rand::rng().fill(&mut iv);
-
-    // Encrypt with AES-256-CBC
-    let ciphertext = encrypt_aes_cbc(&iv, plaintext, &key.enc_key)?;
-
-    // Calculate HMAC if mac_key is available (type 2)
-    if let Some(mac_key) = &key.mac_key {
-        let mac = calculate_mac(&iv, &ciphertext, mac_key)?;
-
-        // Format: "2.iv|ciphertext|mac"
+    if key.mac_key.is_some() {
+        // Type 2: AES-CBC + HMAC
+        let (iv, ciphertext, mac) =
+            encryption::encrypt_aes256_hmac(plaintext, key).map_err(wrap_validation_error)?;
         Ok(format!(
             "2.{}|{}|{}",
-            STANDARD.encode(iv),
+            STANDARD.encode(&iv),
             STANDARD.encode(&ciphertext),
             STANDARD.encode(&mac)
         ))
     } else {
-        // Format: "0.iv|ciphertext" (type 0, no MAC)
+        // Type 0: AES-CBC without MAC
+        let (iv, ciphertext) = encryption::encrypt_aes_cbc_raw(plaintext, &key.enc_key)
+            .map_err(wrap_validation_error)?;
         Ok(format!(
             "0.{}|{}",
-            STANDARD.encode(iv),
+            STANDARD.encode(&iv),
             STANDARD.encode(&ciphertext)
         ))
     }
 }
 
-fn encrypt_aes_cbc(iv: &[u8], plaintext: &[u8], enc_key: &[u8]) -> Result<Vec<u8>, AppError> {
-    let encryptor = Aes256CbcEncryptor::new_from_slices(enc_key, iv).map_err(|error| {
-        AppError::ValidationFieldError {
+fn split_cipher_payload(payload: &str, expected: usize) -> Result<Vec<&str>, AppError> {
+    let parts: Vec<&str> = payload.split('|').collect();
+    if parts.len() != expected || parts.iter().any(|part| part.trim().is_empty()) {
+        return Err(AppError::ValidationFieldError {
             field: "unknown".to_string(),
-            message: format!("invalid aes key/iv: {error}"),
-        }
-    })?;
-
-    let mut buffer = plaintext.to_vec();
-    // Add padding space
-    let block_size = 16;
-    let padding_len = block_size - (buffer.len() % block_size);
-    buffer.resize(buffer.len() + padding_len, 0);
-
-    let ciphertext = encryptor
-        .encrypt_padded_mut::<Pkcs7>(&mut buffer, plaintext.len())
-        .map_err(|_| AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "plaintext encryption failed".to_string(),
-        })?;
-
-    Ok(ciphertext.to_vec())
+            message: "cipher string payload shape is invalid".to_string(),
+        });
+    }
+    Ok(parts)
 }
 
-fn calculate_mac(iv: &[u8], ciphertext: &[u8], mac_key: &[u8]) -> Result<Vec<u8>, AppError> {
-    let mut signer =
-        HmacSha256::new_from_slice(mac_key).map_err(|error| AppError::ValidationFieldError {
+/// Maps crypto module errors to ValidationFieldError for backward compatibility.
+fn wrap_validation_error(error: AppError) -> AppError {
+    match error {
+        AppError::CryptoInvalidKey => AppError::ValidationFieldError {
             field: "unknown".to_string(),
-            message: format!("invalid mac key: {error}"),
-        })?;
-    signer.update(iv);
-    signer.update(ciphertext);
-    Ok(signer.finalize().into_bytes().to_vec())
+            message: "invalid encryption key".to_string(),
+        },
+        AppError::CryptoEncryptionFailed => AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "plaintext encryption failed".to_string(),
+        },
+        AppError::CryptoDecryptionFailed => AppError::ValidationFieldError {
+            field: "unknown".to_string(),
+            message: "cipher string mac verification failed".to_string(),
+        },
+        other => other,
+    }
 }

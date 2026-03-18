@@ -41,25 +41,25 @@
 
 ## 6. 密码学模块 (阶段 2: 完整功能)
 
-- [ ] 6.1 创建 `key_derivation.rs` 实现 PBKDF2 密钥派生
-- [ ] 6.2 实现 HKDF-Expand 对称密钥派生
-- [ ] 6.3 实现 Master Password Hash 生成
-- [ ] 6.4 创建 `encryption.rs` 实现 AES-256-CBC 加密/解密
-- [ ] 6.5 实现 HMAC-SHA256 消息认证
-- [ ] 6.6 创建 `cipher_string.rs` 实现 CipherString 格式处理
-- [ ] 6.7 创建 `rsa_keys.rs` 实现 RSA-2048 密钥对生成
-- [ ] 6.8 实现 RSA 私钥加密
-- [ ] 6.9 实现对称密钥自加密
+- [x] 6.1 创建 `key_derivation.rs` 实现 PBKDF2 密钥派生
+- [x] 6.2 实现 HKDF-Expand 对称密钥派生
+- [x] 6.3 实现 Master Password Hash 生成
+- [x] 6.4 创建 `encryption.rs` 实现 AES-256-CBC 加密/解密
+- [x] 6.5 实现 HMAC-SHA256 消息认证
+- [x] 6.6 创建 `cipher_string.rs` 实现 CipherString 格式处理
+- [x] 6.7 创建 `rsa_keys.rs` 实现 RSA-2048 密钥对生成
+- [x] 6.8 实现 RSA 私钥加密
+- [x] 6.9 实现对称密钥自加密
 
 ## 7. 密码学模块测试 (阶段 2: 完整功能)
 
-- [ ] 7.1 编写 PBKDF2 单元测试
-- [ ] 7.2 编写 HKDF 单元测试
-- [ ] 7.3 编写 AES-256-CBC 加密/解密测试
-- [ ] 7.4 编写 HMAC-SHA256 测试
-- [ ] 7.5 编写 CipherString 格式解析测试
-- [ ] 7.6 编写 RSA 密钥对生成测试
-- [ ] 7.7 验证与 Bitwarden 官方实现的兼容性
+- [x] 7.1 编写 PBKDF2 单元测试
+- [x] 7.2 编写 HKDF 单元测试
+- [x] 7.3 编写 AES-256-CBC 加密/解密测试
+- [x] 7.4 编写 HMAC-SHA256 测试
+- [x] 7.5 编写 CipherString 格式解析测试
+- [x] 7.6 编写 RSA 密钥对生成测试
+- [x] 7.7 验证与 Bitwarden 官方实现的兼容性
 
 ## 8. 注册完成逻辑 (阶段 2: 完整功能)
 
