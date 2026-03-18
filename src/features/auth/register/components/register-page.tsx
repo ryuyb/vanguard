@@ -2,8 +2,8 @@ import { LoaderCircle, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmailVerificationPage } from "@/features/auth/register/components/email-verification-page";
 import { RegisterForm } from "@/features/auth/register/components/register-form";
-import { RegistrationFeedback } from "@/features/auth/register/components/registration-feedback";
 import { useRegistrationFlow } from "@/features/auth/register/hooks/use-registration-flow";
 
 type RegisterPageProps = {
@@ -12,7 +12,18 @@ type RegisterPageProps = {
 
 export function RegisterPage({ navigateToLogin }: RegisterPageProps) {
   const { t } = useTranslation();
-  const { form, feedback, submitProgressText } = useRegistrationFlow();
+  const { form, feedback, resetFeedback, submitProgressText } =
+    useRegistrationFlow();
+
+  if (feedback.kind === "emailSent") {
+    return (
+      <EmailVerificationPage
+        email={feedback.email}
+        onBackToEdit={resetFeedback}
+        onBackToLogin={navigateToLogin}
+      />
+    );
+  }
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
@@ -47,15 +58,13 @@ export function RegisterPage({ navigateToLogin }: RegisterPageProps) {
             >
               <RegisterForm form={form} />
 
-              <RegistrationFeedback feedback={feedback} />
-
               <form.Subscribe selector={(s) => s.isSubmitting}>
                 {(isSubmitting) => (
                   <Button
                     type="submit"
                     size="lg"
                     className="h-12 w-full bg-emerald-600 text-base font-medium hover:bg-emerald-700 transition-colors"
-                    disabled={isSubmitting || feedback.kind === "emailSent"}
+                    disabled={isSubmitting}
                   >
                     {isSubmitting && (
                       <LoaderCircle className="h-5 w-5 animate-spin" />
