@@ -116,3 +116,36 @@ pub struct WebauthnAllowCredential {
 pub struct WebauthnRequestExtensions {
     pub appid: Option<String>,
 }
+
+// Registration DTOs
+
+#[derive(Debug, Clone)]
+pub struct SendVerificationEmailCommand {
+    pub base_url: String,
+    pub email: String,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum RegistrationOutcome {
+    /// Server does not allow registration (400 error)
+    Disabled { message: String },
+    /// Email verification required (204 response)
+    EmailVerificationRequired,
+    /// Direct registration allowed (200 response with token)
+    DirectRegistration { token: String },
+}
+
+#[derive(Debug, Clone)]
+pub struct RegisterFinishCommand {
+    pub base_url: String,
+    pub email: String,
+    pub name: String,
+    pub master_password: String,
+    pub master_password_hint: Option<String>,
+    pub token: String,
+    pub kdf: i32,
+    pub kdf_iterations: i32,
+    pub kdf_memory: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
+}

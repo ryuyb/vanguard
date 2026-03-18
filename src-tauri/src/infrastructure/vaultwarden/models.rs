@@ -726,3 +726,41 @@ pub struct CipherResponse {
     pub id: String,
     pub revision_date: String,
 }
+
+// Registration models
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterRequest {
+    pub email: String,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterResponse {
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterFinishRequest {
+    pub email: String,
+    pub name: String,
+    pub master_password_hash: String,
+    pub master_password_hint: Option<String>,
+    pub key: String,
+    pub keys: RegisterKeys,
+    pub kdf: i32,
+    pub kdf_iterations: i32,
+    pub kdf_memory: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
+    pub token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterKeys {
+    pub public_key: String,
+    pub encrypted_private_key: String,
+}
