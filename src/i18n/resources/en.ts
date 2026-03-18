@@ -86,6 +86,9 @@ export const enTranslationCatalog: AppTranslationCatalog = {
       validation: {
         missingCredentials:
           "Enter the server address, email, and master password first.",
+        missingServerUrl: "Please enter server address.",
+        missingEmail: "Please enter email address.",
+        missingPassword: "Please enter master password.",
         invalidServerUrl:
           "The server address is invalid. It must start with http:// or https://.",
         invalidEmail:

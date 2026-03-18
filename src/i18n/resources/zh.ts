@@ -85,6 +85,9 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       },
       validation: {
         missingCredentials: "请先填写服务地址、登录邮箱和主密码。",
+        missingServerUrl: "请输入服务器地址。",
+        missingEmail: "请输入邮箱地址。",
+        missingPassword: "请输入主密码。",
         invalidServerUrl: "服务地址格式不正确,请以 http:// 或 https:// 开头。",
         invalidEmail: "邮箱格式看起来不正确,请检查后重试。",
         incompleteTwoFactor: "请输入完整的二步验证码后再继续。",

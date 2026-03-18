@@ -18,6 +18,7 @@ import {
   SERVER_URL_OPTIONS,
 } from "@/features/auth/login/constants";
 import type { RegistrationForm } from "@/features/auth/register/hooks/use-registration-flow";
+import { FormFieldError } from "@/features/auth/shared/form-field-error";
 
 type RegisterFormProps = {
   form: RegistrationForm;
@@ -35,25 +36,27 @@ export function RegisterForm({ form }: RegisterFormProps) {
         </Label>
         <form.Field name="serverUrlOption">
           {(field) => (
-            <Select
-              value={field.state.value}
-              onValueChange={field.handleChange}
-              disabled={form.state.isSubmitting}
-            >
-              <SelectTrigger id="reg-base-url" className="h-12 w-full bg-white">
-                <SelectValue placeholder={t("auth.register.form.serverUrl.placeholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {SERVER_URL_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+            <>
+              <Select
+                value={field.state.value}
+                onValueChange={field.handleChange}
+              >
+                <SelectTrigger id="reg-base-url" className="h-12 w-full bg-white">
+                  <SelectValue placeholder={t("auth.register.form.serverUrl.placeholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {SERVER_URL_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM_SERVER_URL_OPTION}>
+                    {t("auth.register.form.serverUrl.customOption")}
                   </SelectItem>
-                ))}
-                <SelectItem value={CUSTOM_SERVER_URL_OPTION}>
-                  {t("auth.register.form.serverUrl.customOption")}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
+              <FormFieldError errors={field.state.meta.errors} />
+            </>
           )}
         </form.Field>
 
@@ -62,22 +65,24 @@ export function RegisterForm({ form }: RegisterFormProps) {
             serverUrlOption === CUSTOM_SERVER_URL_OPTION ? (
               <form.Field name="customBaseUrl">
                 {(field) => (
-                  <InputGroup>
-                    <InputGroupAddon>
-                      <Globe className="h-5 w-5 text-slate-400" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="reg-base-url-custom"
-                      type="url"
-                      autoComplete="url"
-                      placeholder={t("auth.register.form.serverUrl.customPlaceholder")}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      disabled={form.state.isSubmitting}
-                      className="h-12 text-base"
-                    />
-                  </InputGroup>
+                  <>
+                    <InputGroup>
+                      <InputGroupAddon>
+                        <Globe className="h-5 w-5 text-slate-400" />
+                      </InputGroupAddon>
+                      <InputGroupInput
+                        id="reg-base-url-custom"
+                        type="url"
+                        autoComplete="url"
+                        placeholder={t("auth.register.form.serverUrl.customPlaceholder")}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="h-12 text-base"
+                      />
+                    </InputGroup>
+                    <FormFieldError errors={field.state.meta.errors} />
+                  </>
                 )}
               </form.Field>
             ) : null
@@ -92,22 +97,24 @@ export function RegisterForm({ form }: RegisterFormProps) {
         </Label>
         <form.Field name="email">
           {(field) => (
-            <InputGroup>
-              <InputGroupAddon>
-                <Mail className="h-5 w-5 text-slate-400" />
-              </InputGroupAddon>
-              <InputGroupInput
-                id="reg-email"
-                type="email"
-                autoComplete="email"
-                placeholder={t("auth.register.form.email.placeholder")}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                disabled={form.state.isSubmitting}
-                className="h-12 text-base"
-              />
-            </InputGroup>
+            <>
+              <InputGroup>
+                <InputGroupAddon>
+                  <Mail className="h-5 w-5 text-slate-400" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="reg-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t("auth.register.form.email.placeholder")}
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  className="h-12 text-base"
+                />
+              </InputGroup>
+              <FormFieldError errors={field.state.meta.errors} />
+            </>
           )}
         </form.Field>
       </div>
@@ -119,22 +126,24 @@ export function RegisterForm({ form }: RegisterFormProps) {
         </Label>
         <form.Field name="name">
           {(field) => (
-            <InputGroup>
-              <InputGroupAddon>
-                <User className="h-5 w-5 text-slate-400" />
-              </InputGroupAddon>
-              <InputGroupInput
-                id="reg-name"
-                type="text"
-                autoComplete="name"
-                placeholder={t("auth.register.form.name.placeholder")}
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                disabled={form.state.isSubmitting}
-                className="h-12 text-base"
-              />
-            </InputGroup>
+            <>
+              <InputGroup>
+                <InputGroupAddon>
+                  <User className="h-5 w-5 text-slate-400" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="reg-name"
+                  type="text"
+                  autoComplete="name"
+                  placeholder={t("auth.register.form.name.placeholder")}
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
+                  className="h-12 text-base"
+                />
+              </InputGroup>
+              <FormFieldError errors={field.state.meta.errors} />
+            </>
           )}
         </form.Field>
       </div>

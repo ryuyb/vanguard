@@ -22,7 +22,7 @@ export const loginSchema = z
       return normalizeBaseUrl(baseUrl).length > 0;
     },
     {
-      message: "auth.login.validation.missingCredentials",
+      message: "auth.login.validation.missingServerUrl",
       path: ["serverUrlOption"],
     },
   )
@@ -41,7 +41,7 @@ export const loginSchema = z
     },
   )
   .refine((data) => data.email.trim().length > 0, {
-    message: "auth.login.validation.missingCredentials",
+    message: "auth.login.validation.missingEmail",
     path: ["email"],
   })
   .refine(
@@ -55,7 +55,7 @@ export const loginSchema = z
     },
   )
   .refine((data) => data.masterPassword.length > 0, {
-    message: "auth.login.validation.missingCredentials",
+    message: "auth.login.validation.missingPassword",
     path: ["masterPassword"],
   });
 
