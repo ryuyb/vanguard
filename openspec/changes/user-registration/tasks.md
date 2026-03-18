@@ -72,12 +72,12 @@
 
 ## 9. 密码设置 UI (阶段 2: 完整功能)
 
-- [ ] 9.1 创建 `password-setup-form.tsx` 密码设置表单
-- [ ] 9.2 创建 `password-strength.tsx` 密码强度指示器
-- [ ] 9.3 实现 `use-password-strength.ts` 密码强度检查 hook
-- [ ] 9.4 实现密码泄露检查 (Have I Been Pwned API)
-- [ ] 9.5 实现密码确认验证
-- [ ] 9.6 添加密码提示输入 (可选)
+- [x] 9.1 创建 `password-setup-form.tsx` 密码设置表单
+- [x] 9.2 创建 `password-strength.tsx` 密码强度指示器
+- [x] 9.3 实现 `use-password-strength.ts` 密码强度检查 hook
+- [x] 9.4 实现密码泄露检查 (Have I Been Pwned API)
+- [x] 9.5 实现密码确认验证
+- [x] 9.6 添加密码提示输入 (可选)
 
 ## 10. 场景 3 完整流程 (阶段 2: 完整功能)
 
