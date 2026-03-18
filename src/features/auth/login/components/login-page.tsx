@@ -12,9 +12,10 @@ import { useLoginFlow } from "@/features/auth/login/hooks";
 
 type LoginPageProps = {
   navigateToVault: () => Promise<void>;
+  navigateToRegister?: () => Promise<void>;
 };
 
-export function LoginPage({ navigateToVault }: LoginPageProps) {
+export function LoginPage({ navigateToVault, navigateToRegister }: LoginPageProps) {
   const { t } = useTranslation();
   const {
     form,
@@ -115,6 +116,18 @@ export function LoginPage({ navigateToVault }: LoginPageProps) {
                   </Button>
                 )}
               </form.Subscribe>
+
+              {navigateToRegister && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={navigateToRegister}
+                    className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    {t("auth.register.actions.submit")}
+                  </button>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
