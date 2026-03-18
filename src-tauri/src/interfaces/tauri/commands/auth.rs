@@ -6,9 +6,9 @@ use crate::infrastructure::vaultwarden::registration_adapter::VaultwardenRegistr
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
     LogoutRequestDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
-    RestoreAuthStateRequestDto, RestoreAuthStateResponseDto, RestoreAuthStateStatusDto,
-    SendEmailLoginRequestDto, SendVerificationEmailRequestDto, SendVerificationEmailResponseDto,
-    VerifyEmailTokenRequestDto,
+    RegisterFinishRequestDto, RestoreAuthStateRequestDto, RestoreAuthStateResponseDto,
+    RestoreAuthStateStatusDto, SendEmailLoginRequestDto, SendVerificationEmailRequestDto,
+    SendVerificationEmailResponseDto, VerifyEmailTokenRequestDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::interfaces::tauri::session;
@@ -300,4 +300,103 @@ pub async fn auth_send_verification_email(
             SendVerificationEmailResponseDto::DirectRegistration { token }
         }
     })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_register_finish(
+    state: State<'_, AppState>,
+    request: RegisterFinishRequestDto,
+) -> Result<(), ErrorPayload> {
+    use crate::application::dto::auth::RegisterFinishCommand;
+    use crate::application::services::registration_service::derive_registration_keys;
+    use crate::infrastructure::vaultwarden::models::{RegisterFinishRequest, RegisterKeys};
+
+    let command = RegisterFinishCommand {
+        base_url: request.base_url.clone(),
+        email: request.email.clone(),
+        name: request.name.clone(),
+        master_password: request.master_password.clone(),
+        master_password_hint: request.master_password_hint.clone(),
+        token: request.token.clone(),
+        kdf: request.kdf,
+        kdf_iterations: request.kdf_iterations,
+        kdf_memory: request.kdf_memory,
+        kdf_parallelism: request.kdf_parallelism,
+    };
+
+    // Step 1: Derive all cryptographic keys
+    let keys = derive_registration_keys(&command)
+        .map_err(|error| log_command_error("auth_register_finish", error))?;
+
+    // Step 2: Call register/finish API
+    let api_request = RegisterFinishRequest {
+        email: command.email.clone(),
+        name: command.name.clone(),
+        master_password_hash: keys.master_password_hash,
+        master_password_hint: command.master_password_hint,
+        key: keys.encrypted_symmetric_key,
+        keys: RegisterKeys {
+            public_key: keys.public_key_b64,
+            encrypted_private_key: keys.encrypted_private_key,
+        },
+        kdf: command.kdf,
+        kdf_iterations: command.kdf_iterations,
+        kdf_memory: command.kdf_memory,
+        kdf_parallelism: command.kdf_parallelism,
+        token: Some(command.token),
+    };
+
+    state
+        .vaultwarden_client()
+        .register_finish(&request.base_url, api_request)
+        .await
+        .map_err(|error| {
+            let (status, message) = match &error {
+                crate::infrastructure::vaultwarden::error::VaultwardenError::ApiError {
+                    status,
+                    message,
+                    ..
+                } => (*status, message.clone()),
+                other => (0, format!("{other}")),
+            };
+            log_command_error(
+                "auth_register_finish",
+                AppError::NetworkRemoteError { status, message },
+            )
+        })?;
+
+    // Step 3: Auto-login after successful registration
+    let login_result = state
+        .auth_service()
+        .login_with_password(crate::application::dto::auth::PasswordLoginCommand {
+            base_url: request.base_url.clone(),
+            username: request.email.clone(),
+            password: request.master_password.clone(),
+            two_factor_provider: None,
+            two_factor_token: None,
+            two_factor_remember: None,
+            authrequest: None,
+        })
+        .await
+        .map_err(|error| log_command_error("auth_register_finish", error))?;
+
+    if let crate::application::dto::auth::PasswordLoginOutcome::Authenticated(session) =
+        login_result
+    {
+        initialize_authenticated_session(
+            &state,
+            &request.base_url,
+            &request.email,
+            &request.master_password,
+            &session,
+        )
+        .await
+        .map_err(|error| {
+            let _ = state.clear_auth_session();
+            log_command_error("auth_register_finish", error)
+        })?;
+    }
+
+    Ok(())
 }

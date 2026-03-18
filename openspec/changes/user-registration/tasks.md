@@ -63,12 +63,12 @@
 
 ## 8. 注册完成逻辑 (阶段 2: 完整功能)
 
-- [ ] 8.1 创建 `registration_service.rs` 注册业务逻辑
-- [ ] 8.2 实现 `register_finish` Tauri command
-- [ ] 8.3 集成密码学模块,生成注册所需的所有密钥
-- [ ] 8.4 实现 `register/finish` API 调用
-- [ ] 8.5 实现注册成功后的自动登录流程
-- [ ] 8.6 添加详细的错误处理和回滚逻辑
+- [x] 8.1 创建 `registration_service.rs` 注册业务逻辑
+- [x] 8.2 实现 `register_finish` Tauri command
+- [x] 8.3 集成密码学模块,生成注册所需的所有密钥
+- [x] 8.4 实现 `register/finish` API 调用
+- [x] 8.5 实现注册成功后的自动登录流程
+- [x] 8.6 添加详细的错误处理和回滚逻辑
 
 ## 9. 密码设置 UI (阶段 2: 完整功能)
 
