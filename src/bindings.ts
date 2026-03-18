@@ -53,6 +53,14 @@ async authSendVerificationEmail(request: SendVerificationEmailRequestDto) : Prom
     else return { status: "error", error: e  as any };
 }
 },
+async authRegisterFinish(request: RegisterFinishRequestDto) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("auth_register_finish", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async configGetAppConfig() : Promise<Result<AppConfigDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("config_get_app_config") };
@@ -359,6 +367,7 @@ export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
+export type RegisterFinishRequestDto = { baseUrl: string; email: string; name: string; masterPassword: string; masterPasswordHint: string | null; token: string; kdf: number; kdfIterations: number; kdfMemory: number | null; kdfParallelism: number | null }
 export type RenameFolderRequest = { folderId: string; newName: string }
 export type RestoreAuthStateRequestDto = Record<string, never>
 export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }

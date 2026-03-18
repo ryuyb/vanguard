@@ -152,3 +152,18 @@ pub enum SendVerificationEmailResponseDto {
     EmailVerificationRequired,
     DirectRegistration { token: String },
 }
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterFinishRequestDto {
+    pub base_url: String,
+    pub email: String,
+    pub name: String,
+    pub master_password: String,
+    pub master_password_hint: Option<String>,
+    pub token: String,
+    pub kdf: i32,
+    pub kdf_iterations: i32,
+    pub kdf_memory: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
+}

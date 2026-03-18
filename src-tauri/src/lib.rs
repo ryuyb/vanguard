@@ -22,6 +22,7 @@ pub fn run() {
             interfaces::tauri::commands::auth::auth_restore_state,
             interfaces::tauri::commands::auth::auth_logout,
             interfaces::tauri::commands::auth::auth_send_verification_email,
+            interfaces::tauri::commands::auth::auth_register_finish,
             interfaces::tauri::commands::config::config_get_app_config,
             interfaces::tauri::commands::config::config_update_app_config,
             interfaces::tauri::commands::desktop::desktop_open_main_window,
