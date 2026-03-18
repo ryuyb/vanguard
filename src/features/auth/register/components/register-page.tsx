@@ -49,13 +49,13 @@ export function RegisterPage({ navigateToLogin }: RegisterPageProps) {
 
               <RegistrationFeedback feedback={feedback} />
 
-              <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
-                {([canSubmit, isSubmitting]) => (
+              <form.Subscribe selector={(s) => s.isSubmitting}>
+                {(isSubmitting) => (
                   <Button
                     type="submit"
                     size="lg"
                     className="h-12 w-full bg-emerald-600 text-base font-medium hover:bg-emerald-700 transition-colors"
-                    disabled={!canSubmit || feedback.kind === "emailSent" || feedback.kind === "disabled"}
+                    disabled={isSubmitting || feedback.kind === "emailSent" || feedback.kind === "disabled"}
                   >
                     {isSubmitting && (
                       <LoaderCircle className="h-5 w-5 animate-spin" />

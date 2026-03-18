@@ -93,14 +93,14 @@ export function LoginPage({ navigateToVault, navigateToRegister }: LoginPageProp
 
               <LoginFeedbackAlert feedback={feedback} />
 
-              <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting]}>
-                {([canSubmit, isSubmitting]) => (
+              <form.Subscribe selector={(s) => s.isSubmitting}>
+                {(isSubmitting) => (
                   <Button
                     type="submit"
                     size="lg"
                     className="h-12 w-full bg-blue-600 text-base font-medium hover:bg-blue-700 transition-colors"
                     disabled={
-                      !canSubmit ||
+                      isSubmitting ||
                       isRestoringSession ||
                       (twoFactorState ? !twoFactorState.token.trim() : false)
                     }

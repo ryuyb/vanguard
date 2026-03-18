@@ -14,7 +14,12 @@ import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree });
 
+const PRE_AUTH_ROUTES = new Set(["/", "/register"]);
+
 function shouldNavigateToResolvedRoute(currentPath: string, target: string) {
+  if (target === "/" && PRE_AUTH_ROUTES.has(currentPath)) {
+    return false;
+  }
   return currentPath !== target;
 }
 
