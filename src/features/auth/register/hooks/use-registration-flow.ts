@@ -65,9 +65,7 @@ export function useRegistrationFlow() {
         } else if (data.outcome === "emailVerificationRequired") {
           setFeedback({
             kind: "emailSent",
-            text: appI18n.t(
-              "auth.register.messages.emailVerificationRequired.description",
-            ),
+            email,
           });
         } else if (data.outcome === "directRegistration") {
           // Phase 2 placeholder: direct registration with token
@@ -84,5 +82,7 @@ export function useRegistrationFlow() {
     },
   });
 
-  return { form, feedback, submitProgressText };
+  const resetFeedback = () => setFeedback({ kind: "idle" });
+
+  return { form, feedback, resetFeedback, submitProgressText };
 }

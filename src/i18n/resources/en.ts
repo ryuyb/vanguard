@@ -234,6 +234,14 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         finishRegistration: "Finish Registration",
         finishing: "Finishing registration...",
       },
+      emailVerification: {
+        title: "Check Your Email",
+        description:
+          "Click the link in the email sent to {{email}} to continue creating your account.",
+        notReceived: "Didn't receive the email?",
+        editEmail: "Go back to edit your email address.",
+        backToLogin: "Back to Sign In",
+      },
       validation: {
         missingServerUrl: "Please enter server address.",
         invalidServerUrl:

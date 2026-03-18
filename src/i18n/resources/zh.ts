@@ -224,6 +224,14 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         finishRegistration: "完成注册",
         finishing: "正在完成注册...",
       },
+      emailVerification: {
+        title: "检查您的电子邮箱",
+        description:
+          "点击发送到 {{email}} 的电子邮件中的链接，然后继续创建您的账户。",
+        notReceived: "没有收到电子邮件吗？",
+        editEmail: "返回编辑您的电子邮箱地址。",
+        backToLogin: "返回登录页面",
+      },
       validation: {
         missingServerUrl: "请输入服务器地址。",
         invalidServerUrl:
