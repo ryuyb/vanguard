@@ -6,11 +6,11 @@
 
 ## 2. 后端基础设施 (阶段 1: MVP)
 
-- [ ] 2.1 在 `endpoints.rs` 添加注册 API endpoints
-- [ ] 2.2 创建 `registration_adapter.rs` 实现注册 API 调用
-- [ ] 2.3 创建注册相关的 DTO 类型定义
-- [ ] 2.4 实现 `send_verification_email` API 调用
-- [ ] 2.5 添加错误处理和日志记录
+- [x] 2.1 在 `endpoints.rs` 添加注册 API endpoints
+- [x] 2.2 创建 `registration_adapter.rs` 实现注册 API 调用
+- [x] 2.3 创建注册相关的 DTO 类型定义
+- [x] 2.4 实现 `send_verification_email` API 调用
+- [x] 2.5 添加错误处理和日志记录
 
 ## 3. 前端注册页面 (阶段 1: MVP)
 

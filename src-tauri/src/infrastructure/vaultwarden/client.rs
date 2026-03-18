@@ -241,6 +241,107 @@ impl VaultwardenClient {
         Err(Self::api_error(status, body))
     }
 
+    pub async fn register(
+        &self,
+        base_url: &str,
+        request: super::models::RegisterRequest,
+    ) -> VaultwardenResult<(u16, Option<super::models::RegisterResponse>)> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::register(base_url);
+
+        log::debug!(
+            target: "vanguard::vaultwarden",
+            "register request endpoint={} email={}",
+            endpoint,
+            request.email
+        );
+
+        let response = self
+            .http_client
+            .post(endpoint)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        log::debug!(
+            target: "vanguard::vaultwarden",
+            "register response status={} body_len={}",
+            status,
+            body.len()
+        );
+
+        // Handle different registration scenarios
+        match status {
+            200 => {
+                // Direct registration with token
+                let parsed = serde_json::from_str::<super::models::RegisterResponse>(&body)
+                    .map_err(|error| {
+                        VaultwardenError::Decode(format!("invalid register response: {error}"))
+                    })?;
+                Ok((status, Some(parsed)))
+            }
+            204 => {
+                // Email verification required
+                Ok((status, None))
+            }
+            400..=499 => {
+                // Registration disabled or error
+                Err(Self::api_error(status, body))
+            }
+            _ => Err(Self::api_error(status, body)),
+        }
+    }
+
+    pub async fn register_finish(
+        &self,
+        base_url: &str,
+        request: super::models::RegisterFinishRequest,
+    ) -> VaultwardenResult<()> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::register_finish(base_url);
+
+        log::debug!(
+            target: "vanguard::vaultwarden",
+            "register_finish request endpoint={} email={}",
+            endpoint,
+            request.email
+        );
+
+        let response = self
+            .http_client
+            .post(endpoint)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        log::debug!(
+            target: "vanguard::vaultwarden",
+            "register_finish response status={} body_len={}",
+            status,
+            body.len()
+        );
+
+        if (200..300).contains(&status) {
+            return Ok(());
+        }
+
+        Err(Self::api_error(status, body))
+    }
+
     pub async fn sync(
         &self,
         base_url: &str,

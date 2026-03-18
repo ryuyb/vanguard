@@ -62,6 +62,14 @@ impl VaultwardenEndpoints {
     pub fn cipher_by_id(base_url: &str, cipher_id: &str) -> String {
         format!("{}/api/ciphers/{}", normalize_base(base_url), cipher_id)
     }
+
+    pub fn register(base_url: &str) -> String {
+        format!("{}/api/accounts/register", normalize_base(base_url))
+    }
+
+    pub fn register_finish(base_url: &str) -> String {
+        format!("{}/api/accounts/register/finish", normalize_base(base_url))
+    }
 }
 
 fn normalize_base(base_url: &str) -> &str {
