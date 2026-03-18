@@ -64,7 +64,7 @@ impl VaultwardenEndpoints {
     }
 
     pub fn register(base_url: &str) -> String {
-        format!("{}/api/accounts/register", normalize_base(base_url))
+        format!("{}/identity/accounts/register/send-verification-email", normalize_base(base_url))
     }
 
     pub fn register_finish(base_url: &str) -> String {

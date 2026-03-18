@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
+import { CheckCircle2, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { RegistrationFeedbackState } from "@/features/auth/register/types";
 
@@ -12,24 +12,6 @@ export function RegistrationFeedback({ feedback }: RegistrationFeedbackProps) {
   if (feedback.kind === "idle") return null;
 
   const configs = {
-    error: {
-      icon: AlertCircle,
-      title: t("auth.feedback.register.error"),
-      border: "border-red-200/60",
-      bg: "bg-red-50/50",
-      iconColor: "text-red-600",
-      titleColor: "text-red-900",
-      textColor: "text-red-800",
-    },
-    disabled: {
-      icon: AlertCircle,
-      title: t("auth.register.messages.registrationDisabled.title"),
-      border: "border-amber-200/60",
-      bg: "bg-amber-50/50",
-      iconColor: "text-amber-600",
-      titleColor: "text-amber-900",
-      textColor: "text-amber-800",
-    },
     emailSent: {
       icon: Mail,
       title: t("auth.register.messages.emailVerificationRequired.title"),
@@ -54,7 +36,9 @@ export function RegistrationFeedback({ feedback }: RegistrationFeedbackProps) {
   const Icon = config.icon;
 
   return (
-    <div className={`rounded-xl border ${config.border} ${config.bg} px-4 py-3.5 text-sm`}>
+    <div
+      className={`rounded-xl border ${config.border} ${config.bg} px-4 py-3.5 text-sm`}
+    >
       <div className="flex items-start gap-3">
         <Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${config.iconColor}`} />
         <div className="flex-1">

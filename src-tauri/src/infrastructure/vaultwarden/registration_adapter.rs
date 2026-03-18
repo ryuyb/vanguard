@@ -34,6 +34,7 @@ impl VaultwardenRegistrationAdapter {
                 RegisterRequest {
                     email: command.email,
                     name: command.name,
+                    receive_marketing_emails: false
                 },
             )
             .await

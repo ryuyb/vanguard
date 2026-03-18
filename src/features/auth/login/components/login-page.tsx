@@ -15,7 +15,10 @@ type LoginPageProps = {
   navigateToRegister?: () => Promise<void>;
 };
 
-export function LoginPage({ navigateToVault, navigateToRegister }: LoginPageProps) {
+export function LoginPage({
+  navigateToVault,
+  navigateToRegister,
+}: LoginPageProps) {
   const { t } = useTranslation();
   const {
     form,
