@@ -184,6 +184,95 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         unlockFailed: "Unlock failed. Please try again later.",
       },
     },
+    register: {
+      title: "Create Vanguard Account",
+      subtitle: "Register a new account to start using your vault",
+      hero: {
+        badge: "Account Registration",
+        title: "Create a new account and start managing your passwords",
+        description:
+          "Enter your server address and email to create a new vault account.",
+        illustrationAlt: "Account registration illustration",
+      },
+      form: {
+        serverUrl: {
+          label: "Server Address",
+          placeholder: "Select server address",
+          customOption: "Custom Address",
+          customPlaceholder: "https://vault.example.com",
+        },
+        email: {
+          label: "Email Address",
+          placeholder: "you@example.com",
+        },
+        name: {
+          label: "Name",
+          placeholder: "Enter your name",
+        },
+        masterPassword: {
+          label: "Master Password",
+          placeholder: "Create master password",
+          showPassword: "Show password",
+          hidePassword: "Hide password",
+        },
+        confirmPassword: {
+          label: "Confirm Password",
+          placeholder: "Re-enter master password",
+        },
+        passwordHint: {
+          label: "Password Hint (Optional)",
+          placeholder: "A hint to help you remember your password",
+        },
+      },
+      actions: {
+        submit: "Create Account",
+        submitting: "Creating account...",
+        backToLogin: "Back to Sign In",
+        finishRegistration: "Finish Registration",
+        finishing: "Finishing registration...",
+      },
+      validation: {
+        missingServerUrl: "Please enter server address.",
+        invalidServerUrl:
+          "The server address is invalid. It must start with http:// or https://.",
+        missingEmail: "Please enter email address.",
+        invalidEmail:
+          "The email address looks invalid. Please check it and try again.",
+        missingName: "Please enter your name.",
+        missingPassword: "Please enter master password.",
+        passwordTooShort: "Master password must be at least 8 characters.",
+        passwordMismatch: "Passwords do not match.",
+      },
+      progress: {
+        creatingAccount: "Creating account...",
+        sendingVerification: "Sending verification email...",
+        generatingKeys: "Generating encryption keys...",
+        finishingRegistration: "Finishing registration...",
+        loggingIn: "Signing in...",
+      },
+      messages: {
+        registrationDisabled: {
+          title: "Registration Disabled",
+          description:
+            "This server does not allow new user registration. Please contact the administrator.",
+        },
+        emailVerificationRequired: {
+          title: "Email Verification Required",
+          description:
+            "A verification email has been sent to your inbox. Please check your email and click the link to complete registration. After that, return to the sign-in page to log in.",
+        },
+        registrationFailed: "Registration failed. Please try again later.",
+        passwordStrength: {
+          weak: "Weak",
+          fair: "Fair",
+          good: "Good",
+          strong: "Strong",
+        },
+        passwordCompromised:
+          "This password has appeared in a data breach. Consider using a different password.",
+        checkingPassword: "Checking password security...",
+      },
+    },
     feedback: {
       login: {
         error: "Sign In Failed",
@@ -192,6 +281,10 @@ export const enTranslationCatalog: AppTranslationCatalog = {
       },
       unlock: {
         error: "Verification Failed",
+      },
+      register: {
+        error: "Registration Failed",
+        success: "Registration Successful",
       },
     },
   },
