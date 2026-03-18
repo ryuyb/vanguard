@@ -93,7 +93,7 @@ jobs:
     runs-on: macos-latest
     needs: metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
 
@@ -126,7 +126,7 @@ jobs:
           components: clippy
 
       - name: Restore cargo registry cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -136,7 +136,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo target cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src-tauri/target
           key: ${{ runner.os }}-cargo-target-native-${{ hashFiles('src-tauri/Cargo.lock') }}
@@ -187,7 +187,7 @@ jobs:
           - aarch64-apple-darwin
           - x86_64-apple-darwin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref }}
 
@@ -220,7 +220,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Restore cargo registry cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -230,7 +230,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo target cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: src-tauri/target
           key: ${{ runner.os }}-cargo-target-${{ matrix.target }}-${{ hashFiles('src-tauri/Cargo.lock') }}
