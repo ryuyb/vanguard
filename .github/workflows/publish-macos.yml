@@ -164,8 +164,11 @@ jobs:
     needs:
       - metadata
       - quality-gate
+    outputs:
+      release-id: ${{ steps.release.outputs.id }}
     steps:
       - name: Create or update release entry
+        id: release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.metadata.outputs.tag }}
@@ -251,8 +254,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ needs.metadata.outputs.tag }}
-          releaseName: Vanguard ${{ needs.metadata.outputs.tag }}
-          releaseDraft: false
-          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}
+          releaseId: ${{ needs.create-release.outputs.release-id }}
           args: --target ${{ matrix.target }}
