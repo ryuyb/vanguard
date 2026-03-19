@@ -377,7 +377,7 @@ main() {
     else
         echo ""
         print_info "下一步操作:"
-        echo "  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json"
+        echo "  git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json"
 
         if [[ $new_version =~ -rc\. ]]; then
             echo "  git commit -m \"chore: bump version to $new_version (release candidate)\""
