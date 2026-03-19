@@ -11,9 +11,7 @@ import {
   LoaderCircle,
   Lock,
   LogOut,
-  MoreVertical,
   Plus,
-  RotateCcw,
   Search,
   Settings,
   Star,
@@ -963,8 +961,8 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                   </div>
                 </div>
 
-                <ScrollArea className="min-h-0 flex-1">
-                  <div className="space-y-1.5 px-3 py-2">
+                <ScrollArea className="min-h-0 flex-1 overflow-hidden [&>div>div]:!block">
+                  <div className="space-y-1.5 px-3 py-2 min-w-0 w-full">
                     {filteredCiphers.map(
                       (cipher: (typeof filteredCiphers)[number]) => (
                         <CipherRowObserver
@@ -974,7 +972,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         >
                           <ContextMenu>
                             <ContextMenuTrigger asChild>
-                              <div>
+                              <div className="min-w-0">
                                 <CipherRow
                                   cipher={cipher}
                                   iconLoadState={cipher.iconLoadState}
@@ -1068,94 +1066,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       !isCipherDetailLoading &&
                       !cipherDetailError &&
                       selectedCipherDetail && (
-                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden space-y-3">
-                          {/* Cipher 操作栏 */}
-                          {selectedMenuId !== TRASH_ID && (
-                            <div className="flex items-center justify-end gap-2 px-1">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 px-2"
-                                  >
-                                    <MoreVertical className="size-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className="w-44"
-                                >
-                                  <DropdownMenuItem
-                                    onSelect={() =>
-                                      handleEditCipher(selectedCipherDetail)
-                                    }
-                                  >
-                                    <Edit2 className="size-4" />
-                                    {t("vault.page.actions.edit")}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    onSelect={() =>
-                                      handleDeleteCipher(
-                                        selectedCipherDetail.id,
-                                        selectedCipherDetail.name ??
-                                          t("vault.page.cipher.untitled"),
-                                      )
-                                    }
-                                  >
-                                    <Trash2 className="size-4" />
-                                    {t("vault.page.actions.delete")}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          )}
-                          {selectedMenuId === TRASH_ID && (
-                            <div className="flex items-center justify-end gap-2 px-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-3 text-xs"
-                                onClick={() => {
-                                  setTrashActionCipherId(
-                                    selectedCipherDetail.id,
-                                  );
-                                  setTrashActionCipherName(
-                                    selectedCipherDetail.name ??
-                                      t("vault.page.cipher.untitled"),
-                                  );
-                                  setIsRestoreDialogOpen(true);
-                                }}
-                              >
-                                <RotateCcw className="size-3.5" />
-                                {t("vault.page.actions.restore")}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                className="h-8 px-3 text-xs"
-                                onClick={() => {
-                                  setTrashActionCipherId(
-                                    selectedCipherDetail.id,
-                                  );
-                                  setTrashActionCipherName(
-                                    selectedCipherDetail.name ??
-                                      t("vault.page.cipher.untitled"),
-                                  );
-                                  setIsPermanentDeleteDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="size-3.5" />
-                                {t("vault.page.actions.permanentDelete")}
-                              </Button>
-                            </div>
-                          )}
-
+                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden">
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
@@ -1164,6 +1075,36 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                               selectedCipherDetail,
                               iconServer,
                             )}
+                            mode={
+                              selectedMenuId === TRASH_ID ? "trash" : "normal"
+                            }
+                            onEdit={() =>
+                              handleEditCipher(selectedCipherDetail)
+                            }
+                            onDelete={() =>
+                              handleDeleteCipher(
+                                selectedCipherDetail.id,
+                                selectedCipherDetail.name ??
+                                  t("vault.page.cipher.untitled"),
+                              )
+                            }
+                            onRestore={() => {
+                              setTrashActionCipherId(selectedCipherDetail.id);
+                              setTrashActionCipherName(
+                                selectedCipherDetail.name ??
+                                  t("vault.page.cipher.untitled"),
+                              );
+                              setIsRestoreDialogOpen(true);
+                            }}
+                            onPermanentDelete={() => {
+                              setTrashActionCipherId(selectedCipherDetail.id);
+                              setTrashActionCipherName(
+                                selectedCipherDetail.name ??
+                                  t("vault.page.cipher.untitled"),
+                              );
+                              setIsPermanentDeleteDialogOpen(true);
+                            }}
+                            isActionLoading={isTrashActionLoading}
                           />
                         </div>
                       )}

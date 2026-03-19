@@ -3,6 +3,7 @@ import {
   CipherIcon,
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
+import { TruncatableText } from "@/features/vault/components/truncatable-text";
 import type { CipherIconLoadState } from "@/features/vault/types";
 import { toCipherIconAlt } from "@/features/vault/utils";
 
@@ -32,7 +33,7 @@ export function CipherRow({
       type="button"
       onClick={onClick}
       className={[
-        "w-full rounded-lg px-3 py-2.5 text-left transition-all border",
+        "w-full min-w-0 rounded-lg px-3 py-2.5 text-left transition-all border overflow-hidden",
         selected
           ? "bg-blue-50 border-blue-200 text-blue-900 shadow-sm"
           : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300",
@@ -42,7 +43,7 @@ export function CipherRow({
         <CipherIcon
           alt={toCipherIconAlt(cipher.name)}
           className={[
-            "bg-white text-slate-500 border",
+            "bg-white text-slate-500 border shrink-0",
             selected ? "border-blue-200" : "border-slate-200",
           ].join(" ")}
           iconUrl={cipher.iconUrl ?? null}
@@ -53,10 +54,11 @@ export function CipherRow({
         >
           {toCipherTypeIcon(cipher.type)}
         </CipherIcon>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">
-            {cipher.name ?? "Untitled cipher"}
-          </div>
+        <div className="min-w-0 flex-1 shrink overflow-hidden">
+          <TruncatableText
+            text={cipher.name ?? "Untitled cipher"}
+            className="min-w-0 w-full text-sm font-semibold cursor-text"
+          />
           <div className="mt-1 truncate text-xs text-slate-500">
             {cipher.username ?? ""}
           </div>

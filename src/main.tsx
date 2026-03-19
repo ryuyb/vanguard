@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLocaleProvider, initializeAppI18n } from "@/i18n";
 import { resolveSessionRoute } from "@/lib/route-session";
 import { routeTree } from "./routeTree.gen";
@@ -60,8 +61,10 @@ async function bootstrap() {
     <StrictMode>
       <AppLocaleProvider>
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
-          <Toaster position="top-right" richColors />
+          <TooltipProvider>
+            <RouterProvider router={router} />
+            <Toaster position="top-right" richColors />
+          </TooltipProvider>
         </QueryClientProvider>
       </AppLocaleProvider>
       <TanStackDevtools plugins={[formDevtoolsPlugin()]} />

@@ -1,4 +1,12 @@
-import { ChevronDown, Eye, EyeOff } from "lucide-react";
+import {
+  ChevronDown,
+  Edit2,
+  Eye,
+  EyeOff,
+  MoreVertical,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commands, type VaultCipherDetailDto } from "@/bindings";
@@ -10,9 +18,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   CipherIcon,
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
+import { TruncatableText } from "@/features/vault/components/truncatable-text";
 import { useCipherFieldCopy } from "@/features/vault/hooks";
 import {
   firstNonEmptyText,
@@ -177,12 +193,24 @@ type CipherDetailPanelProps = {
   cipher: VaultCipherDetailDto;
   iconUrl?: string | null;
   iconServer?: string | null;
+  mode?: "normal" | "trash";
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onRestore?: () => void;
+  onPermanentDelete?: () => void;
+  isActionLoading?: boolean;
 };
 
 export function CipherDetailPanel({
   cipher,
   iconUrl: iconUrlProp,
   iconServer,
+  mode = "normal",
+  onEdit,
+  onDelete,
+  onRestore,
+  onPermanentDelete,
+  isActionLoading = false,
 }: CipherDetailPanelProps) {
   const { t } = useTranslation();
   const { copyField } = useCipherFieldCopy(cipher.id);
@@ -413,339 +441,395 @@ export function CipherDetailPanel({
   }, []);
 
   return (
-    <Card className="h-full min-h-0 min-w-0 w-full gap-0 overflow-x-hidden overflow-y-auto border-none bg-white py-0 shadow-none">
-      <CardHeader className="gap-2 border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-6 py-4">
-        <div className="flex min-h-9 items-center gap-3.5">
+    <Card className="h-full min-h-0 min-w-0 w-full gap-0 border-none bg-white py-0 shadow-none flex flex-col">
+      <CardHeader className="gap-2 border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-6 py-4 shrink-0">
+        <div className="flex min-h-9 items-center gap-3.5 min-w-0">
           <CipherIcon
             alt={toCipherIconAlt(cipher.name)}
-            className="size-11 bg-white border border-slate-200 text-slate-500 shadow-sm"
+            className="size-11 bg-white border border-slate-200 text-slate-500 shadow-sm shrink-0"
             iconUrl={iconUrl}
             isVisible={Boolean(iconUrl)}
             loadState={iconUrl ? "loading" : "fallback"}
           >
             {toCipherTypeIcon(cipher.type)}
           </CipherIcon>
-          <div className="min-w-0 flex-1">
-            <h2 className="m-0 truncate leading-tight text-xl font-bold text-slate-900">
-              {cipher.name ?? t("vault.page.cipher.untitled")}
-            </h2>
+          <div className="min-w-0 flex-1 shrink overflow-hidden">
+            <TruncatableText
+              text={cipher.name ?? t("vault.page.cipher.untitled")}
+              as="h2"
+              className="m-0 leading-tight text-xl font-bold text-slate-900 cursor-text"
+            />
           </div>
+          {mode === "normal" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 shrink-0"
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onSelect={onEdit}>
+                  <Edit2 className="size-4" />
+                  {t("vault.page.actions.edit")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                  <Trash2 className="size-4" />
+                  {t("vault.page.actions.delete")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {mode === "trash" && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={isActionLoading}
+                onClick={onRestore}
+              >
+                <RotateCcw className="size-3.5" />
+                {t("vault.page.actions.restore")}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={isActionLoading}
+                onClick={onPermanentDelete}
+              >
+                <Trash2 className="size-3.5" />
+                {t("vault.page.actions.permanentDelete")}
+              </Button>
+            </div>
+          )}
         </div>
       </CardHeader>
 
-      <CardContent className="min-w-0 space-y-3 pt-5">
-        {/* 主要凭证区块 - 类似 1Password 的统一卡片 */}
-        {(username || password || hasOneTimePassword || hasPasskey) && (
-          <div className="rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-200">
-            {username && (
-              <button
-                type="button"
-                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors first:rounded-t-lg"
-                onClick={() => copyField("username")}
-              >
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.username")}
-                </div>
-                <div className="mt-2 text-sm font-medium text-slate-900">
-                  {username}
-                </div>
-              </button>
-            )}
-
-            {password && (
-              <button
-                type="button"
-                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
-                onClick={() => copyField("password")}
-              >
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.password")}
-                </div>
-                <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                  <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
-                    {isPasswordVisible ? password : "••••••••••••"}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <CardContent className="min-w-0 space-y-3 pt-5">
+          {/* 主要凭证区块 - 类似 1Password 的统一卡片 */}
+          {(username || password || hasOneTimePassword || hasPasskey) && (
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm divide-y divide-slate-200">
+              {username && (
+                <button
+                  type="button"
+                  className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors first:rounded-t-lg"
+                  onClick={() => copyField("username")}
+                >
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.username")}
                   </div>
-                  <Button
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {username}
+                  </div>
+                </button>
+              )}
+
+              {password && (
+                <button
+                  type="button"
+                  className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
+                  onClick={() => copyField("password")}
+                >
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.password")}
+                  </div>
+                  <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                    <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
+                      {isPasswordVisible ? password : "••••••••••••"}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="size-8 shrink-0 rounded-full p-0 hover:bg-slate-200"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsPasswordVisible((visible) => !visible);
+                      }}
+                      aria-label={
+                        isPasswordVisible
+                          ? t("vault.detail.actions.hidePassword")
+                          : t("vault.detail.actions.showPassword")
+                      }
+                      title={
+                        isPasswordVisible
+                          ? t("vault.detail.actions.hidePassword")
+                          : t("vault.detail.actions.showPassword")
+                      }
+                    >
+                      {isPasswordVisible ? (
+                        <EyeOff className="size-4 text-slate-600" />
+                      ) : (
+                        <Eye className="size-4 text-slate-600" />
+                      )}
+                    </Button>
+                  </div>
+                </button>
+              )}
+
+              {hasOneTimePassword && (
+                <button
+                  type="button"
+                  className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
+                  onClick={() => copyField("totp")}
+                >
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.oneTimePassword")}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <div className="font-mono text-sm font-bold text-slate-900 tracking-wider">
+                      {oneTimePasswordCode ? (
+                        <>
+                          {oneTimePasswordCode.slice(0, 3)}
+                          <span className="mx-0.5">·</span>
+                          {oneTimePasswordCode.slice(3)}
+                        </>
+                      ) : oneTimePasswordFailed ? (
+                        t("common.states.unavailable")
+                      ) : (
+                        t("common.states.loading")
+                      )}
+                    </div>
+                    {oneTimePasswordRemaining != null &&
+                      oneTimePasswordCode && (
+                        <TotpCountdownRing
+                          remaining={oneTimePasswordRemaining}
+                          total={30}
+                          ariaLabel={t("vault.detail.totp.countdownAria")}
+                          title={t("vault.detail.totp.countdownTitle")}
+                        />
+                      )}
+                  </div>
+                </button>
+              )}
+
+              {hasPasskey && (
+                <div className="group px-3.5 py-3 hover:bg-slate-50 transition-colors last:rounded-b-lg">
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.passkey")}
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-slate-900">
+                    {passkeyDetailValue}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DetailField
+            label={t("vault.detail.fields.organization")}
+            value={organizationId}
+          />
+
+          {uniqueUris.length > 0 && (
+            <DetailField
+              label={t("vault.detail.fields.uris")}
+              contentClassName="overflow-hidden"
+            >
+              <div className="min-w-0 w-full space-y-1 overflow-hidden">
+                {uniqueUris.map((uri, index) => (
+                  <button
                     type="button"
-                    variant="ghost"
-                    className="size-8 shrink-0 rounded-full p-0 hover:bg-slate-200"
+                    key={uri}
+                    title={uri}
+                    className="block min-w-0 w-full truncate text-left text-slate-900 hover:text-slate-700"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setIsPasswordVisible((visible) => !visible);
+                      copyField({ uri: index });
                     }}
-                    aria-label={
-                      isPasswordVisible
-                        ? t("vault.detail.actions.hidePassword")
-                        : t("vault.detail.actions.showPassword")
-                    }
-                    title={
-                      isPasswordVisible
-                        ? t("vault.detail.actions.hidePassword")
-                        : t("vault.detail.actions.showPassword")
-                    }
                   >
-                    {isPasswordVisible ? (
-                      <EyeOff className="size-4 text-slate-600" />
-                    ) : (
-                      <Eye className="size-4 text-slate-600" />
-                    )}
-                  </Button>
-                </div>
-              </button>
-            )}
+                    {uri}
+                  </button>
+                ))}
+              </div>
+            </DetailField>
+          )}
+        </CardContent>
 
-            {hasOneTimePassword && (
+        {(notes || customFields.length > 0) && (
+          <CardContent className="min-w-0 pt-4">
+            <div className="space-y-3">
+              {notes && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.notes")}
+                  </div>
+                  <button
+                    type="button"
+                    className="group relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-left hover:shadow-md transition-all"
+                    onClick={() => copyField("notes")}
+                  >
+                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                      {notes}
+                    </pre>
+                  </button>
+                </div>
+              )}
+
+              {customFields.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {t("vault.detail.fields.customFields")}
+                  </div>
+                  <div className="space-y-2.5">
+                    {customFields.map((field, index) => {
+                      const isHiddenType =
+                        field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
+                      const isRevealed = revealedCustomFieldKeys.has(field.key);
+                      const hiddenValue = isRevealed ? field.value : "••••••••";
+                      const isBooleanType =
+                        field.fieldType === CUSTOM_FIELD_TYPE_BOOLEAN;
+                      const normalizedValue = field.value.toLowerCase();
+                      const booleanValue =
+                        normalizedValue === "true"
+                          ? t("vault.detail.boolean.true")
+                          : normalizedValue === "false"
+                            ? t("vault.detail.boolean.false")
+                            : field.value;
+                      const displayValue = isHiddenType
+                        ? hiddenValue
+                        : isBooleanType
+                          ? booleanValue
+                          : field.value;
+                      const canCopy =
+                        field.fieldType === CUSTOM_FIELD_TYPE_TEXT ||
+                        field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
+
+                      return canCopy ? (
+                        <button
+                          type="button"
+                          key={field.key}
+                          className="group relative w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all text-left"
+                          onClick={() => copyField({ customField: index })}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                              {field.name}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                            <div className="min-w-0 break-all text-sm font-medium text-slate-900">
+                              {displayValue}
+                            </div>
+                            {isHiddenType && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="size-8 shrink-0 rounded-full p-0 border-slate-300 hover:bg-slate-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRevealedCustomFieldKeys((previous) => {
+                                    const next = new Set(previous);
+                                    if (next.has(field.key)) {
+                                      next.delete(field.key);
+                                    } else {
+                                      next.add(field.key);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                aria-label={
+                                  isRevealed
+                                    ? t("vault.detail.actions.hideFieldValue")
+                                    : t("vault.detail.actions.showFieldValue")
+                                }
+                                title={
+                                  isRevealed
+                                    ? t("vault.detail.actions.hideFieldValue")
+                                    : t("vault.detail.actions.showFieldValue")
+                                }
+                              >
+                                {isRevealed ? (
+                                  <EyeOff className="size-4 text-slate-600" />
+                                ) : (
+                                  <Eye className="size-4 text-slate-600" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </button>
+                      ) : (
+                        <div
+                          key={field.key}
+                          className="group relative rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                              {field.name}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                            <div className="min-w-0 break-all text-sm font-medium text-slate-900">
+                              {displayValue}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        )}
+
+        <CardContent className="min-w-0 pt-4">
+          <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
+            <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
-                onClick={() => copyField("totp")}
+                className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition-all hover:bg-slate-100 hover:shadow-md"
               >
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.oneTimePassword")}
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="font-mono text-sm font-bold text-slate-900 tracking-wider">
-                    {oneTimePasswordCode ? (
-                      <>
-                        {oneTimePasswordCode.slice(0, 3)}
-                        <span className="mx-0.5">·</span>
-                        {oneTimePasswordCode.slice(3)}
-                      </>
-                    ) : oneTimePasswordFailed ? (
-                      t("common.states.unavailable")
-                    ) : (
-                      t("common.states.loading")
-                    )}
-                  </div>
-                  {oneTimePasswordRemaining != null && oneTimePasswordCode && (
-                    <TotpCountdownRing
-                      remaining={oneTimePasswordRemaining}
-                      total={30}
-                      ariaLabel={t("vault.detail.totp.countdownAria")}
-                      title={t("vault.detail.totp.countdownTitle")}
-                    />
-                  )}
-                </div>
-              </button>
-            )}
-
-            {hasPasskey && (
-              <div className="group px-3.5 py-3 hover:bg-slate-50 transition-colors last:rounded-b-lg">
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.passkey")}
-                </div>
-                <div className="mt-2 text-sm font-medium text-slate-900">
-                  {passkeyDetailValue}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <DetailField
-          label={t("vault.detail.fields.organization")}
-          value={organizationId}
-        />
-
-        {uniqueUris.length > 0 && (
-          <DetailField
-            label={t("vault.detail.fields.uris")}
-            contentClassName="overflow-hidden"
-          >
-            <div className="min-w-0 w-full space-y-1 overflow-hidden">
-              {uniqueUris.map((uri, index) => (
-                <button
-                  type="button"
-                  key={uri}
-                  title={uri}
-                  className="block min-w-0 w-full truncate text-left text-slate-900 hover:text-slate-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyField({ uri: index });
-                  }}
-                >
-                  {uri}
-                </button>
-              ))}
-            </div>
-          </DetailField>
-        )}
-      </CardContent>
-
-      {(notes || customFields.length > 0) && (
-        <CardContent className="min-w-0 pt-4">
-          <div className="space-y-3">
-            {notes && (
-              <div className="space-y-2">
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.notes")}
-                </div>
-                <button
-                  type="button"
-                  className="group relative w-full rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-left hover:shadow-md transition-all"
-                  onClick={() => copyField("notes")}
-                >
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                    {notes}
-                  </pre>
-                </button>
-              </div>
-            )}
-
-            {customFields.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {t("vault.detail.fields.customFields")}
-                </div>
-                <div className="space-y-2.5">
-                  {customFields.map((field, index) => {
-                    const isHiddenType =
-                      field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
-                    const isRevealed = revealedCustomFieldKeys.has(field.key);
-                    const hiddenValue = isRevealed ? field.value : "••••••••";
-                    const isBooleanType =
-                      field.fieldType === CUSTOM_FIELD_TYPE_BOOLEAN;
-                    const normalizedValue = field.value.toLowerCase();
-                    const booleanValue =
-                      normalizedValue === "true"
-                        ? t("vault.detail.boolean.true")
-                        : normalizedValue === "false"
-                          ? t("vault.detail.boolean.false")
-                          : field.value;
-                    const displayValue = isHiddenType
-                      ? hiddenValue
-                      : isBooleanType
-                        ? booleanValue
-                        : field.value;
-                    const canCopy =
-                      field.fieldType === CUSTOM_FIELD_TYPE_TEXT ||
-                      field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
-
-                    return canCopy ? (
-                      <button
-                        type="button"
-                        key={field.key}
-                        className="group relative w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all text-left"
-                        onClick={() => copyField({ customField: index })}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                            {field.name}
-                          </div>
-                        </div>
-                        <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                          <div className="min-w-0 break-all text-sm font-medium text-slate-900">
-                            {displayValue}
-                          </div>
-                          {isHiddenType && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="size-8 shrink-0 rounded-full p-0 border-slate-300 hover:bg-slate-100"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRevealedCustomFieldKeys((previous) => {
-                                  const next = new Set(previous);
-                                  if (next.has(field.key)) {
-                                    next.delete(field.key);
-                                  } else {
-                                    next.add(field.key);
-                                  }
-                                  return next;
-                                });
-                              }}
-                              aria-label={
-                                isRevealed
-                                  ? t("vault.detail.actions.hideFieldValue")
-                                  : t("vault.detail.actions.showFieldValue")
-                              }
-                              title={
-                                isRevealed
-                                  ? t("vault.detail.actions.hideFieldValue")
-                                  : t("vault.detail.actions.showFieldValue")
-                              }
-                            >
-                              {isRevealed ? (
-                                <EyeOff className="size-4 text-slate-600" />
-                              ) : (
-                                <Eye className="size-4 text-slate-600" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      </button>
-                    ) : (
-                      <div
-                        key={field.key}
-                        className="group relative rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                            {field.name}
-                          </div>
-                        </div>
-                        <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                          <div className="min-w-0 break-all text-sm font-medium text-slate-900">
-                            {displayValue}
-                          </div>
-                        </div>
-                      </div>
-                    );
+                <span className="text-sm font-semibold text-slate-700">
+                  {t("vault.detail.timeline.lastEditedWithValue", {
+                    date: lastEditedAt,
                   })}
+                </span>
+                <ChevronDown
+                  className={[
+                    "size-4 text-slate-400 transition-transform",
+                    isTimelineOpen ? "rotate-180" : "",
+                  ].join(" ")}
+                />
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="pt-3">
+              {timelineEvents.length > 0 ? (
+                <ol className="relative ml-1 space-y-3 border-l-2 border-blue-200 pl-5">
+                  {timelineEvents.map((event) => (
+                    <li
+                      key={`${event.label}-${event.date.toISOString()}`}
+                      className="relative"
+                    >
+                      <span className="absolute -left-6.5 top-1.5 size-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
+                      <div className="text-xs font-medium text-slate-500">
+                        {event.label}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        {event.date.toLocaleString()}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <div className="text-sm text-slate-500">
+                  {t("vault.detail.timeline.empty")}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
-      )}
-
-      <CardContent className="min-w-0 pt-4">
-        <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-left transition-all hover:bg-slate-100 hover:shadow-md"
-            >
-              <span className="text-sm font-semibold text-slate-700">
-                {t("vault.detail.timeline.lastEditedWithValue", {
-                  date: lastEditedAt,
-                })}
-              </span>
-              <ChevronDown
-                className={[
-                  "size-4 text-slate-400 transition-transform",
-                  isTimelineOpen ? "rotate-180" : "",
-                ].join(" ")}
-              />
-            </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent className="pt-3">
-            {timelineEvents.length > 0 ? (
-              <ol className="relative ml-1 space-y-3 border-l-2 border-blue-200 pl-5">
-                {timelineEvents.map((event) => (
-                  <li
-                    key={`${event.label}-${event.date.toISOString()}`}
-                    className="relative"
-                  >
-                    <span className="absolute -left-6.5 top-1.5 size-2.5 rounded-full bg-blue-500 ring-4 ring-white" />
-                    <div className="text-xs font-medium text-slate-500">
-                      {event.label}
-                    </div>
-                    <div className="text-sm font-semibold text-slate-900">
-                      {event.date.toLocaleString()}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <div className="text-sm text-slate-500">
-                {t("vault.detail.timeline.empty")}
-              </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-      </CardContent>
+      </div>
     </Card>
   );
 }
