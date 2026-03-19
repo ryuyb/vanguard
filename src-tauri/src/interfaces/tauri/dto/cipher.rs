@@ -185,6 +185,7 @@ pub struct VaultCipherDataDetailDto {
     pub username: Option<String>,
     pub password: Option<String>,
     pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
     pub autofill_on_page_load: Option<bool>,
     pub fido2_credentials: Vec<VaultCipherLoginFido2CredentialDetailDto>,
     pub r#type: Option<i32>,
@@ -224,6 +225,7 @@ pub struct VaultCipherLoginDetailDto {
     pub username: Option<String>,
     pub password: Option<String>,
     pub password_revision_date: Option<String>,
+    pub totp: Option<String>,
     pub autofill_on_page_load: Option<bool>,
     pub fido2_credentials: Vec<VaultCipherLoginFido2CredentialDetailDto>,
 }

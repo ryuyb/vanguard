@@ -92,6 +92,9 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     useClearSelectionWhenMissing,
   } = useCipherDetailSelection();
 
+  const selectedCipherIdRef = useRef(selectedCipherId);
+  selectedCipherIdRef.current = selectedCipherId;
+
   const loadCiphersList = useCallback(async () => {
     try {
       const result = await commands.vaultListCiphers();
@@ -206,9 +209,11 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       // 创建新 cipher 后只重新加载 ciphers 列表
       void loadCiphersList();
     },
-    onCipherUpdated: () => {
-      // 更新 cipher 后只重新加载 ciphers 列表
+    onCipherUpdated: (cipherId) => {
       void loadCiphersList();
+      if (selectedCipherIdRef.current === cipherId) {
+        void loadCipherDetail(cipherId);
+      }
     },
     onCipherDeleted: (cipherId) => {
       // 删除 cipher 时直接从本地状态移除，避免任何网络请求
