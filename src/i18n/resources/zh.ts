@@ -254,6 +254,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         finishingRegistration: "正在完成注册...",
         loggingIn: "正在登录...",
         loginSuccess: "登录成功",
+        syncingVaultData: "正在同步数据...",
+        unlockingVault: "正在解锁...",
       },
       messages: {
         registrationDisabled: {

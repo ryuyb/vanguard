@@ -265,6 +265,8 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         finishingRegistration: "Finishing registration...",
         loggingIn: "Signing in...",
         loginSuccess: "Sign in successful",
+        syncingVaultData: "Syncing vault data...",
+        unlockingVault: "Unlocking vault...",
       },
       messages: {
         registrationDisabled: {

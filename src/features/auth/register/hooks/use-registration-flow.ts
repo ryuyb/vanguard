@@ -2,7 +2,11 @@ import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import { commands } from "@/bindings";
 import { CUSTOM_SERVER_URL_OPTION } from "@/features/auth/login/constants";
-import { normalizeBaseUrl } from "@/features/auth/login/login-flow-helpers";
+import {
+  normalizeBaseUrl,
+  syncVaultAfterLogin,
+  unlockVaultAfterLogin,
+} from "@/features/auth/login/login-flow-helpers";
 import {
   registerFormDefaults,
   registerSchema,
@@ -133,6 +137,24 @@ export function useRegistrationFlow(options?: UseRegistrationFlowOptions) {
 
       // Registration and auto-login successful
       setSubmitProgressText(appI18n.t("auth.register.progress.loginSuccess"));
+
+      // Sync vault data (first sync for new account)
+      setSubmitProgressText(
+        appI18n.t("auth.register.progress.syncingVaultData"),
+      );
+      const syncResult = await syncVaultAfterLogin();
+      if (syncResult.status === "error") {
+        errorHandler.handle(syncResult.error);
+        return;
+      }
+
+      // Unlock vault with master password
+      setSubmitProgressText(appI18n.t("auth.register.progress.unlockingVault"));
+      const unlockResult = await unlockVaultAfterLogin(password);
+      if (unlockResult.status === "error") {
+        errorHandler.handle(unlockResult.error);
+        return;
+      }
 
       // Navigate to vault
       if (options?.onRegistrationComplete) {
