@@ -242,7 +242,9 @@ jobs:
 
       - name: Clean stale bundle artifacts from cache
         shell: bash
-        run: rm -rf src-tauri/target/release/bundle
+        run: |
+          rm -rf src-tauri/target/release/bundle
+          rm -rf src-tauri/target/${{ matrix.target }}/release/bundle
 
       - name: Build and upload release artifacts
         uses: tauri-apps/tauri-action@v0
