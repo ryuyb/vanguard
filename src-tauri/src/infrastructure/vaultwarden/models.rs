@@ -761,7 +761,10 @@ pub struct RegisterFinishRequest {
     pub email_verification_token: Option<String>,
 }
 
-fn serialize_hint_as_empty_string<S>(value: &Option<String>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_hint_as_empty_string<S>(
+    value: &Option<String>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {

@@ -5,10 +5,10 @@ use crate::bootstrap::app_state::AppState;
 use crate::infrastructure::vaultwarden::registration_adapter::VaultwardenRegistrationAdapter;
 use crate::interfaces::tauri::account_id;
 use crate::interfaces::tauri::dto::auth::{
-    LogoutRequestDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
-    RegisterFinishRequestDto, RestoreAuthStateRequestDto, RestoreAuthStateResponseDto,
-    RestoreAuthStateStatusDto, SendEmailLoginRequestDto, SendVerificationEmailRequestDto,
-    SendVerificationEmailResponseDto, VerifyEmailTokenRequestDto,
+    LogoutRequestDto, PasswordLoginRequestDto, PasswordLoginResponseDto, RegisterFinishRequestDto,
+    RestoreAuthStateRequestDto, RestoreAuthStateResponseDto, RestoreAuthStateStatusDto,
+    SendEmailLoginRequestDto, SendVerificationEmailRequestDto, SendVerificationEmailResponseDto,
+    VerifyEmailTokenRequestDto,
 };
 use crate::interfaces::tauri::mapping;
 use crate::interfaces::tauri::session;
