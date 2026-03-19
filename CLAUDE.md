@@ -51,6 +51,15 @@ pnpm build
 
 Fix all issues before committing.
 
+### Branch
+
+Follow **Conventional Branch** specification, use English:
+```
+<type>/<description>
+```
+
+Types: `feature`, `bugfix`, `hotfix`, `release`, `chore`
+
 ### Commit Messages
 
 Follow **Conventional Commits** specification, use English:

@@ -189,12 +189,6 @@ pub fn to_vault_cipher_detail_dto(
         });
     };
 
-    if let Some(serde_json::Value::Object(login)) = root.get_mut("login") {
-        login.remove("totp");
-    }
-    if let Some(serde_json::Value::Object(data)) = root.get_mut("data") {
-        data.remove("totp");
-    }
     root.insert(String::from("hasTotp"), serde_json::Value::Bool(has_totp));
 
     serde_json::from_value::<VaultCipherDetailDto>(raw).map_err(|error| {

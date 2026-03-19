@@ -65,7 +65,7 @@ export function vaultCipherDetailToSyncCipher(
           username: detail.data.username,
           password: detail.data.password,
           password_revision_date: detail.data.passwordRevisionDate,
-          totp: null,
+          totp: detail.data.totp,
           autofill_on_page_load: detail.data.autofillOnPageLoad,
           fido2_credentials: detail.data.fido2Credentials.map((c) => ({
             credential_id: c.credentialId,
@@ -122,7 +122,7 @@ export function vaultCipherDetailToSyncCipher(
           username: detail.login.username,
           password: detail.login.password,
           password_revision_date: detail.login.passwordRevisionDate,
-          totp: null,
+          totp: detail.login.totp,
           autofill_on_page_load: detail.login.autofillOnPageLoad,
           fido2_credentials: detail.login.fido2Credentials.map((c) => ({
             credential_id: c.credentialId,
