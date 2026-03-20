@@ -1,7 +1,10 @@
 import { useForm } from "@tanstack/react-form";
-import { LoaderCircle, Plus, X } from "lucide-react";
+import { readImage } from "@tauri-apps/plugin-clipboard-manager";
+import jsQR from "jsqr";
+import { ClipboardPaste, LoaderCircle, Plus, X } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import type { SyncCipher, VaultFolderItemDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import {
@@ -491,15 +494,67 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.totp")}
                         </Label>
-                        <Input
-                          id="cipher-totp"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          placeholder={t(
-                            "vault.dialogs.cipherForm.placeholders.totp",
-                          )}
-                          className="h-10"
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="cipher-totp"
+                            value={field.state.value}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            placeholder={t(
+                              "vault.dialogs.cipherForm.placeholders.totp",
+                            )}
+                            className="h-10 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10 shrink-0"
+                            title={t(
+                              "vault.dialogs.cipherForm.actions.pasteQr",
+                            )}
+                            onClick={async () => {
+                              try {
+                                const img = await readImage();
+                                const [rgba, { width, height }] =
+                                  await Promise.all([img.rgba(), img.size()]);
+                                const result = jsQR(
+                                  new Uint8ClampedArray(rgba.buffer),
+                                  width,
+                                  height,
+                                );
+                                if (!result) {
+                                  toast.error(
+                                    t("vault.feedback.qrDecodeFailed"),
+                                  );
+                                  return;
+                                }
+                                const data = result.data;
+                                let secret: string | null = null;
+                                if (
+                                  data
+                                    .toLowerCase()
+                                    .startsWith("otpauth://totp/")
+                                ) {
+                                  const url = new URL(data);
+                                  secret = url.searchParams.get("secret");
+                                  if (!secret) {
+                                    toast.error(t("vault.feedback.qrNoTotp"));
+                                    return;
+                                  }
+                                } else {
+                                  // Treat raw string as potential secret
+                                  secret = data;
+                                }
+                                field.handleChange(secret);
+                                toast.success(t("vault.feedback.qrParsed"));
+                              } catch {
+                                toast.error(t("vault.feedback.qrNoImage"));
+                              }
+                            }}
+                          >
+                            <ClipboardPaste className="size-4" />
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </form.Field>

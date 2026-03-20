@@ -504,6 +504,7 @@ export const enTranslationCatalog: AppTranslationCatalog = {
           addCustomField: "Add custom field",
           creating: "Creating...",
           saving: "Saving...",
+          pasteQr: "Paste QR from clipboard",
         },
         validation: {
           nameRequired: "Name is required.",
@@ -673,6 +674,10 @@ export const enTranslationCatalog: AppTranslationCatalog = {
     feedback: {
       loadError: "Failed to load vault data. Please try again.",
       copiedToClipboard: "Copied to clipboard",
+      qrParsed: "TOTP secret extracted from QR code",
+      qrNoImage: "No image found in clipboard",
+      qrDecodeFailed: "Could not decode QR code from clipboard image",
+      qrNoTotp: "QR code does not contain a TOTP secret",
       iconAlt: "{{name}} icon",
       iconAltFallback: "Vault item icon",
       folder: {

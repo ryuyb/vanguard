@@ -490,6 +490,7 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
           addCustomField: "添加自定义字段",
           creating: "创建中...",
           saving: "保存中...",
+          pasteQr: "从剪贴板粘贴二维码",
         },
         validation: {
           nameRequired: "名称不能为空。",
@@ -657,6 +658,10 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
     feedback: {
       loadError: "加载密码库数据失败，请重试。",
       copiedToClipboard: "已复制到剪贴板",
+      qrParsed: "已从二维码中提取 TOTP 密钥",
+      qrNoImage: "剪贴板中没有图片",
+      qrDecodeFailed: "无法从剪贴板图片中识别二维码",
+      qrNoTotp: "二维码中不包含 TOTP 密钥",
       iconAlt: "{{name}} 图标",
       iconAltFallback: "密码库条目图标",
       folder: {
