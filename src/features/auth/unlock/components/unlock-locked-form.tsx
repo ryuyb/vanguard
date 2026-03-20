@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   LogOut,
 } from "lucide-react";
-import type { FormEventHandler } from "react";
+import type { SubmitEventHandler } from "react";
 import { useTranslation } from "react-i18next";
 import type { RestoreAuthStateResponseDto } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ type UnlockLockedFormProps = {
   isPinUnlocking: boolean;
   onBiometricUnlock: () => void;
   onLogout: () => void;
-  onPinUnlock: FormEventHandler<HTMLFormElement>;
+  onPinUnlock: SubmitEventHandler<HTMLFormElement>;
   onShowMasterPasswordUnlock: () => void;
   onShowPinUnlock: () => void;
   onToggleShowPassword: () => void;
