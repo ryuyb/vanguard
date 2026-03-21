@@ -42,6 +42,11 @@ export function useSpotlightCopyAction({
           return;
         }
 
+        // Store autofill value for later
+        const autofillValue = result.data.autofillPerformed
+          ? result.data.value
+          : null;
+
         setCopiedItemId(item.id);
         setCopiedDetailField(field);
         await new Promise((resolve) =>
@@ -50,6 +55,21 @@ export function useSpotlightCopyAction({
         setCopiedItemId(null);
         setCopiedDetailField(null);
         await hideSpotlight();
+
+        // After spotlight is hidden, execute autofill if needed
+        if (autofillValue) {
+          console.log("[Spotlight] Executing autofill after hiding spotlight");
+          // Small delay to ensure spotlight is fully closed
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+          const autofillResult = await commands.vaultExecuteAutofill({
+            value: autofillValue,
+          });
+          if (autofillResult.status === "ok" && autofillResult.data.success) {
+            console.log("[Spotlight] Autofill executed successfully");
+          } else {
+            console.error("[Spotlight] Autofill failed:", autofillResult);
+          }
+        }
       } catch (error) {
         errorHandler.handle(error);
       } finally {

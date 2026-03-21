@@ -2,6 +2,7 @@ use serde_json::json;
 use tauri::{Manager, Runtime};
 use tauri_plugin_store::StoreExt;
 
+use crate::application::ports::text_injection_port::TextInjectionPort;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -18,6 +19,7 @@ const KEY_REQUIRE_MASTER_PASSWORD_INTERVAL: &str = "require_master_password_inte
 const KEY_LOCK_ON_SLEEP: &str = "lock_on_sleep";
 const KEY_IDLE_AUTO_LOCK_DELAY: &str = "idle_auto_lock_delay";
 const KEY_CLIPBOARD_CLEAR_DELAY: &str = "clipboard_clear_delay";
+const KEY_SPOTLIGHT_AUTOFILL: &str = "spotlight_autofill";
 const DEFAULT_SYNC_POLL_INTERVAL_SECONDS: u64 = 60;
 const MIN_SYNC_POLL_INTERVAL_SECONDS: u64 = 30;
 const MAX_SYNC_POLL_INTERVAL_SECONDS: u64 = 120;
@@ -46,6 +48,7 @@ pub struct AppConfig {
     pub lock_on_sleep: bool,
     pub idle_auto_lock_delay: String,
     pub clipboard_clear_delay: String,
+    pub spotlight_autofill: bool,
 }
 
 impl AppConfig {
@@ -91,6 +94,7 @@ impl AppConfig {
                 .as_deref()
                 .unwrap_or(DEFAULT_CLIPBOARD_CLEAR_DELAY),
         );
+        let spotlight_autofill = read_store_bool(&store, KEY_SPOTLIGHT_AUTOFILL).unwrap_or(true);
 
         store.set(KEY_DEVICE_IDENTIFIER.to_string(), json!(device_identifier));
         store.set(
@@ -122,6 +126,10 @@ impl AppConfig {
             KEY_CLIPBOARD_CLEAR_DELAY.to_string(),
             json!(clipboard_clear_delay),
         );
+        store.set(
+            KEY_SPOTLIGHT_AUTOFILL.to_string(),
+            json!(spotlight_autofill),
+        );
         store.save().map_err(|error| AppError::InternalUnexpected {
             message: format!("failed to save config store: {error}"),
         })?;
@@ -139,7 +147,46 @@ impl AppConfig {
             lock_on_sleep,
             idle_auto_lock_delay,
             clipboard_clear_delay,
+            spotlight_autofill,
         })
+    }
+
+    /// Check if text injection is available and disable spotlight_autofill if not
+    /// This should be called during app startup
+    pub fn check_and_fix_text_injection_permission<R: Runtime, M: Manager<R>>(
+        &mut self,
+        manager: &M,
+    ) -> AppResult<()> {
+        // Check if text injection is available
+        let text_injection_available =
+            crate::infrastructure::desktop::EnigoTextInjectionAdapter::new()
+                .map(|adapter| adapter.is_available())
+                .unwrap_or(false);
+
+        if !text_injection_available && self.spotlight_autofill {
+            log::warn!(
+                target: "vanguard::config",
+                "Text injection not available (missing Accessibility permission), disabling spotlight_autofill"
+            );
+
+            // Disable spotlight_autofill in config
+            self.spotlight_autofill = false;
+
+            // Save the updated config
+            let store =
+                manager
+                    .store(STORE_PATH)
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to open config store: {error}"),
+                    })?;
+
+            store.set(KEY_SPOTLIGHT_AUTOFILL.to_string(), serde_json::json!(false));
+            store.save().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to save config store: {error}"),
+            })?;
+        }
+
+        Ok(())
     }
 }
 

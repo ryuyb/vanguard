@@ -170,6 +170,7 @@ export function VaultSettingsDialog({
     useState<AutoLockIdleOption>("never");
   const [clipboardClearAfter, setClipboardClearAfter] =
     useState<ClipboardClearOption>("never");
+  const [spotlightAutofill, setSpotlightAutofill] = useState(true);
   const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [isBiometricSupported, setIsBiometricSupported] = useState<
     boolean | null
@@ -206,6 +207,7 @@ export function VaultSettingsDialog({
         setClipboardClearAfter(
           config.clipboardClearDelay as ClipboardClearOption,
         );
+        setSpotlightAutofill(config.spotlightAutofill);
       }
     } catch {
       // Ignore config load errors, use default values
@@ -318,6 +320,37 @@ export function VaultSettingsDialog({
       setShowWebsiteIcon(checked);
       try {
         await commands.configUpdateAppConfig({ showWebsiteIcon: checked });
+      } catch (error) {
+        toast.error(
+          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
+        );
+      }
+    },
+    [t],
+  );
+
+  const onSpotlightAutofillChange = useCallback(
+    async (checked: boolean) => {
+      // If trying to enable, check permission first
+      if (checked) {
+        const hasPermission =
+          await commands.configCheckTextInjectionPermission();
+        if (!hasPermission) {
+          toast.error(
+            t("vault.dialogs.settings.errors.spotlightAutofillPermission"),
+            {
+              description: t(
+                "vault.dialogs.settings.errors.spotlightAutofillPermissionDescription",
+              ),
+            },
+          );
+          return;
+        }
+      }
+
+      setSpotlightAutofill(checked);
+      try {
+        await commands.configUpdateAppConfig({ spotlightAutofill: checked });
       } catch (error) {
         toast.error(
           toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
@@ -946,6 +979,31 @@ export function VaultSettingsDialog({
                       checked={showWebsiteIcon}
                       onChange={(event) => {
                         void onShowWebsiteIconChange(event.target.checked);
+                      }}
+                    />
+                  </label>
+
+                  <label
+                    htmlFor="vault-setting-spotlight-autofill"
+                    className="flex items-start justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="text-sm text-slate-900">
+                        {t("vault.dialogs.settings.general.spotlightAutofill")}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {t(
+                          "vault.dialogs.settings.general.spotlightAutofillDescription",
+                        )}
+                      </div>
+                    </div>
+                    <input
+                      id="vault-setting-spotlight-autofill"
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-sky-600"
+                      checked={spotlightAutofill}
+                      onChange={(event) => {
+                        void onSpotlightAutofillChange(event.target.checked);
                       }}
                     />
                   </label>

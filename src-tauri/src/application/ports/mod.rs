@@ -5,5 +5,6 @@ pub mod notification_port;
 pub mod pin_unlock_port;
 pub mod remote_vault_port;
 pub mod sync_event_port;
+pub mod text_injection_port;
 pub mod vault_repository_port;
 pub mod vault_runtime_port;

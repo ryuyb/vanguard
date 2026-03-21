@@ -58,6 +58,9 @@ impl SpotlightFeature {
                     if event.state != ShortcutState::Pressed {
                         return;
                     }
+                    // Capture focus BEFORE showing spotlight
+                    // This ensures we get the focus of the previous app, not spotlight itself
+                    Self::capture_focus(app_handle);
                     Self::toggle(app_handle);
                 })
                 .build(),
@@ -84,6 +87,28 @@ impl SpotlightFeature {
         }
 
         Self::toggle_window(app_handle, &spotlight_window);
+    }
+
+    fn capture_focus<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
+        use crate::bootstrap::app_state::AppState;
+        use crate::infrastructure::desktop::FocusTracker;
+
+        if let Some(state) = app_handle.try_state::<AppState>() {
+            if let Ok(mut tracker) = state.focus_tracker().lock() {
+                let tracker_ref: &mut FocusTracker = &mut tracker;
+                tracker_ref.capture_focus();
+            } else {
+                log::warn!(
+                    target: "vanguard::spotlight",
+                    "failed to lock focus tracker"
+                );
+            }
+        } else {
+            log::warn!(
+                target: "vanguard::spotlight",
+                "app state not available for focus capture"
+            );
+        }
     }
 
     fn toggle_window<R: Runtime>(

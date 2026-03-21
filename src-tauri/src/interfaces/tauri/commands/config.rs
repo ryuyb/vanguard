@@ -22,6 +22,7 @@ pub struct AppConfigDto {
     pub lock_on_sleep: bool,
     pub idle_auto_lock_delay: String,
     pub clipboard_clear_delay: String,
+    pub spotlight_autofill: bool,
 }
 
 impl From<AppConfig> for AppConfigDto {
@@ -39,6 +40,7 @@ impl From<AppConfig> for AppConfigDto {
             lock_on_sleep: config.lock_on_sleep,
             idle_auto_lock_delay: config.idle_auto_lock_delay,
             clipboard_clear_delay: config.clipboard_clear_delay,
+            spotlight_autofill: config.spotlight_autofill,
         }
     }
 }
@@ -64,6 +66,8 @@ pub struct UpdateAppConfigRequest {
     pub idle_auto_lock_delay: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clipboard_clear_delay: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spotlight_autofill: Option<bool>,
 }
 
 fn log_command_error(command: &str, error: AppError) -> ErrorPayload {
@@ -145,6 +149,9 @@ pub fn config_update_app_config(
             json!(clipboard_clear_delay),
         );
     }
+    if let Some(spotlight_autofill) = request.spotlight_autofill {
+        store.set("spotlight_autofill".to_string(), json!(spotlight_autofill));
+    }
 
     store.save().map_err(|error| {
         log_command_error(
@@ -163,4 +170,15 @@ pub fn config_update_app_config(
     let config = AppConfig::load(&app_handle)
         .map_err(|error| log_command_error("config_update_app_config", error))?;
     Ok(config.into())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn config_check_text_injection_permission() -> bool {
+    use crate::application::ports::text_injection_port::TextInjectionPort;
+    use crate::infrastructure::desktop::EnigoTextInjectionAdapter;
+
+    EnigoTextInjectionAdapter::new()
+        .map(|adapter| adapter.is_available())
+        .unwrap_or(false)
 }

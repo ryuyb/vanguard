@@ -509,6 +509,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
           description: "设置外观和基础行为偏好。",
           launchOnLogin: "开机自动启动",
           showWebsiteIcon: "显示网站图标",
+          spotlightAutofill: "Spotlight 自动填充",
+          spotlightAutofillDescription: "自动将复制的内容填入之前的输入框",
           shortcuts: {
             title: "快捷键",
             quickAccess: "快速访问快捷键",
@@ -608,6 +610,9 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
           disablePin: "禁用 PIN 解锁失败。",
           pinRequired: "请输入 PIN。",
           saveFailed: "保存设置失败。",
+          spotlightAutofillPermission: "需要辅助功能权限",
+          spotlightAutofillPermissionDescription:
+            "请在系统设置 > 隐私与安全性 > 辅助功能中授予 Vanguard 权限，以使用自动填充功能。",
         },
       },
     },

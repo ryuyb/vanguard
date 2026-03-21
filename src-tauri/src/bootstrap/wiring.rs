@@ -10,6 +10,7 @@ use crate::application::ports::notification_port::NotificationPort;
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::sync_event_port::SyncEventPort;
+use crate::application::ports::text_injection_port::TextInjectionPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
@@ -25,6 +26,7 @@ use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
+use crate::infrastructure::desktop::EnigoTextInjectionAdapter;
 use crate::infrastructure::persistence::{
     SqliteMasterPasswordUnlockDataPort, SqliteVaultRepository,
 };
@@ -39,7 +41,10 @@ use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
 pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppState> {
-    let config = AppConfig::load(manager)?;
+    let mut config = AppConfig::load(manager)?;
+
+    // Check text injection permission and disable spotlight_autofill if not available
+    config.check_and_fix_text_injection_permission(manager)?;
 
     let mut vaultwarden_config = VaultwardenConfig::new();
     vaultwarden_config.device_identifier = config.device_identifier.clone();
@@ -65,6 +70,8 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
     let biometric_unlock_port: Arc<dyn BiometricUnlockPort> = Arc::new(KeychainBiometricUnlockPort);
     let clipboard_port: Arc<dyn ClipboardPort> =
         Arc::new(TauriClipboardPortAdapter::new(manager.app_handle().clone()));
+    let text_injection_port: Arc<dyn TextInjectionPort> =
+        Arc::new(EnigoTextInjectionAdapter::new()?);
     let sync_event_port: Arc<dyn SyncEventPort> =
         Arc::new(TauriSyncEventAdapter::new(manager.app_handle().clone()));
     let auth_service = Arc::new(AuthService::new(Arc::clone(&remote_vault)));
@@ -156,6 +163,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         soft_delete_cipher_use_case,
         restore_cipher_use_case,
         fetch_cipher_use_case,
+        text_injection_port,
         auth_state_path,
     ))
 }

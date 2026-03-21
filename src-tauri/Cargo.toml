@@ -67,6 +67,8 @@ security-framework-sys = "2"
 core-foundation = "0.10"
 objc2 = "0.6.4"
 objc2-foundation = { version = "0.3.2", features = ["NSError", "NSObject", "NSString"] }
+enigo = "0.6"
+accessibility-sys = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

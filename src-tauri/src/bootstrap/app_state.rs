@@ -11,6 +11,7 @@ use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
 use crate::application::ports::clipboard_port::ClipboardPort;
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
+use crate::application::ports::text_injection_port::TextInjectionPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
@@ -26,6 +27,7 @@ use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
 };
+use crate::infrastructure::desktop::FocusTracker;
 use crate::infrastructure::icon::IconService;
 use crate::infrastructure::vaultwarden::VaultwardenClient;
 use crate::support::error::AppError;
@@ -94,6 +96,7 @@ pub struct AppState {
     soft_delete_cipher_use_case: Arc<SoftDeleteCipherUseCase>,
     restore_cipher_use_case: Arc<RestoreCipherUseCase>,
     fetch_cipher_use_case: Arc<FetchCipherUseCase>,
+    text_injection_port: Arc<dyn TextInjectionPort>,
     vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
     auth_session: Arc<Mutex<Option<AuthSession>>>,
     auth_states_dir: Arc<PathBuf>,
@@ -101,6 +104,7 @@ pub struct AppState {
     persisted_auth_state: Arc<Mutex<Option<PersistedAuthState>>>,
     auth_wrap_runtime: Arc<Mutex<Option<SessionWrapRuntime>>>,
     icon_service: Arc<IconService>,
+    focus_tracker: Arc<Mutex<FocusTracker>>,
 }
 
 impl AppState {
@@ -121,6 +125,7 @@ impl AppState {
         soft_delete_cipher_use_case: Arc<SoftDeleteCipherUseCase>,
         restore_cipher_use_case: Arc<RestoreCipherUseCase>,
         fetch_cipher_use_case: Arc<FetchCipherUseCase>,
+        text_injection_port: Arc<dyn TextInjectionPort>,
         auth_states_dir: PathBuf,
     ) -> Self {
         let persisted_auth_state = match load_active_persisted_auth_state(&auth_states_dir) {
@@ -153,6 +158,7 @@ impl AppState {
             soft_delete_cipher_use_case,
             restore_cipher_use_case,
             fetch_cipher_use_case,
+            text_injection_port,
             vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
             auth_session: Arc::new(Mutex::new(None)),
             auth_states_dir: Arc::new(auth_states_dir),
@@ -160,6 +166,7 @@ impl AppState {
             persisted_auth_state: Arc::new(Mutex::new(persisted_auth_state)),
             auth_wrap_runtime: Arc::new(Mutex::new(None)),
             icon_service: Arc::new(IconService::new().expect("Failed to create IconService")),
+            focus_tracker: Arc::new(Mutex::new(FocusTracker::new())),
         }
     }
 
@@ -225,6 +232,14 @@ impl AppState {
 
     pub fn icon_service(&self) -> Arc<IconService> {
         Arc::clone(&self.icon_service)
+    }
+
+    pub fn focus_tracker(&self) -> Arc<Mutex<FocusTracker>> {
+        Arc::clone(&self.focus_tracker)
+    }
+
+    pub fn text_injection_port(&self) -> Arc<dyn TextInjectionPort> {
+        Arc::clone(&self.text_injection_port)
     }
 
     pub fn set_vault_user_key(&self, account_id: String, key: VaultUserKey) -> AppResult<()> {

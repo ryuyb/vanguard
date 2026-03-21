@@ -524,6 +524,9 @@ export const enTranslationCatalog: AppTranslationCatalog = {
           description: "Set appearance and basic behavior preferences.",
           launchOnLogin: "Launch app on login",
           showWebsiteIcon: "Show website icon",
+          spotlightAutofill: "Spotlight autofill",
+          spotlightAutofillDescription:
+            "Automatically fill copied credentials into the previous input field",
           shortcuts: {
             title: "Keyboard shortcuts",
             quickAccess: "Quick access shortcut",
@@ -624,6 +627,9 @@ export const enTranslationCatalog: AppTranslationCatalog = {
           disablePin: "Failed to disable PIN unlock.",
           pinRequired: "PIN is required.",
           saveFailed: "Failed to save settings.",
+          spotlightAutofillPermission: "Accessibility permission required",
+          spotlightAutofillPermissionDescription:
+            "Please grant Vanguard accessibility permission in System Settings > Privacy & Security > Accessibility to use the autofill feature.",
         },
       },
     },

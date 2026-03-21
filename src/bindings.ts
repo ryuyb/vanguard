@@ -77,6 +77,9 @@ async configUpdateAppConfig(request: UpdateAppConfigRequest) : Promise<Result<Ap
     else return { status: "error", error: e  as any };
 }
 },
+async configCheckTextInjectionPermission() : Promise<boolean> {
+    return await TAURI_INVOKE("config_check_text_injection_permission");
+},
 async desktopOpenMainWindow() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("desktop_open_main_window") };
@@ -261,6 +264,18 @@ async vaultCopyCipherField(request: VaultCopyCipherFieldRequestDto) : Promise<Re
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Execute autofill with the stored value
+ * This should be called by frontend after spotlight is hidden
+ */
+async vaultExecuteAutofill(request: VaultExecuteAutofillRequestDto) : Promise<Result<VaultExecuteAutofillResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("vault_execute_autofill", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<Result<VaultCipherTotpCodeResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_cipher_totp_code", { request }) };
@@ -376,7 +391,7 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
-export type AppConfigDto = { deviceIdentifier: string; allowInvalidCerts: boolean; syncPollIntervalSeconds: number; locale: string; launchOnLogin: boolean; showWebsiteIcon: boolean; quickAccessShortcut: string; lockShortcut: string; requireMasterPasswordInterval: string; lockOnSleep: boolean; idleAutoLockDelay: string; clipboardClearDelay: string }
+export type AppConfigDto = { deviceIdentifier: string; allowInvalidCerts: boolean; syncPollIntervalSeconds: number; locale: string; launchOnLogin: boolean; showWebsiteIcon: boolean; quickAccessShortcut: string; lockShortcut: string; requireMasterPasswordInterval: string; lockOnSleep: boolean; idleAutoLockDelay: string; clipboardClearDelay: string; spotlightAutofill: boolean }
 export type CipherCreated = { accountId: string; cipherId: string }
 export type CipherDeleted = { accountId: string; cipherId: string }
 export type CipherMutationResponseDto = { cipherId: string; revisionDate: string }
@@ -425,7 +440,7 @@ export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
-export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null }
+export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null; spotlightAutofill?: boolean | null }
 export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
 export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }
 export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
@@ -447,12 +462,18 @@ export type VaultCipherSshKeyDetailDto = { privateKey: string | null; publicKey:
 export type VaultCipherTotpCodeRequestDto = { cipherId: string }
 export type VaultCipherTotpCodeResponseDto = { code: string; periodSeconds: number; remainingSeconds: number; expiresAtMs: number }
 export type VaultCopyCipherFieldRequestDto = { cipherId: string; field: VaultCopyFieldDto; clearAfterMs: number | null }
-export type VaultCopyCipherFieldResponseDto = { copied: boolean; clearAfterMs: number | null }
+export type VaultCopyCipherFieldResponseDto = { copied: boolean; clearAfterMs: number | null; autofillPerformed: boolean; 
+/**
+ * The copied value - will be set if autofill is enabled so frontend can trigger autofill after hiding spotlight
+ */
+value: string | null }
 export type VaultCopyFieldDto = "username" | "password" | "totp" | "notes" | { customField: { index: number } } | { uri: { index: number } } | "cardNumber" | "cardCode" | "email" | "phone" | "sshPrivateKey" | "sshPublicKey"
 export type VaultDisableBiometricUnlockRequestDto = Record<string, never>
 export type VaultDisablePinUnlockRequestDto = Record<string, never>
 export type VaultEnableBiometricUnlockRequestDto = Record<string, never>
 export type VaultEnablePinUnlockRequestDto = { pin: string; lockType: VaultPinLockTypeDto }
+export type VaultExecuteAutofillRequestDto = { value: string }
+export type VaultExecuteAutofillResponseDto = { success: boolean }
 export type VaultFolderItemDto = { id: string; name: string | null }
 export type VaultFoldersSynced = { accountId: string; folderCount: number }
 export type VaultLockRequestDto = Record<string, never>

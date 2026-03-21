@@ -52,6 +52,21 @@ pub struct VaultCopyCipherFieldRequestDto {
 pub struct VaultCopyCipherFieldResponseDto {
     pub copied: bool,
     pub clear_after_ms: Option<u64>,
+    pub autofill_performed: bool,
+    /// The copied value - will be set if autofill is enabled so frontend can trigger autofill after hiding spotlight
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultExecuteAutofillRequestDto {
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultExecuteAutofillResponseDto {
+    pub success: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
