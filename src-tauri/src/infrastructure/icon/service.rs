@@ -175,17 +175,20 @@ impl Default for IconService {
 
 #[cfg(test)]
 mod tests {
+    fn is_valid_hostname(hostname: &str) -> bool {
+        !hostname.is_empty() && hostname.contains('.')
+    }
+
     #[test]
     fn test_hostname_validation() {
         // Empty hostname should be rejected
-        assert!("".is_empty());
-        assert!(!"".contains('.'));
+        assert!(!is_valid_hostname(""));
 
         // Hostname without dot should be rejected
-        assert!(!"localhost".contains('.'));
+        assert!(!is_valid_hostname("localhost"));
 
         // Valid hostname with dot should be accepted
-        assert!("google.com".contains('.'));
-        assert!(!"google.com".is_empty());
+        assert!(is_valid_hostname("google.com"));
+        assert!(is_valid_hostname("sub.example.com"));
     }
 }
