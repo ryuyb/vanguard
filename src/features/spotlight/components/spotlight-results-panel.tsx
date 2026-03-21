@@ -13,8 +13,36 @@ import {
   CipherIcon,
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
-
+import { useIcon } from "@/features/vault/hooks/use-icon";
 import { cn } from "@/lib/utils";
+
+// Component to load and display icon for spotlight items
+function SpotlightItemIcon({ item }: { item: SpotlightItem }) {
+  const { data: iconData } = useIcon(item.iconHostname);
+  return (
+    <CipherIcon
+      alt={item.title}
+      iconData={iconData}
+      className="size-8 border-slate-200"
+    >
+      {toCipherTypeIcon(item.type)}
+    </CipherIcon>
+  );
+}
+
+// Component to load and display icon for detail panel
+function SpotlightDetailIcon({ item }: { item: SpotlightItem }) {
+  const { data: iconData } = useIcon(item.iconHostname);
+  return (
+    <CipherIcon
+      alt={item.title}
+      iconData={iconData}
+      className="size-10 border-slate-200"
+    >
+      {toCipherTypeIcon(item.type)}
+    </CipherIcon>
+  );
+}
 
 type SpotlightResultsPanelProps = {
   shouldShowResults: boolean;
@@ -62,13 +90,7 @@ export function SpotlightResultsPanel({
           aria-label={t("spotlight.search.detailRegionLabel")}
         >
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
-            <CipherIcon
-              alt={detailItem.title}
-              iconData={detailItem.iconData ?? null}
-              className="size-10 border-slate-200"
-            >
-              {toCipherTypeIcon(detailItem.type)}
-            </CipherIcon>
+            <SpotlightDetailIcon item={detailItem} />
             <div className="flex-1 min-w-0">
               <p className="text-base leading-tight font-semibold text-slate-900">
                 {detailItem.title}
@@ -133,13 +155,7 @@ export function SpotlightResultsPanel({
               )}
             >
               <div className="flex items-center gap-3">
-                <CipherIcon
-                  alt={item.title}
-                  iconData={item.iconData ?? null}
-                  className="size-8 border-slate-200"
-                >
-                  {toCipherTypeIcon(item.type)}
-                </CipherIcon>
+                <SpotlightItemIcon item={item} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-900">
                     {item.title}
