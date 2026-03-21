@@ -3,6 +3,7 @@ use specta::Type;
 use tauri::AppHandle;
 
 use crate::bootstrap::config::AppConfig;
+use crate::interfaces::tauri::desktop::spotlight::SpotlightFeature;
 use crate::interfaces::tauri::desktop::tray::TrayFeature;
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
@@ -109,6 +110,8 @@ pub fn config_update_app_config(
     })?;
 
     let locale_changed = request.locale.is_some();
+    let quick_access_changed = request.quick_access_shortcut.is_some();
+    let lock_shortcut_changed = request.lock_shortcut.is_some();
 
     if let Some(locale) = request.locale {
         store.set("locale".to_string(), json!(locale));
@@ -119,13 +122,13 @@ pub fn config_update_app_config(
     if let Some(show_website_icon) = request.show_website_icon {
         store.set("show_website_icon".to_string(), json!(show_website_icon));
     }
-    if let Some(quick_access_shortcut) = request.quick_access_shortcut {
+    if let Some(ref quick_access_shortcut) = request.quick_access_shortcut {
         store.set(
             "quick_access_shortcut".to_string(),
             json!(quick_access_shortcut),
         );
     }
-    if let Some(lock_shortcut) = request.lock_shortcut {
+    if let Some(ref lock_shortcut) = request.lock_shortcut {
         store.set("lock_shortcut".to_string(), json!(lock_shortcut));
     }
     if let Some(require_master_password_interval) = request.require_master_password_interval {
@@ -162,9 +165,17 @@ pub fn config_update_app_config(
         )
     })?;
 
-    // 如果语言设置发生变化,更新托盘菜单
-    if locale_changed {
+    // 如果语言设置或快捷键发生变化，更新托盘菜单
+    let shortcuts_changed = quick_access_changed || lock_shortcut_changed;
+    if locale_changed || shortcuts_changed {
         TrayFeature::update_menu(&app_handle);
+    }
+
+    // 如果快速访问快捷键发生变化，记录更新（需要重启生效）
+    if quick_access_changed {
+        if let Some(ref new_shortcut) = request.quick_access_shortcut {
+            SpotlightFeature::update_shortcut(&app_handle, new_shortcut);
+        }
     }
 
     let config = AppConfig::load(&app_handle)

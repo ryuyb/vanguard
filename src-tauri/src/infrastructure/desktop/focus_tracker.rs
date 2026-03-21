@@ -110,8 +110,7 @@ fn capture_focus_platform() -> Result<FocusInfo, String> {
 
         // Get the frontmost application
         let workspace_class =
-            objc2::runtime::AnyClass::get(c"NSWorkspace")
-                .ok_or("NSWorkspace not found")?;
+            objc2::runtime::AnyClass::get(c"NSWorkspace").ok_or("NSWorkspace not found")?;
 
         let workspace: *mut AnyObject = msg_send![workspace_class, sharedWorkspace];
         if workspace.is_null() {

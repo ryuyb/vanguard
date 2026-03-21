@@ -69,7 +69,6 @@ impl TextInjectionPort for EnigoTextInjectionAdapter {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

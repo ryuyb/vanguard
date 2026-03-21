@@ -5,11 +5,11 @@ use tauri::{AppHandle, Manager, Runtime};
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
 use crate::interfaces::tauri::desktop::constants::{
-    TRAY_ICON_ID, TRAY_MENU_LOCK_ACCELERATOR, TRAY_MENU_LOCK_ID,
-    TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR, TRAY_MENU_OPEN_QUICK_ACCESS_ID,
-    TRAY_MENU_OPEN_VANGUARD_ID, TRAY_MENU_QUIT_ID, TRAY_MENU_SETTINGS_ID,
+    TRAY_ICON_ID, TRAY_MENU_LOCK_ID, TRAY_MENU_OPEN_QUICK_ACCESS_ID, TRAY_MENU_OPEN_VANGUARD_ID,
+    TRAY_MENU_QUIT_ID, TRAY_MENU_SETTINGS_ID,
 };
 use crate::interfaces::tauri::desktop::main_window::MainWindowFeature;
+use crate::interfaces::tauri::desktop::shortcut_utils::shortcut_to_accelerator;
 use crate::interfaces::tauri::desktop::spotlight::SpotlightFeature;
 use crate::interfaces::tauri::desktop::tray_click_snapshot::{
     TrayClickSnapshot, TrayClickSnapshotStore,
@@ -119,13 +119,22 @@ impl TrayFeature {
         manager: &impl Manager<R>,
         lock_enabled: bool,
     ) -> tauri::Result<Menu<R>> {
-        // 从配置中读取语言设置
-        let locale = AppConfig::load(manager)
-            .ok()
-            .map(|config| TrayLocale::from_locale_str(&config.locale))
+        // 从配置中读取语言和快捷键设置
+        let config = AppConfig::load(manager).ok();
+        let locale = config
+            .as_ref()
+            .map(|c| TrayLocale::from_locale_str(&c.locale))
             .unwrap_or(TrayLocale::Zh);
 
         let texts = TrayMenuTexts::get(locale);
+
+        // 从配置中获取快捷键并转换为加速器格式
+        let quick_access_accelerator = config
+            .as_ref()
+            .and_then(|c| shortcut_to_accelerator(&c.quick_access_shortcut));
+        let lock_accelerator = config
+            .as_ref()
+            .and_then(|c| shortcut_to_accelerator(&c.lock_shortcut));
 
         let open_vanguard = MenuItem::with_id(
             manager,
@@ -139,7 +148,7 @@ impl TrayFeature {
             TRAY_MENU_OPEN_QUICK_ACCESS_ID,
             texts.open_quick_access,
             true,
-            Some(TRAY_MENU_OPEN_QUICK_ACCESS_ACCELERATOR),
+            quick_access_accelerator.as_deref(),
         )?;
         let separator = PredefinedMenuItem::separator(manager)?;
         let lock = MenuItem::with_id(
@@ -147,7 +156,7 @@ impl TrayFeature {
             TRAY_MENU_LOCK_ID,
             texts.lock,
             lock_enabled,
-            Some(TRAY_MENU_LOCK_ACCELERATOR),
+            lock_accelerator.as_deref(),
         )?;
         let settings = MenuItem::with_id(
             manager,

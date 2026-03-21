@@ -1,7 +1,8 @@
 mod constants;
 mod main_window;
 mod monitor;
-mod spotlight;
+mod shortcut_utils;
+pub mod spotlight;
 pub mod tray;
 mod tray_click_snapshot;
 mod tray_i18n;

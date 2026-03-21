@@ -33,6 +33,8 @@ const SUPPORTED_IDLE_AUTO_LOCK_DELAYS: &[&str] = &[
 ];
 const DEFAULT_CLIPBOARD_CLEAR_DELAY: &str = "never";
 const SUPPORTED_CLIPBOARD_CLEAR_DELAYS: &[&str] = &["10s", "20s", "30s", "1m", "2m", "5m", "never"];
+const DEFAULT_QUICK_ACCESS_SHORTCUT: &str = "⌃⇧␣";
+const DEFAULT_LOCK_SHORTCUT: &str = "⇧⌘L";
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -75,9 +77,10 @@ impl AppConfig {
         );
         let launch_on_login = read_store_bool(&store, KEY_LAUNCH_ON_LOGIN).unwrap_or(false);
         let show_website_icon = read_store_bool(&store, KEY_SHOW_WEBSITE_ICON).unwrap_or(true);
-        let quick_access_shortcut =
-            read_store_string(&store, KEY_QUICK_ACCESS_SHORTCUT).unwrap_or_default();
-        let lock_shortcut = read_store_string(&store, KEY_LOCK_SHORTCUT).unwrap_or_default();
+        let quick_access_shortcut = read_store_string(&store, KEY_QUICK_ACCESS_SHORTCUT)
+            .unwrap_or_else(|| DEFAULT_QUICK_ACCESS_SHORTCUT.to_string());
+        let lock_shortcut = read_store_string(&store, KEY_LOCK_SHORTCUT)
+            .unwrap_or_else(|| DEFAULT_LOCK_SHORTCUT.to_string());
         let require_master_password_interval = validate_require_master_password_interval(
             read_store_string(&store, KEY_REQUIRE_MASTER_PASSWORD_INTERVAL)
                 .as_deref()

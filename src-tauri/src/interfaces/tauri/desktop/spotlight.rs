@@ -2,11 +2,13 @@
 
 use tauri::window::Color;
 use tauri::{Manager, Runtime, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{Shortcut, ShortcutState};
 
+use crate::bootstrap::config::AppConfig;
 use crate::interfaces::tauri::desktop::constants::{
     SPOTLIGHT_HEIGHT, SPOTLIGHT_PAGE_PATH, SPOTLIGHT_WIDTH, SPOTLIGHT_WINDOW_LABEL,
 };
+use crate::interfaces::tauri::desktop::shortcut_utils::parse_shortcut;
 use crate::interfaces::tauri::desktop::window_placement::WindowPlacementPolicy;
 
 #[cfg(target_os = "macos")]
@@ -30,7 +32,7 @@ tauri_panel! {
     })
 }
 
-pub(super) struct SpotlightFeature;
+pub struct SpotlightFeature;
 
 impl SpotlightFeature {
     pub(super) fn ensure_window<R: Runtime, M: Manager<R>>(
@@ -45,11 +47,37 @@ impl SpotlightFeature {
         Ok(spotlight_window)
     }
 
+    /// 注册全局快捷键（从配置中读取）
     pub(super) fn register_shortcut<R: Runtime>(
         app: &tauri::App<R>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let spotlight_shortcut =
-            Shortcut::new(Some(Modifiers::SHIFT | Modifiers::CONTROL), Code::Space);
+        // 从配置中读取快捷键
+        let quick_access_shortcut = AppConfig::load(app)
+            .map(|c| c.quick_access_shortcut)
+            .unwrap_or_default();
+
+        Self::register_shortcut_with_string(app, &quick_access_shortcut)?;
+
+        Ok(())
+    }
+
+    /// 使用字符串格式的快捷键注册全局快捷键
+    fn register_shortcut_with_string<R: Runtime>(
+        app: &tauri::App<R>,
+        shortcut_str: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (modifiers, code) = parse_shortcut(shortcut_str);
+
+        // 如果没有有效的快捷键配置，跳过注册
+        if modifiers.is_none() || code.is_none() {
+            log::info!(
+                target: "vanguard::spotlight",
+                "No valid quick access shortcut configured, skipping registration"
+            );
+            return Ok(());
+        }
+
+        let spotlight_shortcut = Shortcut::new(modifiers, code.unwrap());
 
         app.handle().plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -66,7 +94,41 @@ impl SpotlightFeature {
                 .build(),
         )?;
 
+        log::info!(
+            target: "vanguard::spotlight",
+            "Registered quick access shortcut: {}",
+            shortcut_str
+        );
+
         Ok(())
+    }
+
+    /// 更新全局快捷键（当配置改变时调用）
+    ///
+    /// 注意：tauri-plugin-global-shortcut 不支持动态更新快捷键，
+    /// 需要重新注册。但当前 Tauri 插件架构限制，无法在运行时重新加载插件。
+    /// 此方法用于记录配置变更，实际生效需要重启应用。
+    pub fn update_shortcut<R: Runtime>(_app_handle: &tauri::AppHandle<R>, new_shortcut: &str) {
+        log::info!(
+            target: "vanguard::spotlight",
+            "Quick access shortcut changed to: {}. Note: Shortcut changes require app restart to take effect.",
+            new_shortcut
+        );
+
+        // 解析快捷键以验证格式
+        let (modifiers, code) = parse_shortcut(new_shortcut);
+        if new_shortcut.trim().is_empty() {
+            log::info!(
+                target: "vanguard::spotlight",
+                "Quick access shortcut cleared"
+            );
+        } else if modifiers.is_none() || code.is_none() {
+            log::warn!(
+                target: "vanguard::spotlight",
+                "Invalid quick access shortcut format: {}",
+                new_shortcut
+            );
+        }
     }
 
     pub(super) fn toggle<R: Runtime>(app_handle: &tauri::AppHandle<R>) {
