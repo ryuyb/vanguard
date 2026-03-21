@@ -26,6 +26,7 @@ use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
 };
+use crate::infrastructure::icon::IconService;
 use crate::infrastructure::vaultwarden::VaultwardenClient;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -99,6 +100,7 @@ pub struct AppState {
     auth_state_persist_lock: Arc<Mutex<()>>,
     persisted_auth_state: Arc<Mutex<Option<PersistedAuthState>>>,
     auth_wrap_runtime: Arc<Mutex<Option<SessionWrapRuntime>>>,
+    icon_service: Arc<IconService>,
 }
 
 impl AppState {
@@ -157,6 +159,7 @@ impl AppState {
             auth_state_persist_lock: Arc::new(Mutex::new(())),
             persisted_auth_state: Arc::new(Mutex::new(persisted_auth_state)),
             auth_wrap_runtime: Arc::new(Mutex::new(None)),
+            icon_service: Arc::new(IconService::new().expect("Failed to create IconService")),
         }
     }
 
@@ -220,6 +223,10 @@ impl AppState {
         Arc::clone(&self.fetch_cipher_use_case)
     }
 
+    pub fn icon_service(&self) -> Arc<IconService> {
+        Arc::clone(&self.icon_service)
+    }
+
     pub fn set_vault_user_key(&self, account_id: String, key: VaultUserKey) -> AppResult<()> {
         let mut store = self
             .vault_user_keys
@@ -252,7 +259,7 @@ impl AppState {
         Ok(store.get(account_id).cloned())
     }
 
-    pub fn set_auth_session(&self, session: AuthSession) -> AppResult<()> {
+    pub async fn set_auth_session(&self, session: AuthSession) -> AppResult<()> {
         let previous_account_id = {
             let mut store = self
                 .auth_session
@@ -270,6 +277,9 @@ impl AppState {
                 self.remove_vault_user_key(&previous_account_id)?;
             }
         }
+
+        // Initialize icon downloader with the new base URL
+        self.icon_service.set_downloader(&session.base_url).await;
 
         Ok(())
     }

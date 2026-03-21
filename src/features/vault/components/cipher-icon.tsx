@@ -4,28 +4,22 @@ import {
   Globe,
   IdCard,
   KeyRound,
-  LoaderCircle,
   Lock,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { VaultCipherItemDto } from "@/bindings";
-import type { CipherIconLoadState } from "@/features/vault/types";
 import { cn } from "@/lib/utils";
 
 type CipherIconProps = {
   alt: string;
   children?: ReactNode;
   className?: string;
-  iconUrl: string | null;
-  isVisible?: boolean;
-  loadState?: CipherIconLoadState;
-  onError?: () => void;
-  onLoad?: () => void;
+  iconData: string | null;
 };
 
 function toFallbackIcon(
-  iconUrl: string | null,
+  hasIconData: boolean,
   alt: string,
   children?: ReactNode,
 ): ReactNode {
@@ -39,40 +33,35 @@ function toFallbackIcon(
     return <span className="text-xs font-semibold">{title}</span>;
   }
 
-  return iconUrl ? (
+  return hasIconData ? (
     <Globe className="size-4" />
   ) : (
     <FileText className="size-4" />
   );
 }
 
-function toLoadingVisual(loadState: CipherIconLoadState) {
-  if (loadState !== "loading") {
-    return null;
-  }
-
-  return <LoaderCircle className="size-3.5 animate-spin text-slate-400" />;
-}
-
+/**
+ * Cipher icon component.
+ *
+ * Shows fallback icon by default, then seamlessly switches to
+ * the actual icon when data is available. No loading state shown.
+ */
 export function CipherIcon({
   alt,
   children,
   className,
-  iconUrl,
-  isVisible = true,
-  loadState = "fallback",
-  onError,
-  onLoad,
+  iconData,
 }: CipherIconProps) {
   const [didFail, setDidFail] = useState(false);
 
-  // Once loaded successfully, keep showing the image even if not visible
-  // This prevents flickering when scrolling
-  const shouldShowImage =
-    Boolean(iconUrl) &&
-    loadState !== "fallback" &&
-    !didFail &&
-    (loadState === "loaded" || isVisible);
+  // Reset didFail when iconData changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: iconData is a prop that can change
+  useEffect(() => {
+    setDidFail(false);
+  }, [iconData]);
+
+  // Show icon image only when data is available and hasn't failed
+  const shouldShowImage = iconData !== null && !didFail;
 
   return (
     <div
@@ -86,19 +75,13 @@ export function CipherIcon({
         <img
           alt={alt}
           className="size-full object-cover"
-          loading="lazy"
-          src={iconUrl ?? undefined}
+          src={`data:image/png;base64,${iconData}`}
           onError={() => {
             setDidFail(true);
-            onError?.();
-          }}
-          onLoad={() => {
-            setDidFail(false);
-            onLoad?.();
           }}
         />
       ) : (
-        (toLoadingVisual(loadState) ?? toFallbackIcon(iconUrl, alt, children))
+        toFallbackIcon(iconData !== null, alt, children)
       )}
     </div>
   );

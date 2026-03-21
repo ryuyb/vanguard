@@ -30,11 +30,8 @@ import {
 } from "@/features/vault/components/cipher-icon";
 import { TruncatableText } from "@/features/vault/components/truncatable-text";
 import { useCipherFieldCopy } from "@/features/vault/hooks";
-import {
-  firstNonEmptyText,
-  getCipherIconUrl,
-  toCipherIconAlt,
-} from "@/features/vault/utils";
+import { useIcon } from "@/features/vault/hooks/use-icon";
+import { firstNonEmptyText, toCipherIconHost } from "@/features/vault/utils";
 import { cn } from "@/lib/utils";
 
 const CUSTOM_FIELD_TYPE_TEXT = 0;
@@ -191,8 +188,6 @@ function DetailField({
 
 type CipherDetailPanelProps = {
   cipher: VaultCipherDetailDto;
-  iconUrl?: string | null;
-  iconServer?: string | null;
   mode?: "normal" | "trash";
   onEdit?: () => void;
   onDelete?: () => void;
@@ -203,8 +198,6 @@ type CipherDetailPanelProps = {
 
 export function CipherDetailPanel({
   cipher,
-  iconUrl: iconUrlProp,
-  iconServer,
   mode = "normal",
   onEdit,
   onDelete,
@@ -214,7 +207,12 @@ export function CipherDetailPanel({
 }: CipherDetailPanelProps) {
   const { t } = useTranslation();
   const { copyField } = useCipherFieldCopy(cipher.id);
-  const iconUrl = iconUrlProp ?? getCipherIconUrl(cipher, iconServer);
+
+  // Extract hostname from cipher URIs for icon lookup
+  const firstUri =
+    cipher.login?.uris?.[0]?.uri ?? cipher.data?.uris?.[0]?.uri ?? null;
+  const hostname = firstUri ? toCipherIconHost(firstUri) : null;
+  const { data: iconData } = useIcon(hostname);
   const username = firstNonEmptyText(
     cipher.login?.username,
     cipher.data?.username,
@@ -445,11 +443,9 @@ export function CipherDetailPanel({
       <CardHeader className="gap-2 border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/30 px-6 py-4 shrink-0">
         <div className="flex min-h-9 items-center gap-3.5 min-w-0">
           <CipherIcon
-            alt={toCipherIconAlt(cipher.name)}
+            alt={cipher.name ?? "Cipher"}
             className="size-11 bg-white border border-slate-200 text-slate-500 shadow-sm shrink-0"
-            iconUrl={iconUrl}
-            isVisible={Boolean(iconUrl)}
-            loadState={iconUrl ? "loading" : "fallback"}
+            iconData={iconData}
           >
             {toCipherTypeIcon(cipher.type)}
           </CipherIcon>

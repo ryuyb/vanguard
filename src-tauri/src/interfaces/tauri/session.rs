@@ -102,7 +102,7 @@ pub async fn restore_auth_session_with_master_password(
             .or(persisted.context.kdf_parallelism),
     };
 
-    state.set_auth_session(next.clone())?;
+    state.set_auth_session(next.clone()).await?;
     if let Err(error) = state.persist_auth_state(&next, master_password) {
         log::warn!(
             target: "vanguard::tauri::session",
@@ -200,7 +200,7 @@ async fn refresh_auth_session_locked(
         kdf_parallelism: refreshed.kdf_parallelism.or(current.kdf_parallelism),
     };
 
-    state.set_auth_session(next.clone())?;
+    state.set_auth_session(next.clone()).await?;
     if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
         log::warn!(
             target: "vanguard::tauri::session",

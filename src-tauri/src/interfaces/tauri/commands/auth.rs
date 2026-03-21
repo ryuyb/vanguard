@@ -42,7 +42,7 @@ async fn initialize_authenticated_session(
         account_id,
         session_info.clone(),
     )?;
-    state.set_auth_session(auth_session.clone())?;
+    state.set_auth_session(auth_session.clone()).await?;
     if let Err(error) = state.persist_auth_state(&auth_session, master_password) {
         log::warn!(
             target: "vanguard::tauri::auth",

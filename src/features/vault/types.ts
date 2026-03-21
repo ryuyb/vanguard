@@ -30,7 +30,6 @@ export type FolderTreeNodeDraft = {
 };
 
 export type CipherWithIcon = VaultCipherItemDto & {
-  readonly iconUrl: string | null;
-  readonly iconLoadState: CipherIconLoadState;
-  readonly shouldLoadIcon: boolean;
+  /** Hostname extracted from cipher URI for icon lookup */
+  readonly iconHostname: string | null;
 };

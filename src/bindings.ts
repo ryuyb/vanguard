@@ -269,9 +269,35 @@ async vaultGetCipherTotpCode(request: VaultCipherTotpCodeRequestDto) : Promise<R
     else return { status: "error", error: e  as any };
 }
 },
-async vaultGetIconServer() : Promise<Result<string, ErrorPayload>> {
+/**
+ * Gets an icon for the given hostname.
+ * 
+ * # Arguments
+ * * `hostname` - The hostname (e.g., "google.com")
+ * 
+ * # Returns
+ * * `Ok(Some(base64))` - Icon data as base64-encoded PNG
+ * * `Ok(None)` - Icon not available
+ * * `Err(...)` - Error during operation
+ */
+async getIcon(hostname: string) : Promise<Result<string | null, ErrorPayload>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_get_icon_server") };
+    return { status: "ok", data: await TAURI_INVOKE("get_icon", { hostname }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Clears the icon cache.
+ * 
+ * # Returns
+ * * `Ok(())` - Cache cleared successfully
+ * * `Err(...)` - Error during operation
+ */
+async clearIconCache() : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_icon_cache") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

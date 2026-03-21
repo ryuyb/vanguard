@@ -1,10 +1,5 @@
-import type {
-  VaultCipherDetailDto,
-  VaultCipherItemDto,
-  VaultFolderItemDto,
-} from "@/bindings";
+import type { VaultCipherItemDto, VaultFolderItemDto } from "@/bindings";
 import { toErrorText } from "@/features/auth/shared/utils";
-import { DEFAULT_ICON_SERVER } from "@/features/vault/constants";
 import type {
   CipherTypeFilter,
   FolderTreeNode,
@@ -234,6 +229,10 @@ export function getCipherPrimaryUri(
   return firstNonEmptyText(...candidates);
 }
 
+/**
+ * Extracts the hostname from a URI for icon lookup.
+ * Returns null for invalid hosts (localhost, IPs, etc.)
+ */
 export function toCipherIconHost(
   uri: string | null | undefined,
 ): string | null {
@@ -273,53 +272,4 @@ function normalizeIconHost(hostname: string): string | null {
     return null;
   }
   return normalized;
-}
-
-function normalizeServerUrl(url: string): string {
-  return url.replace(/\/+$/, "");
-}
-
-function isOfficialBitwardenIconServer(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.hostname === "icons.bitwarden.net";
-  } catch {
-    return false;
-  }
-}
-
-export function toCipherIconUrl(
-  uri: string | null | undefined,
-  iconServer?: string | null,
-): string | null {
-  const host = toCipherIconHost(uri);
-  if (!host) {
-    return null;
-  }
-  const server = normalizeServerUrl(iconServer ?? DEFAULT_ICON_SERVER);
-  const isOfficial = isOfficialBitwardenIconServer(server);
-
-  return isOfficial
-    ? `${server}/${host}/icon.png`
-    : `${server}/icons/${host}/icon.png`;
-}
-
-export function toCipherIconAlt(name: string | null | undefined): string {
-  const normalized = (name ?? "").trim();
-  if (normalized) {
-    return appI18n.t("vault.feedback.iconAlt", { name: normalized });
-  }
-  return appI18n.t("vault.feedback.iconAltFallback");
-}
-
-export function getCipherIconUrl(
-  cipher:
-    | (VaultCipherDetailDto & { uri?: string | null })
-    | (VaultCipherItemDto & {
-        uri?: string | null;
-        uris?: Array<{ uri: string | null } | string | null> | null;
-      }),
-  iconServer?: string | null,
-): string | null {
-  return toCipherIconUrl(getCipherPrimaryUri(cipher), iconServer);
 }

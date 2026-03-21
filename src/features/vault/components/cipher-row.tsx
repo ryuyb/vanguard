@@ -4,30 +4,19 @@ import {
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
 import { TruncatableText } from "@/features/vault/components/truncatable-text";
-import type { CipherIconLoadState } from "@/features/vault/types";
-import { toCipherIconAlt } from "@/features/vault/utils";
+import { useIcon } from "@/features/vault/hooks/use-icon";
 
 type CipherRowProps = {
   cipher: VaultCipherItemDto & {
-    iconUrl?: string | null;
+    iconHostname?: string | null;
   };
   selected: boolean;
   onClick: () => void;
-  iconLoadState?: CipherIconLoadState;
-  onIconError?: () => void;
-  onIconLoad?: () => void;
-  shouldLoadIcon?: boolean;
 };
 
-export function CipherRow({
-  cipher,
-  selected,
-  onClick,
-  iconLoadState = "fallback",
-  onIconError,
-  onIconLoad,
-  shouldLoadIcon = false,
-}: CipherRowProps) {
+export function CipherRow({ cipher, selected, onClick }: CipherRowProps) {
+  const { data: iconData } = useIcon(cipher.iconHostname ?? null);
+
   return (
     <button
       type="button"
@@ -41,23 +30,19 @@ export function CipherRow({
     >
       <div className="flex items-center gap-3 min-w-0">
         <CipherIcon
-          alt={toCipherIconAlt(cipher.name)}
+          alt={cipher.name ?? "Cipher"}
           className={[
             "bg-white text-slate-500 border shrink-0",
             selected ? "border-blue-200" : "border-slate-200",
           ].join(" ")}
-          iconUrl={cipher.iconUrl ?? null}
-          isVisible={shouldLoadIcon}
-          loadState={shouldLoadIcon ? iconLoadState : "idle"}
-          onError={onIconError}
-          onLoad={onIconLoad}
+          iconData={iconData}
         >
           {toCipherTypeIcon(cipher.type)}
         </CipherIcon>
         <div className="min-w-0 flex-1 shrink overflow-hidden">
           <TruncatableText
             text={cipher.name ?? "Untitled cipher"}
-            className="min-w-0 w-full text-sm font-semibold cursor-text"
+            className="min-w-0 w-full text-sm font-semibold select-none"
           />
           <div className="mt-1 truncate text-xs text-slate-500">
             {cipher.username ?? ""}

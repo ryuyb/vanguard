@@ -5,7 +5,8 @@ export type SpotlightItem = {
   subtitle: string;
   searchText: string;
   type: number;
-  iconUrl: string | null;
+  iconHostname: string | null;
+  iconData?: string | null;
 };
 
 export type CopyField =

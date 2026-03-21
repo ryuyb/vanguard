@@ -13,7 +13,7 @@ import {
   CipherIcon,
   toCipherTypeIcon,
 } from "@/features/vault/components/cipher-icon";
-import { toCipherIconAlt } from "@/features/vault/utils";
+
 import { cn } from "@/lib/utils";
 
 type SpotlightResultsPanelProps = {
@@ -63,10 +63,9 @@ export function SpotlightResultsPanel({
         >
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
             <CipherIcon
-              alt={toCipherIconAlt(detailItem.title)}
-              iconUrl={detailItem.iconUrl}
+              alt={detailItem.title}
+              iconData={detailItem.iconData ?? null}
               className="size-10 border-slate-200"
-              loadState={detailItem.iconUrl ? "loading" : "fallback"}
             >
               {toCipherTypeIcon(detailItem.type)}
             </CipherIcon>
@@ -135,10 +134,9 @@ export function SpotlightResultsPanel({
             >
               <div className="flex items-center gap-3">
                 <CipherIcon
-                  alt={toCipherIconAlt(item.title)}
-                  iconUrl={item.iconUrl}
+                  alt={item.title}
+                  iconData={item.iconData ?? null}
                   className="size-8 border-slate-200"
-                  loadState={item.iconUrl ? "loading" : "fallback"}
                 >
                   {toCipherTypeIcon(item.type)}
                 </CipherIcon>

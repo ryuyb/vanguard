@@ -1,11 +1,11 @@
-import * as React from "react"
+import * as React from "react";
 
-import { Input as BaseInput } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
+import { Input as BaseInput } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type TextInputProps = React.ComponentProps<typeof BaseInput> & {
-  inputGroup?: boolean
-}
+  inputGroup?: boolean;
+};
 
 const TextInput = React.forwardRef<
   React.ComponentRef<typeof BaseInput>,
@@ -28,7 +28,7 @@ const TextInput = React.forwardRef<
           className:
             "flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 aria-invalid:ring-0 dark:bg-transparent",
         }
-      : undefined
+      : undefined;
 
     return (
       <BaseInput
@@ -40,10 +40,10 @@ const TextInput = React.forwardRef<
         {...inputGroupProps}
         {...props}
       />
-    )
+    );
   },
-)
+);
 
-TextInput.displayName = "TextInput"
+TextInput.displayName = "TextInput";
 
-export { TextInput }
+export { TextInput };

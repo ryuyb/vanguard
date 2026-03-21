@@ -82,7 +82,7 @@ import { useVaultPageModel } from "@/features/vault/hooks";
 import { useCipherMutations } from "@/features/vault/hooks/use-cipher-mutations";
 import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
-import { getCipherIconUrl } from "@/features/vault/utils";
+
 import { vaultCipherDetailToSyncCipher } from "@/features/vault/utils/cipher-converter";
 import { toast } from "@/lib/toast";
 
@@ -179,7 +179,6 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
-    iconServer,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -190,8 +189,6 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     loadVaultData,
     lockLabel,
     logoutLabel,
-    markCipherIconFallback,
-    markCipherIconLoaded,
     noFolderCipherCount,
     onFolderTreeOpenChange,
     onLock,
@@ -975,18 +972,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                               <div className="min-w-0">
                                 <CipherRow
                                   cipher={cipher}
-                                  iconLoadState={cipher.iconLoadState}
                                   onClick={() => {
                                     void loadCipherDetail(cipher.id);
                                   }}
-                                  onIconError={() => {
-                                    markCipherIconFallback(cipher.id);
-                                  }}
-                                  onIconLoad={() => {
-                                    markCipherIconLoaded(cipher.id);
-                                  }}
                                   selected={cipher.id === selectedCipherId}
-                                  shouldLoadIcon={cipher.shouldLoadIcon}
                                 />
                               </div>
                             </ContextMenuTrigger>
@@ -1070,11 +1059,6 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <CipherDetailPanel
                             key={selectedCipherDetail.id}
                             cipher={selectedCipherDetail}
-                            iconServer={iconServer}
-                            iconUrl={getCipherIconUrl(
-                              selectedCipherDetail,
-                              iconServer,
-                            )}
                             mode={
                               selectedMenuId === TRASH_ID ? "trash" : "normal"
                             }

@@ -65,11 +65,8 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
         return;
       }
 
-      const iconServerResult = await commands.vaultGetIconServer();
-      const iconServer =
-        iconServerResult.status === "ok" ? iconServerResult.data : null;
       const ciphers = viewData.data.ciphers.map((cipher) =>
-        toCipherItem(cipher, iconServer),
+        toCipherItem(cipher),
       );
       setVaultItems(ciphers);
     } catch (error) {

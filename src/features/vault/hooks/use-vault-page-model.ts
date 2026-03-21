@@ -7,7 +7,6 @@ import {
 } from "@/bindings";
 import {
   ALL_ITEMS_ID,
-  DEFAULT_ICON_SERVER,
   FAVORITES_ID,
   NO_FOLDER_ID,
   TRASH_ID,
@@ -18,7 +17,7 @@ import { useExpandedFolderKeys } from "@/features/vault/hooks/use-expanded-folde
 import { useFilteredCiphers } from "@/features/vault/hooks/use-filtered-ciphers";
 import { useFolderSelectionGuard } from "@/features/vault/hooks/use-folder-selection-guard";
 import { useFoldersSync } from "@/features/vault/hooks/use-folders-sync";
-import { useIconState } from "@/features/vault/hooks/use-icon-state";
+
 import { useInlineSearchFocus } from "@/features/vault/hooks/use-inline-search-focus";
 import type {
   CipherSortBy,
@@ -30,9 +29,9 @@ import type {
 import {
   buildFolderTree,
   collectFolderTreeKeys,
-  getCipherIconUrl,
   sortFolders,
   toAvatarText,
+  toCipherIconHost,
 } from "@/features/vault/utils";
 import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
@@ -60,7 +59,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [userBaseUrl, setUserBaseUrl] = useState(
     appI18n.t("vault.page.user.unknownService"),
   );
-  const [iconServer, setIconServer] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -73,15 +71,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );
-
-  const {
-    setIconLoading,
-    setIconLoaded,
-    setIconFallback,
-    setCipherVisible,
-    cleanupStaleStates,
-    getIconLoadState,
-  } = useIconState();
 
   const {
     cipherDetailError,
@@ -142,17 +131,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
       setUserBaseUrl(
         restore.data.baseUrl ?? appI18n.t("vault.page.user.unknownService"),
       );
-
-      const iconServerResult = await commands.vaultGetIconServer();
-      if (iconServerResult.status === "ok") {
-        setIconServer(iconServerResult.data);
-      } else {
-        console.warn(
-          "Failed to fetch icon server, using default:",
-          iconServerResult.error,
-        );
-        setIconServer(DEFAULT_ICON_SERVER);
-      }
 
       const result = await commands.vaultGetViewData();
 
@@ -294,79 +272,36 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     viewData,
   });
 
-  // Separate icon URL generation from state to optimize re-renders
-  const cipherIconUrls = useMemo(
-    () =>
-      new Map(
-        filteredCiphers.map((cipher) => [
-          cipher.id,
-          getCipherIconUrl(cipher, iconServer),
-        ]),
-      ),
-    [filteredCiphers, iconServer],
-  );
-
+  // Icon data is now loaded directly from backend - no URL construction needed
   const ciphersWithIcons = useMemo<CipherWithIcon[]>(
     () =>
       filteredCiphers.map((cipher) => {
-        const iconUrl = cipherIconUrls.get(cipher.id) ?? null;
-        const iconLoadState = getIconLoadState(cipher.id, iconUrl ?? undefined);
-        const shouldLoadIcon =
-          iconUrl != null &&
-          (iconLoadState === "loading" ||
-            iconLoadState === "loaded" ||
-            iconLoadState === "fallback");
-
+        // Extract hostname from first URI for icon lookup
+        const firstUri = cipher.uris?.[0] ?? null;
+        const iconHostname = firstUri ? toCipherIconHost(firstUri) : null;
         return {
           ...cipher,
-          iconUrl,
-          iconLoadState,
-          shouldLoadIcon,
+          iconHostname,
         };
       }),
-    [cipherIconUrls, filteredCiphers, getIconLoadState],
-  );
-
-  const filteredCipherIds = useMemo(
-    () => filteredCiphers.map((cipher) => cipher.id),
     [filteredCiphers],
   );
 
-  // Clean up icon state when cipher list changes
-  useEffect(() => {
-    cleanupStaleStates(filteredCipherIds);
-  }, [cleanupStaleStates, filteredCipherIds]);
-
+  // Placeholder callbacks - icon loading is now handled by useIcon hook
   const setCipherRowVisible = useCallback(
-    (cipherId: string, visible: boolean) => {
-      setCipherVisible(cipherId, visible);
-
-      if (visible) {
-        const iconUrl = cipherIconUrls.get(cipherId);
-        const currentState = getIconLoadState(cipherId, iconUrl ?? undefined);
-        if (currentState === "idle") {
-          setIconLoading(cipherId);
-        }
-      }
+    (_cipherId: string, _visible: boolean) => {
+      // No-op - visibility tracking not needed with new icon system
     },
-    [cipherIconUrls, getIconLoadState, setCipherVisible, setIconLoading],
+    [],
   );
 
-  const markCipherIconLoaded = useCallback(
-    (cipherId: string) => {
-      const iconUrl = cipherIconUrls.get(cipherId);
-      setIconLoaded(cipherId, iconUrl ?? undefined);
-    },
-    [cipherIconUrls, setIconLoaded],
-  );
+  const markCipherIconLoaded = useCallback((_cipherId: string) => {
+    // No-op - loaded state handled by useIcon hook
+  }, []);
 
-  const markCipherIconFallback = useCallback(
-    (cipherId: string) => {
-      const iconUrl = cipherIconUrls.get(cipherId);
-      setIconFallback(cipherId, iconUrl ?? undefined);
-    },
-    [cipherIconUrls, setIconFallback],
-  );
+  const markCipherIconFallback = useCallback((_cipherId: string) => {
+    // No-op - error state handled by useIcon hook
+  }, []);
 
   useClearSelectionWhenMissing(filteredCiphers.map((cipher) => cipher.id));
 
@@ -458,7 +393,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
-    iconServer,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -508,7 +442,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount: Map<string, number>;
     folderTree: ReturnType<typeof buildFolderTree>;
     headerSearchQuery: string;
-    iconServer: string | null;
     inlineSearchInputRef: typeof inlineSearchInputRef;
     isCipherDetailLoading: boolean;
     isHeaderActionBusy: boolean;
