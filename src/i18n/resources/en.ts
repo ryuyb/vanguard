@@ -391,7 +391,8 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         loadingCipherDetail: "Loading item details...",
         sessionExpired: {
           title: "Session Expired",
-          description: "API session has expired, local data is still accessible. Please unlock with master password to restore sync functionality.",
+          description:
+            "API session has expired, local data is still accessible. Please unlock with master password to restore sync functionality.",
         },
       },
     },

@@ -88,7 +88,8 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   } = useUnifiedUnlock();
 
   // Debounced session expired warning to prevent flicker during unlock
-  const [showSessionExpiredWarning, setShowSessionExpiredWarning] = useState(false);
+  const [showSessionExpiredWarning, setShowSessionExpiredWarning] =
+    useState(false);
   useEffect(() => {
     if (!isVaultUnlockedSessionExpired) {
       setShowSessionExpiredWarning(false);

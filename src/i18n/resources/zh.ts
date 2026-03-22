@@ -378,7 +378,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         loadingCipherDetail: "正在加载条目详情...",
         sessionExpired: {
           title: "会话已过期",
-          description: "API 会话已过期，本地数据仍可访问。请使用主密码重新解锁以恢复同步功能。",
+          description:
+            "API 会话已过期，本地数据仍可访问。请使用主密码重新解锁以恢复同步功能。",
         },
       },
     },

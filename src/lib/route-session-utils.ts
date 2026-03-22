@@ -7,8 +7,8 @@ export async function resolveNextSessionRoute() {
     return "/" as const;
   }
 
-  const unlocked = await commands.vaultIsUnlocked();
-  if (unlocked.status === "ok" && unlocked.data) {
+  const unlockState = await commands.getUnlockState({});
+  if (unlockState.status === "ok" && unlockState.data.status !== "locked") {
     return "/vault" as const;
   }
 

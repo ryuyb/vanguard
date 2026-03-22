@@ -69,28 +69,6 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, ErrorP
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
-    let account_id = match state.active_account_id() {
-        Ok(value) => value,
-        Err(
-            AppError::ValidationFieldError { .. }
-            | AppError::ValidationFormatError { .. }
-            | AppError::ValidationRequired { .. },
-        ) => return Ok(false),
-        Err(error) => {
-            return Err(log_command_error("vault_is_unlocked", &error));
-        }
-    };
-
-    state
-        .get_vault_user_key(&account_id)
-        .await
-        .map(|value| value.is_some())
-        .map_err(|error| log_command_error("vault_is_unlocked", &error))
-}
-
-#[tauri::command]
-#[specta::specta]
 pub async fn vault_unlock(
     app_handle: AppHandle,
     state: State<'_, AppState>,

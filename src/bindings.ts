@@ -174,14 +174,6 @@ async vaultCanUnlock() : Promise<Result<boolean, ErrorPayload>> {
     else return { status: "error", error: e  as any };
 }
 },
-async vaultIsUnlocked() : Promise<Result<boolean, ErrorPayload>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_is_unlocked") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async vaultGetBiometricStatus() : Promise<Result<VaultBiometricStatusResponseDto, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_get_biometric_status") };
