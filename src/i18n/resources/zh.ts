@@ -352,6 +352,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         placeholder: "搜索密码库",
         inlinePlaceholder: "在 {{menu}} 中搜索",
         close: "关闭搜索",
+        searching: "搜索中...",
+        resultCount: "{{count}} 个结果",
       },
       sort: {
         ariaLabel: "排序条目",

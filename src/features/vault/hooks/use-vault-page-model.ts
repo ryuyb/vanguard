@@ -287,6 +287,37 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     [filteredCiphers],
   );
 
+  // Header search results - search across all non-deleted ciphers
+  const headerSearchResults = useMemo<CipherWithIcon[]>(() => {
+    const query = headerSearchQuery.trim().toLowerCase();
+    if (!query) return [];
+
+    const allCiphers = viewData?.ciphers ?? [];
+    const activeCiphers = allCiphers.filter(
+      (cipher) => cipher.deletedDate == null,
+    );
+
+    const matched = activeCiphers.filter((cipher) => {
+      const searchText = [cipher.name, cipher.username, ...(cipher.uris ?? [])]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return searchText.includes(query);
+    });
+
+    // Limit to 10 results
+    const limited = matched.slice(0, 10);
+
+    return limited.map((cipher) => {
+      const firstUri = cipher.uris?.[0] ?? null;
+      const iconHostname = firstUri ? toCipherIconHost(firstUri) : null;
+      return {
+        ...cipher,
+        iconHostname,
+      };
+    });
+  }, [headerSearchQuery, viewData?.ciphers]);
+
   // Placeholder callbacks - icon loading is now handled by useIcon hook
   const setCipherRowVisible = useCallback(
     (_cipherId: string, _visible: boolean) => {
@@ -393,6 +424,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
+    headerSearchResults,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -442,6 +474,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     folderCipherCount: Map<string, number>;
     folderTree: ReturnType<typeof buildFolderTree>;
     headerSearchQuery: string;
+    headerSearchResults: CipherWithIcon[];
     inlineSearchInputRef: typeof inlineSearchInputRef;
     isCipherDetailLoading: boolean;
     isHeaderActionBusy: boolean;

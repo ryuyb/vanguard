@@ -365,6 +365,8 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         placeholder: "Search vault",
         inlinePlaceholder: "Search in {{menu}}",
         close: "Close search",
+        searching: "Searching...",
+        resultCount: "{{count}} result(s)",
       },
       sort: {
         ariaLabel: "Sort items",

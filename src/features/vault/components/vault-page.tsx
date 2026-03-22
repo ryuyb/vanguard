@@ -68,6 +68,7 @@ import {
   type CipherTypeFilter,
   FAVORITES_ID,
   FolderTreeMenuItem,
+  HeaderSearchPanel,
   ICON_OBSERVER_CONFIG,
   NO_FOLDER_ID,
   TRASH_ID,
@@ -179,6 +180,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     folderCipherCount,
     folderTree,
     headerSearchQuery,
+    headerSearchResults,
     inlineSearchInputRef,
     isCipherDetailLoading,
     isHeaderActionBusy,
@@ -439,7 +441,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     <main className="flex h-dvh flex-col bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <header
         data-tauri-drag-region
-        className="w-full border-b border-slate-200/60 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-md md:px-8 md:py-2.5"
+        className="relative z-50 w-full border-b border-slate-200/60 bg-white/80 px-4 py-2 shadow-sm backdrop-blur-md md:px-8 md:py-2.5"
       >
         <div data-tauri-drag-region className="mx-auto w-full max-w-7xl">
           <div
@@ -459,6 +461,20 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                 onChange={(event) => setHeaderSearchQuery(event.target.value)}
                 className="h-9 pl-9 text-sm border-slate-200 bg-slate-50/50 focus:bg-white transition-colors"
               />
+              <AnimatePresence>
+                {headerSearchQuery.trim() && headerSearchResults.length > 0 && (
+                  <HeaderSearchPanel
+                    key="header-search-panel"
+                    results={headerSearchResults}
+                    onSelect={(cipherId) => {
+                      void loadCipherDetail(cipherId);
+                    }}
+                    onClose={() => {
+                      setHeaderSearchQuery("");
+                    }}
+                  />
+                )}
+              </AnimatePresence>
             </div>
 
             <div data-tauri-drag-region className="md:justify-self-end">
