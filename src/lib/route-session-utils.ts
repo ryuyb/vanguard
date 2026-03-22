@@ -1,5 +1,7 @@
 import { commands } from "@/bindings";
 
+export type SessionRoute = "/" | "/unlock" | "/vault";
+
 export async function resolveNextSessionRoute() {
   const restore = await commands.authRestoreState({});
   if (restore.status === "error" || restore.data.status === "needsLogin") {

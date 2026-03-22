@@ -20,13 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toErrorText } from "@/features/auth/shared/utils";
 import {
   APP_LOCALE_OPTIONS,
   type AppLocale,
   appI18n,
   changeAppLocale,
 } from "@/i18n";
+import { errorHandler } from "@/lib/error-handler";
 
 type VaultSettingsDialogProps = {
   open: boolean;
@@ -229,10 +229,8 @@ export function VaultSettingsDialog({
         setIsBiometricEnabled(biometricResult.data.enabled);
       } else {
         setErrorText(
-          toErrorText(
-            biometricResult.error,
+          biometricResult.error.message ??
             t("vault.dialogs.settings.errors.loadBiometricStatus"),
-          ),
         );
       }
 
@@ -241,18 +239,15 @@ export function VaultSettingsDialog({
         setIsPinEnabled(pinResult.data.enabled);
       } else {
         setErrorText(
-          toErrorText(
-            pinResult.error,
+          pinResult.error.message ??
             t("vault.dialogs.settings.errors.loadPinStatus"),
-          ),
         );
       }
     } catch (error) {
       setErrorText(
-        toErrorText(
-          error,
-          t("vault.dialogs.settings.errors.loadSecuritySettings"),
-        ),
+        error instanceof Error
+          ? error.message
+          : t("vault.dialogs.settings.errors.loadSecuritySettings"),
       );
     } finally {
       setIsStatusLoading(false);
@@ -293,9 +288,7 @@ export function VaultSettingsDialog({
         await changeAppLocale(newLocale);
         setLanguage(newLocale);
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -307,9 +300,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ launchOnLogin: checked });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -321,9 +312,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ showWebsiteIcon: checked });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -352,9 +341,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ spotlightAutofill: checked });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -365,9 +352,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ quickAccessShortcut: shortcut });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -378,9 +363,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ lockShortcut: shortcut });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -394,9 +377,7 @@ export function VaultSettingsDialog({
           requireMasterPasswordInterval: value,
         });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -408,9 +389,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ lockOnSleep: checked });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -422,9 +401,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ idleAutoLockDelay: value });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -436,9 +413,7 @@ export function VaultSettingsDialog({
       try {
         await commands.configUpdateAppConfig({ clipboardClearDelay: value });
       } catch (error) {
-        toast.error(
-          toErrorText(error, t("vault.dialogs.settings.errors.saveFailed")),
-        );
+        errorHandler.handle(error);
       }
     },
     [t],
@@ -458,24 +433,21 @@ export function VaultSettingsDialog({
           : await commands.vaultDisableBiometricUnlock({});
         if (result.status === "error") {
           setErrorText(
-            toErrorText(
-              result.error,
-              checked
+            result.error.message ??
+              (checked
                 ? t("vault.dialogs.settings.errors.enableBiometric")
-                : t("vault.dialogs.settings.errors.disableBiometric"),
-            ),
+                : t("vault.dialogs.settings.errors.disableBiometric")),
           );
           return;
         }
         setIsBiometricEnabled(checked);
       } catch (error) {
         setErrorText(
-          toErrorText(
-            error,
-            checked
+          error instanceof Error
+            ? error.message
+            : checked
               ? t("vault.dialogs.settings.errors.enableBiometric")
               : t("vault.dialogs.settings.errors.disableBiometric"),
-          ),
         );
       } finally {
         setIsBiometricBusy(false);
@@ -503,22 +475,19 @@ export function VaultSettingsDialog({
         const disableResult = await commands.vaultDisablePinUnlock({});
         if (disableResult.status === "error") {
           setErrorText(
-            toErrorText(
-              disableResult.error,
+            disableResult.error.message ??
               t("vault.dialogs.settings.errors.disablePin"),
-            ),
           );
           return;
         }
         setIsPinEnabled(false);
       } catch (error) {
         setErrorText(
-          toErrorText(
-            error,
-            checked
+          error instanceof Error
+            ? error.message
+            : checked
               ? t("vault.dialogs.settings.errors.enablePin")
               : t("vault.dialogs.settings.errors.disablePin"),
-          ),
         );
       } finally {
         setIsPinBusy(false);
@@ -544,10 +513,7 @@ export function VaultSettingsDialog({
       });
       if (result.status === "error") {
         setPinDialogError(
-          toErrorText(
-            result.error,
-            t("vault.dialogs.settings.errors.enablePin"),
-          ),
+          result.error.message ?? t("vault.dialogs.settings.errors.enablePin"),
         );
         return;
       }
@@ -557,7 +523,9 @@ export function VaultSettingsDialog({
       setPinInput("");
     } catch (error) {
       setPinDialogError(
-        toErrorText(error, t("vault.dialogs.settings.errors.enablePin")),
+        error instanceof Error
+          ? error.message
+          : t("vault.dialogs.settings.errors.enablePin"),
       );
     } finally {
       setIsPinBusy(false);

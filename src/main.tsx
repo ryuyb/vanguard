@@ -10,7 +10,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLocaleProvider, initializeAppI18n } from "@/i18n";
-import { resolveSessionRoute } from "@/lib/route-session";
+import { resolveNextSessionRoute } from "@/lib/route-session-utils";
 import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({ routeTree });
@@ -26,7 +26,7 @@ function shouldNavigateToResolvedRoute(currentPath: string, target: string) {
 
 async function syncRouteWithSession() {
   try {
-    const target = await resolveSessionRoute();
+    const target = await resolveNextSessionRoute();
     const currentPath = router.state.location.pathname;
     if (!shouldNavigateToResolvedRoute(currentPath, target)) {
       return;

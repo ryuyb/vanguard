@@ -43,7 +43,10 @@ import {
 } from "@/features/vault/utils";
 import { appI18n } from "@/i18n";
 import { errorHandler } from "@/lib/error-handler";
-import { resolveSessionRoute, type SessionRoute } from "@/lib/route-session";
+import {
+  resolveNextSessionRoute,
+  type SessionRoute,
+} from "@/lib/route-session-utils";
 
 export type VaultPageNavigationTarget = SessionRoute;
 
@@ -156,7 +159,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     setPageState("loading");
 
     try {
-      const target = await resolveSessionRoute();
+      const target = await resolveNextSessionRoute();
       if (target !== "/vault") {
         await navigateTo(target);
         return;

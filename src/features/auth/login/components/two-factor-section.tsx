@@ -11,8 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toProviderLabel } from "@/features/auth/login/login-flow-helpers";
 import type { TwoFactorState } from "@/features/auth/login/types";
-import { toProviderLabel } from "@/features/auth/login/utils";
 
 type TwoFactorSectionProps = {
   state: TwoFactorState;
