@@ -84,6 +84,7 @@ pub async fn vault_is_unlocked(state: State<'_, AppState>) -> Result<bool, Error
 
     state
         .get_vault_user_key(&account_id)
+        .await
         .map(|value| value.is_some())
         .map_err(|error| log_command_error("vault_is_unlocked", &error))
 }

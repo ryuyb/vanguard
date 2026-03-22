@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::application::dto::vault::{VaultUnlockContext, VaultUserKeyMaterial};
@@ -26,6 +25,10 @@ use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::auth_persistence::{
     decrypt_refresh_token, encrypt_refresh_token, encrypt_refresh_token_with_runtime,
     PersistedAuthState, PersistedAuthStateContext, SessionWrapRuntime,
+};
+use crate::bootstrap::config::AppConfig;
+use crate::bootstrap::unlock_state::{
+    AccountContext, SessionContext, UnifiedUnlockManager, VaultKeyMaterial,
 };
 use crate::infrastructure::desktop::FocusTracker;
 use crate::infrastructure::icon::IconService;
@@ -59,6 +62,124 @@ impl AuthSession {
             Ok(now_ms) => now_ms.saturating_add(duration_ms) >= self.expires_at_ms,
             Err(_) => true,
         }
+    }
+}
+
+// Conversion helpers between legacy types and UnifiedUnlockManager types
+
+impl From<AuthSession> for AccountContext {
+    fn from(session: AuthSession) -> Self {
+        Self {
+            account_id: session.account_id,
+            email: session.email,
+            base_url: session.base_url,
+            kdf: session.kdf,
+            kdf_iterations: session.kdf_iterations,
+            kdf_memory: session.kdf_memory,
+            kdf_parallelism: session.kdf_parallelism,
+        }
+    }
+}
+
+impl From<&AuthSession> for AccountContext {
+    fn from(session: &AuthSession) -> Self {
+        Self {
+            account_id: session.account_id.clone(),
+            email: session.email.clone(),
+            base_url: session.base_url.clone(),
+            kdf: session.kdf,
+            kdf_iterations: session.kdf_iterations,
+            kdf_memory: session.kdf_memory,
+            kdf_parallelism: session.kdf_parallelism,
+        }
+    }
+}
+
+impl From<AuthSession> for SessionContext {
+    fn from(session: AuthSession) -> Self {
+        use std::time::{Duration, Instant};
+        let expires_at = Instant::now()
+            + Duration::from_millis(
+                session
+                    .expires_at_ms
+                    .saturating_sub(now_unix_ms().unwrap_or(0))
+                    .max(0) as u64,
+            );
+        Self {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+            expires_at,
+            last_activity: Instant::now(),
+        }
+    }
+}
+
+impl From<&AuthSession> for SessionContext {
+    fn from(session: &AuthSession) -> Self {
+        use std::time::{Duration, Instant};
+        let expires_at = Instant::now()
+            + Duration::from_millis(
+                session
+                    .expires_at_ms
+                    .saturating_sub(now_unix_ms().unwrap_or(0))
+                    .max(0) as u64,
+            );
+        Self {
+            access_token: session.access_token.clone(),
+            refresh_token: session.refresh_token.clone(),
+            expires_at,
+            last_activity: Instant::now(),
+        }
+    }
+}
+
+impl From<VaultUserKey> for VaultKeyMaterial {
+    fn from(key: VaultUserKey) -> Self {
+        Self {
+            enc_key: key.enc_key.clone(),
+            mac_key: key.mac_key.clone(),
+        }
+    }
+}
+
+impl From<VaultKeyMaterial> for VaultUserKey {
+    fn from(key: VaultKeyMaterial) -> Self {
+        Self {
+            enc_key: key.enc_key.clone(),
+            mac_key: key.mac_key.clone(),
+        }
+    }
+}
+
+// Convert from SessionContext back to AuthSession (requires account context)
+fn session_context_to_auth_session(
+    session_ctx: &SessionContext,
+    account_ctx: &AccountContext,
+) -> AuthSession {
+    // Calculate expires_at_ms based on the remaining duration from now
+    let now_instant = Instant::now();
+    let now_ms = now_unix_ms().unwrap_or(0);
+    let expires_at_ms = if session_ctx.expires_at > now_instant {
+        now_ms
+            + session_ctx
+                .expires_at
+                .duration_since(now_instant)
+                .as_millis() as i64
+    } else {
+        now_ms
+    };
+
+    AuthSession {
+        account_id: account_ctx.account_id.clone(),
+        base_url: account_ctx.base_url.clone(),
+        email: account_ctx.email.clone(),
+        access_token: session_ctx.access_token.clone(),
+        refresh_token: session_ctx.refresh_token.clone(),
+        expires_at_ms,
+        kdf: account_ctx.kdf,
+        kdf_iterations: account_ctx.kdf_iterations,
+        kdf_memory: account_ctx.kdf_memory,
+        kdf_parallelism: account_ctx.kdf_parallelism,
     }
 }
 
@@ -97,8 +218,8 @@ pub struct AppState {
     restore_cipher_use_case: Arc<RestoreCipherUseCase>,
     fetch_cipher_use_case: Arc<FetchCipherUseCase>,
     text_injection_port: Arc<dyn TextInjectionPort>,
-    vault_user_keys: Arc<Mutex<HashMap<String, VaultUserKey>>>,
-    auth_session: Arc<Mutex<Option<AuthSession>>>,
+    // Unified unlock state manager - replaces vault_user_keys and auth_session
+    unlock_manager: Arc<UnifiedUnlockManager>,
     auth_states_dir: Arc<PathBuf>,
     auth_state_persist_lock: Arc<Mutex<()>>,
     persisted_auth_state: Arc<Mutex<Option<PersistedAuthState>>>,
@@ -127,6 +248,7 @@ impl AppState {
         fetch_cipher_use_case: Arc<FetchCipherUseCase>,
         text_injection_port: Arc<dyn TextInjectionPort>,
         auth_states_dir: PathBuf,
+        config: AppConfig,
     ) -> Self {
         let persisted_auth_state = match load_active_persisted_auth_state(&auth_states_dir) {
             Ok(value) => value,
@@ -141,6 +263,9 @@ impl AppState {
                 None
             }
         };
+
+        // Initialize unified unlock manager with config
+        let unlock_manager = UnifiedUnlockManager::new(config);
 
         Self {
             auth_service,
@@ -159,8 +284,7 @@ impl AppState {
             restore_cipher_use_case,
             fetch_cipher_use_case,
             text_injection_port,
-            vault_user_keys: Arc::new(Mutex::new(HashMap::new())),
-            auth_session: Arc::new(Mutex::new(None)),
+            unlock_manager,
             auth_states_dir: Arc::new(auth_states_dir),
             auth_state_persist_lock: Arc::new(Mutex::new(())),
             persisted_auth_state: Arc::new(Mutex::new(persisted_auth_state)),
@@ -242,54 +366,70 @@ impl AppState {
         Arc::clone(&self.text_injection_port)
     }
 
-    pub fn set_vault_user_key(&self, account_id: String, key: VaultUserKey) -> AppResult<()> {
-        let mut store = self
-            .vault_user_keys
-            .lock()
-            .map_err(|_| AppError::InternalUnexpected {
-                message: "failed to lock vault user key store".to_string(),
-            })?;
-        store.insert(account_id, key);
+    pub fn unlock_manager(&self) -> Arc<UnifiedUnlockManager> {
+        Arc::clone(&self.unlock_manager)
+    }
+
+    // Legacy methods - now delegate to UnifiedUnlockManager
+
+    pub async fn set_vault_user_key(
+        &self,
+        _account_id: String,
+        key: VaultUserKey,
+    ) -> AppResult<()> {
+        // Store key material in unlock manager
+        let key_material: VaultKeyMaterial = key.into();
+        self.unlock_manager.set_key_material(key_material).await?;
+
+        // Also ensure account context is set if we have it in persisted state
+        if self.unlock_manager.account_context().await.is_none() {
+            if let Ok(Some(persisted)) = self.persisted_auth_context() {
+                let account_ctx = AccountContext {
+                    account_id: persisted.account_id,
+                    email: persisted.email,
+                    base_url: persisted.base_url,
+                    kdf: persisted.kdf,
+                    kdf_iterations: persisted.kdf_iterations,
+                    kdf_memory: persisted.kdf_memory,
+                    kdf_parallelism: persisted.kdf_parallelism,
+                };
+                self.unlock_manager.set_account_context(account_ctx).await?;
+            }
+        }
+
         Ok(())
     }
 
-    pub fn remove_vault_user_key(&self, account_id: &str) -> AppResult<()> {
-        let mut store = self
-            .vault_user_keys
-            .lock()
-            .map_err(|_| AppError::InternalUnexpected {
-                message: "failed to lock vault user key store".to_string(),
-            })?;
-        store.remove(account_id);
+    pub async fn remove_vault_user_key(&self, _account_id: &str) -> AppResult<()> {
+        // Remove key material from unlock manager
+        self.unlock_manager.remove_key_material().await?;
         Ok(())
     }
 
-    pub fn get_vault_user_key(&self, account_id: &str) -> AppResult<Option<VaultUserKey>> {
-        let store = self
-            .vault_user_keys
-            .lock()
-            .map_err(|_| AppError::InternalUnexpected {
-                message: "failed to lock vault user key store".to_string(),
-            })?;
-        Ok(store.get(account_id).cloned())
+    pub async fn get_vault_user_key(&self, _account_id: &str) -> AppResult<Option<VaultUserKey>> {
+        // Get key material from unlock manager
+        let key_material = self.unlock_manager.key_material().await;
+        Ok(key_material.map(|k| k.into()))
     }
 
     pub async fn set_auth_session(&self, session: AuthSession) -> AppResult<()> {
-        let previous_account_id = {
-            let mut store = self
-                .auth_session
-                .lock()
-                .map_err(|_| AppError::InternalUnexpected {
-                    message: "failed to lock auth session store".to_string(),
-                })?;
-            let previous = store.as_ref().map(|value| value.account_id.clone());
-            *store = Some(session.clone());
-            previous
-        };
+        // Get previous account ID from unlock manager
+        let previous_account_id = self.unlock_manager.active_account_id().await.ok();
 
-        if let Some(previous_account_id) = previous_account_id {
-            if previous_account_id != session.account_id {
-                self.remove_vault_user_key(&previous_account_id)?;
+        // Convert AuthSession to AccountContext and SessionContext
+        let account_ctx: AccountContext = (&session).into();
+        let session_ctx: SessionContext = (&session).into();
+
+        // Update unlock manager with new session
+        self.unlock_manager
+            .set_account_context(account_ctx.clone())
+            .await?;
+        self.unlock_manager.update_session(session_ctx).await?;
+
+        // If account changed, remove old vault key
+        if let Some(prev_id) = previous_account_id {
+            if prev_id != session.account_id {
+                self.unlock_manager.remove_key_material().await?;
             }
         }
 
@@ -299,44 +439,45 @@ impl AppState {
         Ok(())
     }
 
-    pub fn clear_auth_session(&self) -> AppResult<()> {
-        let previous_account_id = {
-            let mut store = self
-                .auth_session
-                .lock()
-                .map_err(|_| AppError::InternalUnexpected {
-                    message: "failed to lock auth session store".to_string(),
-                })?;
-            let previous = store.as_ref().map(|value| value.account_id.clone());
-            *store = None;
-            previous
-        };
+    pub async fn clear_auth_session(&self) -> AppResult<()> {
+        // Get previous account ID before clearing
+        let previous_account_id = self.unlock_manager.active_account_id().await.ok();
 
-        if let Some(account_id) = previous_account_id {
-            self.remove_vault_user_key(&account_id)?;
+        // Clear session from unlock manager (keeps account context and vault keys)
+        self.unlock_manager.clear_session().await?;
+
+        // Remove vault key for the previous account
+        if let Some(_account_id) = previous_account_id {
+            self.unlock_manager.remove_key_material().await?;
         }
+
         self.clear_auth_wrap_runtime()?;
 
         Ok(())
     }
 
-    pub fn clear_all_auth_state(&self) -> AppResult<()> {
-        self.clear_auth_session()?;
+    pub async fn clear_all_auth_state(&self) -> AppResult<()> {
+        self.clear_auth_session().await?;
         self.clear_persisted_auth_state()
     }
 
-    pub fn auth_session(&self) -> AppResult<Option<AuthSession>> {
-        let store = self
-            .auth_session
-            .lock()
-            .map_err(|_| AppError::InternalUnexpected {
-                message: "failed to lock auth session store".to_string(),
-            })?;
-        Ok(store.clone())
+    pub async fn auth_session(&self) -> AppResult<Option<AuthSession>> {
+        // Reconstruct AuthSession from unlock manager state
+        let account_ctx = self.unlock_manager.account_context().await;
+        let session_ctx = self.unlock_manager.session_context().await;
+
+        match (account_ctx, session_ctx) {
+            (Some(account), Some(session)) => {
+                let auth_session = session_context_to_auth_session(&session, &account);
+                Ok(Some(auth_session))
+            }
+            _ => Ok(None),
+        }
     }
 
-    pub fn require_auth_session(&self) -> AppResult<AuthSession> {
-        self.auth_session()?
+    pub async fn require_auth_session(&self) -> AppResult<AuthSession> {
+        self.auth_session()
+            .await?
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "session".to_string(),
                 message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
@@ -344,9 +485,12 @@ impl AppState {
     }
 
     pub fn active_account_id(&self) -> AppResult<String> {
-        if let Some(session) = self.auth_session()? {
-            return Ok(session.account_id);
+        // Try to get from unlock manager (blocking)
+        if let Ok(account_id) = self.unlock_manager.active_account_id_blocking() {
+            return Ok(account_id);
         }
+
+        // Fall back to persisted context
         self.persisted_auth_context()?
             .map(|value| value.account_id)
             .ok_or_else(|| AppError::ValidationFieldError {
@@ -539,17 +683,36 @@ impl VaultRuntimePort for AppState {
     }
 
     fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
-        self.auth_session().map(|value| {
-            value.map(|session| VaultUnlockContext {
-                account_id: session.account_id,
-                base_url: session.base_url,
-                email: session.email,
-                kdf: session.kdf,
-                kdf_iterations: session.kdf_iterations,
-                kdf_memory: session.kdf_memory,
-                kdf_parallelism: session.kdf_parallelism,
-            })
-        })
+        // Use tokio's runtime to call async method from sync context
+        let rt = tokio::runtime::Handle::try_current();
+        match rt {
+            Ok(handle) => {
+                let account_ctx = handle.block_on(self.unlock_manager.account_context());
+                Ok(account_ctx.map(|ctx| VaultUnlockContext {
+                    account_id: ctx.account_id,
+                    base_url: ctx.base_url,
+                    email: ctx.email,
+                    kdf: ctx.kdf,
+                    kdf_iterations: ctx.kdf_iterations,
+                    kdf_memory: ctx.kdf_memory,
+                    kdf_parallelism: ctx.kdf_parallelism,
+                }))
+            }
+            Err(_) => {
+                // No runtime available, fall back to checking persisted context
+                AppState::persisted_auth_context(self).map(|value| {
+                    value.map(|persisted| VaultUnlockContext {
+                        account_id: persisted.account_id,
+                        base_url: persisted.base_url,
+                        email: persisted.email,
+                        kdf: persisted.kdf,
+                        kdf_iterations: persisted.kdf_iterations,
+                        kdf_memory: persisted.kdf_memory,
+                        kdf_parallelism: persisted.kdf_parallelism,
+                    })
+                })
+            }
+        }
     }
 
     fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
@@ -568,38 +731,60 @@ impl VaultRuntimePort for AppState {
 
     fn get_vault_user_key_material(
         &self,
-        account_id: &str,
+        _account_id: &str,
     ) -> AppResult<Option<VaultUserKeyMaterial>> {
-        self.get_vault_user_key(account_id).map(|value| {
-            value.map(|key| VaultUserKeyMaterial {
-                enc_key: key.enc_key.clone(),
-                mac_key: key.mac_key.clone(),
-                refresh_token: None,
-            })
-        })
+        // Use tokio's runtime to call async method from sync context
+        let rt = tokio::runtime::Handle::try_current();
+        match rt {
+            Ok(handle) => {
+                let key_material = handle.block_on(self.unlock_manager.key_material_dto());
+                Ok(key_material)
+            }
+            Err(_) => Ok(None),
+        }
     }
 
     fn set_vault_user_key_material(
         &self,
-        account_id: String,
+        _account_id: String,
         key: VaultUserKeyMaterial,
     ) -> AppResult<()> {
-        self.set_vault_user_key(
-            account_id,
-            VaultUserKey {
-                enc_key: key.enc_key,
-                mac_key: key.mac_key,
-            },
-        )
+        // Use tokio's runtime to call async method from sync context
+        let rt = tokio::runtime::Handle::try_current();
+        match rt {
+            Ok(handle) => {
+                let key_material: VaultKeyMaterial = key.into();
+                handle.block_on(self.unlock_manager.set_key_material(key_material))?;
+                Ok(())
+            }
+            Err(_) => Err(AppError::InternalUnexpected {
+                message: "No tokio runtime available".to_string(),
+            }),
+        }
     }
 
-    fn remove_vault_user_key_material(&self, account_id: &str) -> AppResult<()> {
-        self.remove_vault_user_key(account_id)
+    fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
+        // Use tokio's runtime to call async method from sync context
+        let rt = tokio::runtime::Handle::try_current();
+        match rt {
+            Ok(handle) => {
+                handle.block_on(self.unlock_manager.remove_key_material())?;
+                Ok(())
+            }
+            Err(_) => Ok(()), // Silently succeed if no runtime
+        }
     }
 
     fn get_refresh_token(&self) -> AppResult<Option<String>> {
-        self.auth_session()
-            .map(|session| session.and_then(|s| s.refresh_token.clone()))
+        // Use tokio's runtime to call async method from sync context
+        let rt = tokio::runtime::Handle::try_current();
+        match rt {
+            Ok(handle) => {
+                let token = handle.block_on(self.unlock_manager.refresh_token());
+                Ok(token)
+            }
+            Err(_) => Ok(None),
+        }
     }
 }
 

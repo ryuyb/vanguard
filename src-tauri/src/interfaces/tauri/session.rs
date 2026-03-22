@@ -75,7 +75,7 @@ pub async fn restore_auth_session_with_master_password(
                     .realtime_sync_service()
                     .stop_for_account(&persisted.context.account_id)
                     .await;
-                let _ = state.clear_all_auth_state();
+                let _ = state.clear_all_auth_state().await;
             }
             return Err(error);
         }
@@ -118,7 +118,7 @@ pub async fn restore_auth_session_with_master_password(
 
 async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSession> {
     loop {
-        let current = state.require_auth_session()?;
+        let current = state.require_auth_session().await?;
         if !force && !current.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
             return Ok(current);
         }
@@ -127,7 +127,7 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
         let singleflight_lock = acquire_refresh_singleflight_lock(&account_id)?;
         let decision = {
             let _guard = singleflight_lock.lock().await;
-            let latest = state.require_auth_session()?;
+            let latest = state.require_auth_session().await?;
             if latest.account_id != account_id {
                 RefreshDecision::Retry
             } else if !force && !latest.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
@@ -177,7 +177,7 @@ async fn refresh_auth_session_locked(
                     .realtime_sync_service()
                     .stop_for_account(&current.account_id)
                     .await;
-                let _ = state.clear_all_auth_state();
+                let _ = state.clear_all_auth_state().await;
             }
             return Err(error);
         }
@@ -313,7 +313,7 @@ pub async fn restore_auth_session_with_refresh_token(
                     .realtime_sync_service()
                     .stop_for_account(&persisted_context.account_id)
                     .await;
-                let _ = state.clear_all_auth_state();
+                let _ = state.clear_all_auth_state().await;
             }
             return Err(error);
         }

@@ -36,6 +36,7 @@ pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderDto>, 
     // 获取 vault_user_key 用于解密
     let user_key = state
         .get_vault_user_key(&auth_session.account_id)
+        .await
         .map_err(|error| log_command_error("list_folders", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -97,6 +98,7 @@ pub async fn create_folder(
     // 获取 vault_user_key 用于加密
     let user_key = state
         .get_vault_user_key(&auth_session.account_id)
+        .await
         .map_err(|error| log_command_error("create_folder", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -161,6 +163,7 @@ pub async fn rename_folder(
     // 获取 vault_user_key 用于加密
     let user_key = state
         .get_vault_user_key(&auth_session.account_id)
+        .await
         .map_err(|error| log_command_error("rename_folder", &error))?
         .ok_or_else(|| {
             log_command_error(

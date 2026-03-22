@@ -44,14 +44,20 @@ pub struct TrayFeature;
 impl TrayFeature {
     /// 更新托盘菜单(包括语言和锁定状态)
     pub fn update_menu<R: Runtime>(app_handle: &AppHandle<R>) {
-        // 检查是否已解锁
+        // 检查是否已解锁 - 使用 blocking 调用
         let is_unlocked = app_handle
             .try_state::<AppState>()
             .and_then(|state| {
-                state
-                    .active_account_id()
-                    .ok()
-                    .and_then(|account_id| state.get_vault_user_key(&account_id).ok().flatten())
+                state.active_account_id().ok().and_then(|account_id| {
+                    // Use tokio runtime to block on the async call
+                    let rt = tokio::runtime::Handle::try_current();
+                    match rt {
+                        Ok(handle) => handle
+                            .block_on(state.get_vault_user_key(&account_id))
+                            .unwrap_or_default(),
+                        Err(_) => None,
+                    }
+                })
             })
             .is_some();
 

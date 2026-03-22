@@ -106,7 +106,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         Arc::clone(&sync_service),
         Arc::clone(&fetch_cipher_use_case),
         sync_policy,
-        config.device_identifier,
+        config.device_identifier.clone(),
     ));
     let get_cipher_detail_use_case =
         Arc::new(GetCipherDetailUseCase::new(Arc::clone(&sync_service)));
@@ -165,6 +165,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         fetch_cipher_use_case,
         text_injection_port,
         auth_state_path,
+        config,
     ))
 }
 

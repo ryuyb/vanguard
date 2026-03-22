@@ -131,6 +131,7 @@ pub async fn vault_get_cipher_detail(
 
     let user_key = state
         .get_vault_user_key(&account_id)
+        .await
         .map_err(|error| log_command_error("vault_get_cipher_detail", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -285,6 +286,7 @@ pub async fn create_cipher(
 
     let session = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("create_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -298,6 +300,7 @@ pub async fn create_cipher(
 
     let user_key = state
         .get_vault_user_key(&account_id)
+        .await
         .map_err(|error| log_command_error("create_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -339,6 +342,7 @@ pub async fn update_cipher(
 
     let session = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("update_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -352,6 +356,7 @@ pub async fn update_cipher(
 
     let user_key = state
         .get_vault_user_key(&account_id)
+        .await
         .map_err(|error| log_command_error("update_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -394,6 +399,7 @@ pub async fn delete_cipher(
 
     let session = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("delete_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -431,6 +437,7 @@ pub async fn soft_delete_cipher(
 
     let session = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("soft_delete_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(
@@ -471,6 +478,7 @@ pub async fn restore_cipher(
 
     let session = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("restore_cipher", &error))?
         .ok_or_else(|| {
             log_command_error(

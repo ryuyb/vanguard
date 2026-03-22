@@ -73,7 +73,7 @@ pub async fn auth_login_with_password(
         .map_err(|error| log_command_error("auth_login_with_password", error))?;
 
     if !matches!(result, PasswordLoginOutcome::Authenticated(_)) {
-        let _ = state.clear_auth_session();
+        let _ = state.clear_auth_session().await;
     }
 
     if let PasswordLoginOutcome::Authenticated(session) = &result {
@@ -81,7 +81,7 @@ pub async fn auth_login_with_password(
             initialize_authenticated_session(&state, &base_url, &email, &master_password, session)
                 .await
         {
-            if let Err(clear_error) = state.clear_auth_session() {
+            if let Err(clear_error) = state.clear_auth_session().await {
                 log::warn!(
                     target: "vanguard::tauri::auth",
                     "failed to cleanup auth session after init error: [{}] {}",
@@ -119,6 +119,7 @@ pub async fn auth_restore_state(
 ) -> Result<RestoreAuthStateResponseDto, ErrorPayload> {
     if let Some(session) = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("auth_restore_state", error))?
     {
         return Ok(RestoreAuthStateResponseDto {
@@ -172,6 +173,7 @@ pub async fn auth_logout(
 ) -> Result<(), ErrorPayload> {
     let active_session_account_id = state
         .auth_session()
+        .await
         .map_err(|error| log_command_error("auth_logout", error))?
         .map(|value| value.account_id);
     let persisted_account_id = state
@@ -265,6 +267,7 @@ pub async fn auth_logout(
 
     state
         .clear_all_auth_state()
+        .await
         .map_err(|error| log_command_error("auth_logout", error))?;
     Ok(())
 }
@@ -383,7 +386,7 @@ pub async fn auth_register_finish(
     if let crate::application::dto::auth::PasswordLoginOutcome::Authenticated(session) =
         login_result
     {
-        initialize_authenticated_session(
+        match initialize_authenticated_session(
             &state,
             &request.base_url,
             &request.email,
@@ -391,10 +394,13 @@ pub async fn auth_register_finish(
             &session,
         )
         .await
-        .map_err(|error| {
-            let _ = state.clear_auth_session();
-            log_command_error("auth_register_finish", error)
-        })?;
+        {
+            Ok(_) => {}
+            Err(error) => {
+                let _ = state.clear_auth_session().await;
+                return Err(log_command_error("auth_register_finish", error));
+            }
+        }
     }
 
     Ok(())

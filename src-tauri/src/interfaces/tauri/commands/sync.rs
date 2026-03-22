@@ -68,6 +68,7 @@ pub async fn vault_sync_status(
 ) -> Result<SyncStatusResponseDto, ErrorPayload> {
     let account_id = state
         .require_auth_session()
+        .await
         .map(|value| value.account_id)
         .map_err(|error| log_command_error("vault_sync_status", error))?;
     let context = state
