@@ -1,10 +1,7 @@
 import { Globe, Mail, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { TextInput } from "@/components/text-input";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -78,7 +75,8 @@ export function RegisterForm({ form }: RegisterFormProps) {
                       <InputGroupAddon>
                         <Globe className="h-5 w-5 text-slate-400" />
                       </InputGroupAddon>
-                      <InputGroupInput
+                      <TextInput
+                        inputGroup
                         id="reg-base-url-custom"
                         type="url"
                         autoComplete="url"
@@ -115,7 +113,8 @@ export function RegisterForm({ form }: RegisterFormProps) {
                 <InputGroupAddon>
                   <Mail className="h-5 w-5 text-slate-400" />
                 </InputGroupAddon>
-                <InputGroupInput
+                <TextInput
+                  inputGroup
                   id="reg-email"
                   type="email"
                   autoComplete="email"
@@ -147,7 +146,8 @@ export function RegisterForm({ form }: RegisterFormProps) {
                 <InputGroupAddon>
                   <User className="h-5 w-5 text-slate-400" />
                 </InputGroupAddon>
-                <InputGroupInput
+                <TextInput
+                  inputGroup
                   id="reg-name"
                   type="text"
                   autoComplete="name"

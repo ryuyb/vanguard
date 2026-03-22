@@ -1,11 +1,8 @@
 import { LoaderCircle, Send, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -74,7 +71,8 @@ export function TwoFactorSection({
           <InputGroupAddon>
             <ShieldCheck className="text-slate-500" />
           </InputGroupAddon>
-          <InputGroupInput
+          <TextInput
+            inputGroup
             id="two-factor-token"
             type="text"
             inputMode="numeric"

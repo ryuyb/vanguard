@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { commands } from "@/bindings";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -1045,7 +1045,7 @@ export function VaultSettingsDialog({
                       )}
                     </div>
                     <div className="relative">
-                      <Input
+                      <TextInput
                         value={quickAccessShortcut}
                         onChange={(event) =>
                           setQuickAccessShortcut(event.target.value)
@@ -1090,7 +1090,7 @@ export function VaultSettingsDialog({
                       {t("vault.dialogs.settings.general.shortcuts.lock")}
                     </div>
                     <div className="relative">
-                      <Input
+                      <TextInput
                         value={lockShortcut}
                         onChange={(event) =>
                           setLockShortcut(event.target.value)
@@ -1159,7 +1159,7 @@ export function VaultSettingsDialog({
             }}
           >
             <div className="space-y-2">
-              <Input
+              <TextInput
                 autoFocus
                 type="password"
                 inputMode="numeric"

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { SyncCipher, VaultFolderItemDto } from "@/bindings";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -389,7 +389,7 @@ export function CipherFormDialog({
                   {t("vault.dialogs.cipherForm.fields.name")}{" "}
                   <span className="text-red-500">*</span>
                 </Label>
-                <Input
+                <TextInput
                   id="cipher-name"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -449,7 +449,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.username")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-username"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -471,7 +471,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.password")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-password"
                           type="password"
                           value={field.state.value}
@@ -495,7 +495,7 @@ export function CipherFormDialog({
                           {t("vault.dialogs.cipherForm.fields.totp")}
                         </Label>
                         <div className="flex gap-2">
-                          <Input
+                          <TextInput
                             id="cipher-totp"
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
@@ -570,7 +570,7 @@ export function CipherFormDialog({
                             key={`uri-${index}`}
                             className="flex gap-2 items-center"
                           >
-                            <Input
+                            <TextInput
                               value={uri}
                               onChange={(e) => {
                                 const updated = [...field.state.value];
@@ -634,7 +634,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.cardholderName")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-cardholder-name"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -656,7 +656,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.cardNumber")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-card-number"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -811,7 +811,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.securityCode")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-security-code"
                           type="password"
                           value={field.state.value}
@@ -889,7 +889,7 @@ export function CipherFormDialog({
                         >
                           {t("vault.dialogs.cipherForm.fields.sshFingerprint")}
                         </Label>
-                        <Input
+                        <TextInput
                           id="cipher-ssh-fingerprint"
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
@@ -938,7 +938,7 @@ export function CipherFormDialog({
                         className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
                       >
                         <div className="flex gap-2 items-start">
-                          <Input
+                          <TextInput
                             value={customField.name}
                             onChange={(e) => {
                               const updated = [...field.state.value];
@@ -1041,7 +1041,7 @@ export function CipherFormDialog({
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Input
+                          <TextInput
                             value={customField.value}
                             onChange={(e) => {
                               const updated = [...field.state.value];

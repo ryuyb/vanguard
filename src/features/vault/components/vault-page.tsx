@@ -27,6 +27,7 @@ import {
   type SyncCipher,
   type VaultCipherDetailDto,
 } from "@/bindings";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -52,7 +53,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -453,7 +453,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               className="relative w-full md:max-w-105 md:justify-self-center"
             >
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-              <Input
+              <TextInput
                 ref={searchInputRef}
                 type="search"
                 placeholder={t("vault.page.search.placeholder")}
@@ -816,7 +816,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.18, ease: "easeOut" }}
                         >
-                          <Input
+                          <TextInput
                             ref={inlineSearchInputRef}
                             type="search"
                             value={cipherSearchQuery}

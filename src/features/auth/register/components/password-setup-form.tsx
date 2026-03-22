@@ -1,8 +1,8 @@
 import { Eye, EyeOff, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordStrengthIndicator } from "@/features/auth/register/components/password-strength";
 import type { PwnedCheckResult } from "@/features/auth/register/hooks/use-password-strength";
@@ -73,7 +73,7 @@ export function PasswordSetupForm({
           {t("auth.register.form.masterPassword.label")}
         </Label>
         <div className="relative">
-          <Input
+          <TextInput
             id="password"
             type={showPassword ? "text" : "password"}
             value={password}
@@ -121,7 +121,7 @@ export function PasswordSetupForm({
           {t("auth.register.form.confirmPassword.label")}
         </Label>
         <div className="relative">
-          <Input
+          <TextInput
             id="confirmPassword"
             type={showConfirmPassword ? "text" : "password"}
             value={confirmPassword}
@@ -157,7 +157,7 @@ export function PasswordSetupForm({
         <Label htmlFor="passwordHint">
           {t("auth.register.form.passwordHint.label")}
         </Label>
-        <Input
+        <TextInput
           id="passwordHint"
           type="text"
           value={passwordHint}

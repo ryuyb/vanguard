@@ -9,12 +9,9 @@ import {
 import type { SubmitEventHandler } from "react";
 import { useTranslation } from "react-i18next";
 import type { RestoreAuthStateResponseDto } from "@/bindings";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { UnlockFeedbackAlert } from "@/features/auth/unlock/components/unlock-feedback-alert";
 import type { UnlockForm } from "@/features/auth/unlock/hooks/use-unlock-flow";
@@ -115,7 +112,8 @@ export function UnlockLockedForm({
                   <InputGroupAddon>
                     <KeyRound className="h-5 w-5 text-slate-400" />
                   </InputGroupAddon>
-                  <InputGroupInput
+                  <TextInput
+                    inputGroup
                     id="unlock-pin"
                     type="password"
                     inputMode="numeric"
@@ -145,7 +143,8 @@ export function UnlockLockedForm({
                   <InputGroupAddon>
                     <KeyRound className="h-5 w-5 text-slate-400" />
                   </InputGroupAddon>
-                  <InputGroupInput
+                  <TextInput
+                    inputGroup
                     id="unlock-master-password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"

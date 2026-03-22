@@ -1,10 +1,7 @@
 import { Globe } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { TextInput } from "@/components/text-input";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -77,7 +74,8 @@ export function ServerUrlField({
                     <InputGroupAddon>
                       <Globe className="h-5 w-5 text-slate-400" />
                     </InputGroupAddon>
-                    <InputGroupInput
+                    <TextInput
+                      inputGroup
                       id="base-url-custom"
                       type="url"
                       autoComplete="url"

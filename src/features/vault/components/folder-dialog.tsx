@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type FolderDialogProps = {
@@ -86,7 +86,7 @@ export function FolderDialog({
                   ? t("vault.dialogs.folder.subFolderNameLabel")
                   : t("vault.dialogs.folder.folderNameLabel")}
               </Label>
-              <Input
+              <TextInput
                 id="folder-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}

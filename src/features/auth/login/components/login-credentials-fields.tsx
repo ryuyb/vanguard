@@ -1,11 +1,8 @@
 import { Eye, EyeOff, KeyRound, Mail } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import type { LoginForm } from "@/features/auth/login/hooks/use-login-flow";
 import { FormFieldError } from "@/features/auth/shared/form-field-error";
@@ -38,7 +35,8 @@ export function LoginCredentialsFields({
                 <InputGroupAddon>
                   <Mail className="h-5 w-5 text-slate-400" />
                 </InputGroupAddon>
-                <InputGroupInput
+                <TextInput
+                  inputGroup
                   id="email"
                   type="email"
                   autoComplete="email"
@@ -72,7 +70,8 @@ export function LoginCredentialsFields({
                 <InputGroupAddon>
                   <KeyRound className="h-5 w-5 text-slate-400" />
                 </InputGroupAddon>
-                <InputGroupInput
+                <TextInput
+                  inputGroup
                   id="master-password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
