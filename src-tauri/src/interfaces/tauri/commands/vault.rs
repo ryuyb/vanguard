@@ -97,7 +97,7 @@ pub async fn vault_unlock(
 ) -> Result<(), ErrorPayload> {
     let method = request.method.clone();
 
-    build_unlock_use_case(&state)
+    let unlock_result = build_unlock_use_case(&state)
         .execute(
             &*state,
             UnlockVaultCommand {
@@ -125,16 +125,27 @@ pub async fn vault_unlock(
             );
         }
     } else {
-        // PIN 或生物识别解锁时，检查 auth_session 是否存在
-        // 如果不存在（例如应用重启后），记录警告（允许本地操作，但 API 调用会失败）
-        if state
-            .auth_session()
-            .map_err(|error| log_command_error("vault_unlock", &error))?
-            .is_none()
-        {
+        // PIN 或生物识别解锁时，使用存储的 refresh_token 恢复 session
+        if let Some(refresh_token) = unlock_result.refresh_token {
+            if let Err(error) =
+                crate::interfaces::tauri::session::restore_auth_session_with_refresh_token(
+                    &state,
+                    &refresh_token,
+                )
+                .await
+            {
+                log::warn!(
+                    target: "vanguard::tauri::vault",
+                    "vault_unlock with PIN/biometric succeeded but failed to restore auth session: [{}] {}",
+                    error.code(),
+                    error.log_message()
+                );
+            }
+        } else {
+            // 向后兼容：旧数据没有存储 refresh_token
             log::warn!(
                 target: "vanguard::tauri::vault",
-                "vault unlocked with PIN/biometric but auth session is missing, API calls will fail until master password unlock"
+                "vault unlocked with PIN/biometric but no refresh_token available, API calls may fail. Please re-enable PIN/biometric unlock."
             );
         }
     }

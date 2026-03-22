@@ -46,6 +46,7 @@ pub fn parse_user_key(raw: &str) -> Result<VaultUserKeyMaterial, AppError> {
         return Ok(VaultUserKeyMaterial {
             enc_key,
             mac_key: Some(mac_key),
+            refresh_token: None,
         });
     }
 
@@ -54,10 +55,12 @@ pub fn parse_user_key(raw: &str) -> Result<VaultUserKeyMaterial, AppError> {
         32 => Ok(VaultUserKeyMaterial {
             enc_key: raw_bytes,
             mac_key: None,
+            refresh_token: None,
         }),
         64 => Ok(VaultUserKeyMaterial {
             enc_key: raw_bytes[..32].to_vec(),
             mac_key: Some(raw_bytes[32..].to_vec()),
+            refresh_token: None,
         }),
         len => Err(AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -177,12 +180,14 @@ pub fn parse_user_key_material(raw: &[u8]) -> Result<VaultUserKeyMaterial, AppEr
             return Ok(VaultUserKeyMaterial {
                 enc_key: raw.to_vec(),
                 mac_key: None,
+                refresh_token: None,
             });
         }
         64 => {
             return Ok(VaultUserKeyMaterial {
                 enc_key: raw[..32].to_vec(),
                 mac_key: Some(raw[32..].to_vec()),
+                refresh_token: None,
             });
         }
         _ => {}

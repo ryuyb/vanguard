@@ -15,4 +15,7 @@ pub trait VaultRuntimePort: Send + Sync {
         key: VaultUserKeyMaterial,
     ) -> AppResult<()>;
     fn remove_vault_user_key_material(&self, account_id: &str) -> AppResult<()>;
+    /// Get the refresh token from the current auth session, if available.
+    /// Returns None if no session exists or session has no refresh token.
+    fn get_refresh_token(&self) -> AppResult<Option<String>>;
 }

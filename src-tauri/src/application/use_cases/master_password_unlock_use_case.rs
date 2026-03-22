@@ -102,6 +102,7 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
 
         Ok(UnlockVaultResult {
             account_id: unlock_context.account_id,
+            refresh_token: None,
         })
     }
 }
@@ -133,6 +134,7 @@ fn derive_wrapping_key_material(master_key: &[u8]) -> Result<VaultUserKeyMateria
     Ok(VaultUserKeyMaterial {
         enc_key: hkdf_expand_from_prk(master_key, b"enc", 32),
         mac_key: Some(hkdf_expand_from_prk(master_key, b"mac", 32)),
+        refresh_token: None,
     })
 }
 

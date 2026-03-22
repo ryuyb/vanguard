@@ -33,6 +33,7 @@ fn to_store_bundle(bundle: &VaultBiometricBundle) -> biometric_store::BiometricU
         bundle.account_id.clone(),
         bundle.enc_key_b64.clone(),
         bundle.mac_key_b64.clone(),
+        bundle.refresh_token.clone(),
     )
 }
 
@@ -41,5 +42,6 @@ fn from_store_bundle(bundle: biometric_store::BiometricUnlockBundle) -> VaultBio
         account_id: bundle.account_id,
         enc_key_b64: bundle.enc_key_b64,
         mac_key_b64: bundle.mac_key_b64,
+        refresh_token: bundle.refresh_token,
     }
 }

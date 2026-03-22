@@ -126,6 +126,7 @@ mod tests {
         VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         }
     }
 
@@ -159,6 +160,7 @@ mod tests {
         let key = VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: None,
+            refresh_token: None,
         };
         assert!(encrypt_aes256_hmac(b"test", &key).is_err());
     }

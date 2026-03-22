@@ -112,7 +112,10 @@ impl VaultBiometricUseCase {
                     .to_string(),
             })?;
 
-        let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key)?;
+        // Get refresh_token from runtime for session restoration
+        let refresh_token = runtime.get_refresh_token()?;
+
+        let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key, refresh_token)?;
         self.biometric_unlock_port
             .save_unlock_bundle(&account_id, &bundle)?;
         let verified_bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
@@ -176,14 +179,17 @@ impl VaultBiometricUseCase {
         }
 
         let user_key = biometric_bundle_to_vault_user_key(&bundle)?;
-        runtime.set_vault_user_key_material(account_id.clone(), user_key)?;
+        runtime.set_vault_user_key_material(account_id.clone(), user_key.clone())?;
 
         log::info!(
             target: "vanguard::application::vault_biometric",
             "vault unlocked with biometric account_id={}",
             account_id
         );
-        Ok(UnlockVaultResult { account_id })
+        Ok(UnlockVaultResult {
+            account_id,
+            refresh_token: user_key.refresh_token,
+        })
     }
 
     pub fn lock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
@@ -205,6 +211,7 @@ impl BiometricUnlockExecutor for VaultBiometricUseCase {
 fn vault_user_key_to_biometric_bundle(
     account_id: &str,
     user_key: &VaultUserKeyMaterial,
+    refresh_token: Option<String>,
 ) -> Result<VaultBiometricBundle, AppError> {
     vault_crypto::validate_key_lengths(&user_key.enc_key, user_key.mac_key.as_deref())?;
     Ok(VaultBiometricBundle {
@@ -214,6 +221,7 @@ fn vault_user_key_to_biometric_bundle(
             .mac_key
             .as_ref()
             .map(|value| STANDARD_NO_PAD.encode(value)),
+        refresh_token,
     })
 }
 
@@ -236,5 +244,9 @@ fn biometric_bundle_to_vault_user_key(
         .transpose()?;
     vault_crypto::validate_key_lengths(&enc_key, mac_key.as_deref())?;
 
-    Ok(VaultUserKeyMaterial { enc_key, mac_key })
+    Ok(VaultUserKeyMaterial {
+        enc_key,
+        mac_key,
+        refresh_token: bundle.refresh_token.clone(),
+    })
 }

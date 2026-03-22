@@ -56,6 +56,7 @@ mod tests {
         VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         }
     }
 

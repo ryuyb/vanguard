@@ -102,7 +102,10 @@ impl VaultPinUseCase {
                         .into(),
             })?;
 
-        let envelope = encrypt_user_key_with_pin(&pin, &user_key)?;
+        // Get refresh_token from runtime for session restoration
+        let refresh_token = runtime.get_refresh_token()?;
+
+        let envelope = encrypt_user_key_with_pin(&pin, &user_key, refresh_token.as_deref())?;
         self.pin_unlock_port
             .save_pin_envelope(&account_id, command.lock_type, &envelope)
             .await?;
@@ -206,7 +209,7 @@ impl PinUnlockExecutor for VaultPinUseCase {
             .load_pin_envelope(&account_id, lock_type)
             .await?;
         let user_key = decrypt_user_key_with_pin(pin.trim(), &envelope)?;
-        runtime.set_vault_user_key_material(account_id.clone(), user_key)?;
+        runtime.set_vault_user_key_material(account_id.clone(), user_key.clone())?;
 
         log::info!(
             target: "vanguard::application::vault_pin",
@@ -215,13 +218,17 @@ impl PinUnlockExecutor for VaultPinUseCase {
             pin_lock_type_name(lock_type)
         );
 
-        Ok(UnlockVaultResult { account_id })
+        Ok(UnlockVaultResult {
+            account_id,
+            refresh_token: user_key.refresh_token,
+        })
     }
 }
 
 fn encrypt_user_key_with_pin(
     pin: &str,
     user_key: &VaultUserKeyMaterial,
+    refresh_token: Option<&str>,
 ) -> AppResult<PinProtectedUserKeyEnvelope> {
     let trimmed_pin = pin.trim();
     if trimmed_pin.is_empty() {
@@ -251,12 +258,36 @@ fn encrypt_user_key_with_pin(
             message: "failed to encrypt pin envelope".into(),
         })?;
 
+    // Encrypt refresh_token if provided (using the same key but different nonce)
+    let encrypted_refresh_token = if let Some(token) = refresh_token {
+        let mut rt_nonce = [0u8; PIN_NONCE_LEN];
+        rand::rng().fill(&mut rt_nonce);
+        let rt_cipher = XChaCha20Poly1305::new_from_slice(&derived_key).map_err(|_| {
+            AppError::InternalUnexpected {
+                message: "failed to initialize refresh token cipher".into(),
+            }
+        })?;
+        let rt_ciphertext = rt_cipher
+            .encrypt(XNonce::from_slice(&rt_nonce), token.as_bytes())
+            .map_err(|_| AppError::InternalUnexpected {
+                message: "failed to encrypt refresh token".into(),
+            })?;
+        Some(format!(
+            "{}:{}",
+            STANDARD_NO_PAD.encode(rt_nonce),
+            STANDARD_NO_PAD.encode(rt_ciphertext)
+        ))
+    } else {
+        None
+    };
+
     Ok(PinProtectedUserKeyEnvelope {
         algorithm: String::from(PIN_ENVELOPE_ALGORITHM),
         kdf: String::from(PIN_ENVELOPE_KDF),
         salt_b64: STANDARD_NO_PAD.encode(salt),
         nonce_b64: STANDARD_NO_PAD.encode(nonce),
         ciphertext_b64: STANDARD_NO_PAD.encode(ciphertext),
+        refresh_token: encrypted_refresh_token,
     })
 }
 
@@ -312,7 +343,51 @@ fn decrypt_user_key_with_pin(
         .decrypt(XNonce::from_slice(&nonce), ciphertext.as_ref())
         .map_err(|_| AppError::AuthInvalidPin)?;
 
-    vault_crypto::parse_user_key_material(&plaintext)
+    let user_key = vault_crypto::parse_user_key_material(&plaintext)?;
+
+    // Decrypt refresh_token if present
+    let refresh_token = if let Some(encrypted_rt) = &envelope.refresh_token {
+        // Format: "nonce:ciphertext"
+        let parts: Vec<&str> = encrypted_rt.split(':').collect();
+        if parts.len() != 2 {
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: "invalid refresh token format in pin envelope".into(),
+            });
+        }
+        let rt_nonce = vault_crypto::decode_base64_flexible(parts[0], "pin.refresh_token_nonce")?;
+        if rt_nonce.len() != PIN_NONCE_LEN {
+            return Err(AppError::ValidationFieldError {
+                field: "unknown".to_string(),
+                message: format!(
+                    "pin envelope refresh token nonce length must be {PIN_NONCE_LEN} bytes"
+                ),
+            });
+        }
+        let rt_ciphertext =
+            vault_crypto::decode_base64_flexible(parts[1], "pin.refresh_token_ciphertext")?;
+        let rt_cipher = XChaCha20Poly1305::new_from_slice(&derived_key).map_err(|_| {
+            AppError::InternalUnexpected {
+                message: "failed to initialize refresh token cipher".into(),
+            }
+        })?;
+        let rt_plaintext = rt_cipher
+            .decrypt(XNonce::from_slice(&rt_nonce), rt_ciphertext.as_ref())
+            .map_err(|_| AppError::AuthInvalidPin)?;
+        Some(
+            String::from_utf8(rt_plaintext).map_err(|_| AppError::InternalUnexpected {
+                message: "refresh token is not valid utf-8".into(),
+            })?,
+        )
+    } else {
+        None
+    };
+
+    Ok(VaultUserKeyMaterial {
+        enc_key: user_key.enc_key,
+        mac_key: user_key.mac_key,
+        refresh_token,
+    })
 }
 
 fn serialize_user_key(user_key: &VaultUserKeyMaterial) -> AppResult<Vec<u8>> {
@@ -434,6 +509,10 @@ mod tests {
         fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
             *self.user_key.lock().expect("user_key lock") = None;
             Ok(())
+        }
+
+        fn get_refresh_token(&self) -> AppResult<Option<String>> {
+            Ok(None)
         }
     }
 
@@ -566,6 +645,7 @@ mod tests {
         VaultUserKeyMaterial {
             enc_key: vec![3u8; 32],
             mac_key: Some(vec![7u8; 32]),
+            refresh_token: None,
         }
     }
 

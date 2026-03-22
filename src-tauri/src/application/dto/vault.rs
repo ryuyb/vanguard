@@ -10,6 +10,7 @@ pub use crate::application::dto::folder::{
     CreateFolderRequest, DeleteFolderRequest, RenameFolderRequest,
 };
 pub use crate::application::dto::unlock::{
-    EnablePinUnlockCommand, UnlockVaultCommand, UnlockVaultResult, VaultBiometricBundle,
-    VaultBiometricStatus, VaultPinStatus, VaultUnlockContext, VaultUserKeyMaterial,
+    EnableBiometricUnlockCommand, EnablePinUnlockCommand, UnlockVaultCommand, UnlockVaultResult,
+    VaultBiometricBundle, VaultBiometricStatus, VaultPinStatus, VaultUnlockContext,
+    VaultUserKeyMaterial,
 };

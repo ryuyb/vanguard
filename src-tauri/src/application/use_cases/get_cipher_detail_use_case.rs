@@ -706,6 +706,7 @@ mod tests {
         let key = VaultUserKeyMaterial {
             enc_key: enc_key.to_vec(),
             mac_key: Some(mac_key.to_vec()),
+            refresh_token: None,
         };
 
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
@@ -720,6 +721,7 @@ mod tests {
         let key = VaultUserKeyMaterial {
             enc_key: enc_key.to_vec(),
             mac_key: None,
+            refresh_token: None,
         };
 
         let cipher = encrypt_type2("hello-vault", &enc_key, &mac_key);
@@ -734,6 +736,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: enc_key.to_vec(),
             mac_key: Some(mac_key.to_vec()),
+            refresh_token: None,
         };
         let encrypted_name = encrypt_type2("demo", &enc_key, &mac_key);
         let encrypted_password = encrypt_type2("history-pass", &enc_key, &mac_key);
@@ -817,6 +820,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: user_enc_key.to_vec(),
             mac_key: Some(user_mac_key.to_vec()),
+            refresh_token: None,
         };
 
         let cipher_enc_key = [3u8; 32];
@@ -878,6 +882,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: [1u8; 32].to_vec(),
             mac_key: Some([2u8; 32].to_vec()),
+            refresh_token: None,
         };
         let cipher = SyncCipher {
             id: String::from("cipher-1"),
@@ -920,6 +925,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: [1u8; 32].to_vec(),
             mac_key: Some([2u8; 32].to_vec()),
+            refresh_token: None,
         };
         let cipher = SyncCipher {
             id: String::from("cipher-1"),

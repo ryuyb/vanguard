@@ -8,6 +8,8 @@ pub struct UnlockVaultCommand {
 #[derive(Debug, Clone)]
 pub struct UnlockVaultResult {
     pub account_id: String,
+    /// Optional refresh token for automatic session restoration after PIN/biometric unlock
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -15,6 +17,9 @@ pub struct EnablePinUnlockCommand {
     pub pin: String,
     pub lock_type: PinLockType,
 }
+
+#[derive(Debug, Clone)]
+pub struct EnableBiometricUnlockCommand;
 
 #[derive(Debug, Clone)]
 pub struct VaultPinStatus {
@@ -45,10 +50,14 @@ pub struct VaultBiometricBundle {
     pub account_id: String,
     pub enc_key_b64: String,
     pub mac_key_b64: Option<String>,
+    /// Optional refresh token for automatic session restoration
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct VaultUserKeyMaterial {
     pub enc_key: Vec<u8>,
     pub mac_key: Option<Vec<u8>>,
+    /// Optional refresh token for automatic session restoration
+    pub refresh_token: Option<String>,
 }

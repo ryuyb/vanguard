@@ -262,6 +262,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         };
 
         let cipher = SyncCipher {
@@ -318,6 +319,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         };
 
         let cipher = SyncCipher {
@@ -389,6 +391,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         };
 
         // Pre-encrypt a value
@@ -437,6 +440,7 @@ mod tests {
         let user_key = VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         };
 
         let cipher = SyncCipher {

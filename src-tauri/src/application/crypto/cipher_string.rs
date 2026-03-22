@@ -84,6 +84,7 @@ mod tests {
         VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         }
     }
 
@@ -131,6 +132,7 @@ mod tests {
         let wrong_key = VaultUserKeyMaterial {
             enc_key: vec![9u8; 32],
             mac_key: Some(vec![8u8; 32]),
+            refresh_token: None,
         };
         assert!(decrypt(&cs, &wrong_key).is_err());
     }

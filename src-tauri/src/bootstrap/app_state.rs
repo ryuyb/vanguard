@@ -574,6 +574,7 @@ impl VaultRuntimePort for AppState {
             value.map(|key| VaultUserKeyMaterial {
                 enc_key: key.enc_key.clone(),
                 mac_key: key.mac_key.clone(),
+                refresh_token: None,
             })
         })
     }
@@ -594,6 +595,11 @@ impl VaultRuntimePort for AppState {
 
     fn remove_vault_user_key_material(&self, account_id: &str) -> AppResult<()> {
         self.remove_vault_user_key(account_id)
+    }
+
+    fn get_refresh_token(&self) -> AppResult<Option<String>> {
+        self.auth_session()
+            .map(|session| session.and_then(|s| s.refresh_token.clone()))
     }
 }
 

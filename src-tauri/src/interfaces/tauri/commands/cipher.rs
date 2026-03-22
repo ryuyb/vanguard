@@ -501,6 +501,7 @@ impl From<&VaultUserKey> for VaultUserKeyMaterial {
         Self {
             enc_key: user_key.enc_key.clone(),
             mac_key: user_key.mac_key.clone(),
+            refresh_token: None,
         }
     }
 }

@@ -37,4 +37,17 @@ pub struct PinProtectedUserKeyEnvelope {
     pub salt_b64: String,
     pub nonce_b64: String,
     pub ciphertext_b64: String,
+    /// Optional refresh token encrypted alongside user keys (for session restoration)
+    pub refresh_token: Option<String>,
+}
+
+/// Bundle for biometric unlock containing user keys and optional refresh token.
+/// The refresh_token allows automatic session restoration after biometric authentication.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BiometricUnlockBundle {
+    pub account_id: String,
+    pub enc_key: Vec<u8>,
+    pub mac_key: Option<Vec<u8>>,
+    /// Optional refresh token for automatic session restoration
+    pub refresh_token: Option<String>,
 }

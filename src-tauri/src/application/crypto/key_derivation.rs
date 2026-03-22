@@ -48,6 +48,7 @@ pub fn derive_stretched_master_key(master_key: &[u8]) -> Result<VaultUserKeyMate
     Ok(VaultUserKeyMaterial {
         enc_key: hkdf_expand(master_key, b"enc", 32),
         mac_key: Some(hkdf_expand(master_key, b"mac", 32)),
+        refresh_token: None,
     })
 }
 

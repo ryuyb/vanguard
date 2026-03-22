@@ -15,6 +15,7 @@ pub fn generate_encrypted_symmetric_key(
     let user_key = VaultUserKeyMaterial {
         enc_key: raw[..32].to_vec(),
         mac_key: Some(raw[32..].to_vec()),
+        refresh_token: None,
     };
 
     let encrypted = cipher_string::encrypt(&raw, stretched_master_key)?;
@@ -33,6 +34,7 @@ mod tests {
         VaultUserKeyMaterial {
             enc_key: vec![1u8; 32],
             mac_key: Some(vec![2u8; 32]),
+            refresh_token: None,
         }
     }
 

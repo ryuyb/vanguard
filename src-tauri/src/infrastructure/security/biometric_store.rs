@@ -11,15 +11,23 @@ pub struct BiometricUnlockBundle {
     pub account_id: String,
     pub enc_key_b64: String,
     pub mac_key_b64: Option<String>,
+    /// Optional refresh token for automatic session restoration
+    pub refresh_token: Option<String>,
 }
 
 impl BiometricUnlockBundle {
-    pub fn new(account_id: String, enc_key_b64: String, mac_key_b64: Option<String>) -> Self {
+    pub fn new(
+        account_id: String,
+        enc_key_b64: String,
+        mac_key_b64: Option<String>,
+        refresh_token: Option<String>,
+    ) -> Self {
         Self {
             version: BIOMETRIC_BUNDLE_VERSION,
             account_id,
             enc_key_b64,
             mac_key_b64,
+            refresh_token,
         }
     }
 }

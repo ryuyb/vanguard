@@ -142,6 +142,10 @@ mod tests {
         fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
             Ok(())
         }
+
+        fn get_refresh_token(&self) -> AppResult<Option<String>> {
+            Ok(None)
+        }
     }
 
     struct RecordingMasterExecutor {
@@ -161,6 +165,7 @@ mod tests {
                 .push(master_password);
             Ok(UnlockVaultResult {
                 account_id: runtime.active_account_id()?,
+                refresh_token: None,
             })
         }
     }
@@ -179,6 +184,7 @@ mod tests {
             self.calls.lock().expect("pin calls lock").push(pin);
             Ok(UnlockVaultResult {
                 account_id: runtime.active_account_id()?,
+                refresh_token: None,
             })
         }
     }
@@ -197,6 +203,7 @@ mod tests {
             *guard += 1;
             Ok(UnlockVaultResult {
                 account_id: runtime.active_account_id()?,
+                refresh_token: None,
             })
         }
     }
