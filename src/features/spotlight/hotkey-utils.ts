@@ -1,8 +1,14 @@
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { CopyField } from "@/features/spotlight/types";
 
+// 支持 React 和原生两种 KeyboardEvent 类型
+type KeyboardEventLike = Pick<
+  KeyboardEvent,
+  "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey"
+>;
+
 export function toCopyFieldFromShortcut(
-  event: KeyboardEvent<HTMLInputElement>,
+  event: ReactKeyboardEvent<HTMLInputElement> | KeyboardEventLike,
 ): CopyField | null {
   const normalizedKey = event.key.toLowerCase();
   const isCopyShortcut =
