@@ -34,6 +34,8 @@ pub fn run() {
             interfaces::tauri::commands::sync::vault_sync_now,
             interfaces::tauri::commands::sync::vault_sync_status,
             interfaces::tauri::commands::sync::vault_sync_check_revision,
+            interfaces::tauri::commands::unlock_state::get_unlock_state,
+            interfaces::tauri::commands::unlock_state::refresh_session,
             interfaces::tauri::commands::vault::vault_can_unlock,
             interfaces::tauri::commands::vault::vault_is_unlocked,
             interfaces::tauri::commands::vault::vault_get_biometric_status,
@@ -68,7 +70,8 @@ pub fn run() {
             interfaces::tauri::events::sync::VaultFoldersSynced,
             interfaces::tauri::events::cipher::CipherCreated,
             interfaces::tauri::events::cipher::CipherUpdated,
-            interfaces::tauri::events::cipher::CipherDeleted
+            interfaces::tauri::events::cipher::CipherDeleted,
+            interfaces::tauri::events::unlock_state::UnlockStateChanged
         ]);
 
     let invoke_handler = specta_builder.invoke_handler();
@@ -128,11 +131,30 @@ pub fn run() {
                 },
             )?;
             app.manage(app_state);
+
             Ok(())
         })
         .invoke_handler(invoke_handler)
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            #[cfg(desktop)]
+            if let tauri::RunEvent::Resumed = event {
+                // Handle system resume - lock vault if lock_on_sleep is enabled
+                if let Some(state) = app_handle.try_state::<bootstrap::app_state::AppState>() {
+                    let manager = state.unlock_manager();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = manager.handle_system_resume().await {
+                            log::warn!(
+                                target: "vanguard::unlock_state",
+                                "Failed to handle system resume: {}",
+                                e.log_message()
+                            );
+                        }
+                    });
+                }
+            }
+        });
 }
 
 #[cfg(debug_assertions)]

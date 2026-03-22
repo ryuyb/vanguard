@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tauri::{Manager, Runtime};
+use tauri::{Emitter, Manager, Runtime};
 
 use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
@@ -26,6 +26,7 @@ use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
+use crate::bootstrap::unlock_state::{UnlockState, UnlockStatus};
 use crate::infrastructure::desktop::EnigoTextInjectionAdapter;
 use crate::infrastructure::persistence::{
     SqliteMasterPasswordUnlockDataPort, SqliteVaultRepository,
@@ -36,7 +37,9 @@ use crate::infrastructure::security::pin_unlock_port_adapter::KeychainPinUnlockP
 use crate::infrastructure::vaultwarden::{
     VaultwardenClient, VaultwardenConfig, VaultwardenNotificationPort, VaultwardenRemotePort,
 };
+use crate::interfaces::tauri::dto::unlock_state::UnlockStatusDto;
 use crate::interfaces::tauri::events::sync_event_adapter::TauriSyncEventAdapter;
+use crate::interfaces::tauri::events::unlock_state::{UnlockStateChanged, UnlockStateEvent};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -147,7 +150,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         Arc::clone(&sync_event_port),
     ));
 
-    Ok(AppState::new(
+    let app_state = AppState::new(
         auth_service,
         sync_service,
         realtime_sync_service,
@@ -166,7 +169,12 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         text_injection_port,
         auth_state_path,
         config,
-    ))
+    );
+
+    // Setup state change event emitter
+    setup_state_event_emitter(manager.app_handle().clone(), &app_state);
+
+    Ok(app_state)
 }
 
 fn resolve_sqlite_dir<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<std::path::PathBuf> {
@@ -205,4 +213,44 @@ fn resolve_auth_state_path<R: Runtime, M: Manager<R>>(
         ),
     })?;
     Ok(auth_states_dir)
+}
+
+/// Setup state change event emitter for Tauri events
+fn setup_state_event_emitter<R: Runtime>(app_handle: tauri::AppHandle<R>, app_state: &AppState) {
+    let manager = app_state.unlock_manager();
+
+    manager.set_on_state_change(move |old_state: &UnlockState, new_state: &UnlockState| {
+        let old_status = unlock_status_to_dto(old_state.status);
+        let new_status = unlock_status_to_dto(new_state.status);
+
+        let event_dto = UnlockStateEvent {
+            old_status,
+            new_status,
+            has_key_material: new_state.key_material.is_some(),
+            account_id: new_state
+                .account_context
+                .as_ref()
+                .map(|ctx| ctx.account_id.clone()),
+        };
+
+        if let Err(e) = app_handle.emit(
+            "unlock-state:changed",
+            UnlockStateChanged { event: event_dto },
+        ) {
+            log::warn!(
+                target: "vanguard::wiring",
+                "Failed to emit unlock state change event: {}",
+                e
+            );
+        }
+    });
+}
+
+fn unlock_status_to_dto(status: UnlockStatus) -> UnlockStatusDto {
+    match status {
+        UnlockStatus::Locked => UnlockStatusDto::Locked,
+        UnlockStatus::VaultUnlockedSessionExpired => UnlockStatusDto::VaultUnlockedSessionExpired,
+        UnlockStatus::FullyUnlocked => UnlockStatusDto::FullyUnlocked,
+        UnlockStatus::Unlocking => UnlockStatusDto::Unlocking,
+    }
 }

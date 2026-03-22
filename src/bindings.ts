@@ -144,6 +144,28 @@ async vaultSyncCheckRevision(request: SyncStatusRequestDto) : Promise<Result<Syn
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Get current unlock state
+ */
+async getUnlockState(request: GetUnlockStateRequestDto) : Promise<Result<UnlockStateResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_unlock_state", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Manually refresh the session
+ */
+async refreshSession(request: RefreshSessionRequestDto) : Promise<Result<RefreshSessionResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("refresh_session", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async vaultCanUnlock() : Promise<Result<boolean, ErrorPayload>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock") };
@@ -367,6 +389,7 @@ export const events = __makeEvents__<{
 cipherCreated: CipherCreated,
 cipherDeleted: CipherDeleted,
 cipherUpdated: CipherUpdated,
+unlockStateChanged: UnlockStateChanged,
 vaultFoldersSynced: VaultFoldersSynced,
 vaultSyncAuthRequired: VaultSyncAuthRequired,
 vaultSyncFailed: VaultSyncFailed,
@@ -377,6 +400,7 @@ vaultSyncSucceeded: VaultSyncSucceeded
 cipherCreated: "cipher:created",
 cipherDeleted: "cipher:deleted",
 cipherUpdated: "cipher:updated",
+unlockStateChanged: "unlock-state:changed",
 vaultFoldersSynced: "vault-folders:synced",
 vaultSyncAuthRequired: "vault-sync:auth-required",
 vaultSyncFailed: "vault-sync:failed",
@@ -391,6 +415,10 @@ vaultSyncSucceeded: "vault-sync:succeeded"
 
 /** user-defined types **/
 
+/**
+ * Account context information (non-sensitive)
+ */
+export type AccountContextDto = { accountId: string; email: string; baseUrl: string }
 export type AppConfigDto = { deviceIdentifier: string; allowInvalidCerts: boolean; syncPollIntervalSeconds: number; locale: string; launchOnLogin: boolean; showWebsiteIcon: boolean; quickAccessShortcut: string; lockShortcut: string; requireMasterPasswordInterval: string; lockOnSleep: boolean; idleAutoLockDelay: string; clipboardClearDelay: string; spotlightAutofill: boolean }
 export type CipherCreated = { accountId: string; cipherId: string }
 export type CipherDeleted = { accountId: string; cipherId: string }
@@ -403,11 +431,23 @@ export type DeleteFolderRequest = { folderId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
 export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
 export type FolderDto = { id: string; name: string }
+/**
+ * Request to get unlock state
+ */
+export type GetUnlockStateRequestDto = Record<string, never>
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LogoutRequestDto = Record<string, never>
 export type MasterPasswordPolicyDto = { minComplexity: number | null; minLength: number | null; requireLower: boolean; requireUpper: boolean; requireNumbers: boolean; requireSpecial: boolean; enforceOnLogin: boolean; object: string | null }
 export type PasswordLoginRequestDto = { baseUrl: string; email: string; masterPassword: string; twoFactorProvider: number | null; twoFactorToken: string | null; twoFactorRemember: boolean | null; authrequest: string | null }
 export type PasswordLoginResponseDto = ({ status: "authenticated" } & SessionResponseDto) | ({ status: "twoFactorRequired" } & TwoFactorChallengeDto)
+/**
+ * Request to refresh session
+ */
+export type RefreshSessionRequestDto = Record<string, never>
+/**
+ * Response from refresh session
+ */
+export type RefreshSessionResponseDto = { success: boolean; isSessionValid: boolean }
 export type RegisterFinishRequestDto = { baseUrl: string; email: string; name: string; masterPassword: string; masterPasswordHint: string | null; token: string; kdf: number; kdfIterations: number; kdfMemory: number | null; kdfParallelism: number | null }
 export type RenameFolderRequest = { folderId: string; newName: string }
 export type RestoreAuthStateRequestDto = Record<string, never>
@@ -417,6 +457,18 @@ export type RestoreCipherRequestDto = { cipherId: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
 export type SendVerificationEmailRequestDto = { baseUrl: string; email: string; name: string | null }
 export type SendVerificationEmailResponseDto = { outcome: "disabled"; message: string } | { outcome: "emailVerificationRequired" } | { outcome: "directRegistration"; token: string }
+/**
+ * Session context information
+ */
+export type SessionContextDto = { 
+/**
+ * Whether the session is valid (not expired)
+ */
+isValid: boolean; 
+/**
+ * Whether the session is expiring soon (within grace period)
+ */
+isExpiringSoon: boolean }
 export type SessionResponseDto = { accessToken: string; refreshToken: string | null; expiresIn: number; tokenType: string; scope: string | null; key: string | null; privateKey: string | null; kdf: number | null; kdfIterations: number | null; kdfMemory: number | null; kdfParallelism: number | null; twoFactorToken: string | null }
 export type SoftDeleteCipherRequestDto = { cipherId: string }
 export type SyncAttachment = { id: string; key: string | null; file_name: string | null; size: string | null; size_name: string | null; url: string | null; object: string | null }
@@ -440,6 +492,50 @@ export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
 export type TwoFactorChallengeDto = { error: string | null; errorDescription: string | null; providers: string[]; providers2: Partial<{ [key in string]: TwoFactorProviderHintDto | null }> | null; masterPasswordPolicy: MasterPasswordPolicyDto | null }
 export type TwoFactorProviderHintDto = { host: string | null; signature: string | null; authUrl: string | null; nfc: boolean | null; email: string | null; challenge: string | null; timeout: number | null; rpId: string | null; allowCredentials: WebauthnAllowCredentialDto[]; userVerification: string | null; extensions: WebauthnRequestExtensionsDto | null }
+/**
+ * Unlock method used
+ */
+export type UnlockMethodDto = { type: "masterPassword" } | { type: "pin" } | { type: "biometric" }
+/**
+ * Tauri event for unlock state changes
+ */
+export type UnlockStateChanged = { event: UnlockStateEvent }
+/**
+ * Event emitted when unlock state changes
+ */
+export type UnlockStateEvent = { oldStatus: UnlockStatusDto; newStatus: UnlockStatusDto; hasKeyMaterial: boolean; accountId: string | null }
+/**
+ * Complete unlock state response
+ */
+export type UnlockStateResponseDto = { status: UnlockStatusDto; account: AccountContextDto | null; session: SessionContextDto | null; 
+/**
+ * Whether vault keys are available in memory
+ */
+hasKeyMaterial: boolean; 
+/**
+ * The method used to unlock (if currently unlocked)
+ */
+unlockMethod: UnlockMethodDto | null }
+/**
+ * Current unlock status
+ */
+export type UnlockStatusDto = 
+/**
+ * Vault is locked, no session or keys available
+ */
+"locked" | 
+/**
+ * Vault is unlocked but API session has expired
+ */
+"vaultUnlockedSessionExpired" | 
+/**
+ * Both vault and API session are valid
+ */
+"fullyUnlocked" | 
+/**
+ * Unlock operation is in progress
+ */
+"unlocking"
 export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null; spotlightAutofill?: boolean | null }
 export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
 export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }

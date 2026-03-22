@@ -179,16 +179,8 @@ impl Default for UnlockState {
     }
 }
 
-/// State change event for subscribers
-#[derive(Debug, Clone)]
-pub struct StateChangeEvent {
-    pub old_state: UnlockState,
-    pub new_state: UnlockState,
-    pub timestamp: Instant,
-}
-
-/// Subscriber callback type
-pub type StateSubscriber = Box<dyn Fn(&StateChangeEvent) + Send + Sync>;
+/// State change callback type (optional, for external notifications like Tauri events)
+pub type StateChangeCallback = Box<dyn Fn(&UnlockState, &UnlockState) + Send + Sync>;
 
 /// Result of unlock operation
 #[derive(Debug, Clone)]
@@ -203,28 +195,37 @@ pub enum UnlockResult {
 /// Unified unlock manager - single source of truth for auth state
 pub struct UnifiedUnlockManager {
     state: Arc<RwLock<UnlockState>>,
-    subscribers: Arc<Mutex<Vec<SubscriberEntry>>>,
     config: Arc<Mutex<AppConfig>>,
     auto_lock_timer: Arc<Mutex<Option<AutoLockTimer>>>,
     // Self-reference for auto-lock callback
     self_ref: Arc<Mutex<Option<Arc<UnifiedUnlockManager>>>>,
+    // Optional callback for state change notifications (e.g., emit Tauri events)
+    on_state_change: Arc<Mutex<Option<StateChangeCallback>>>,
 }
 
 impl UnifiedUnlockManager {
-    /// Create a new manager with the given configuration
+    /// Create a new manager with the given configuration and optional state change callback
     pub fn new(config: AppConfig) -> Arc<Self> {
         let manager = Arc::new(Self {
             state: Arc::new(RwLock::new(UnlockState::locked())),
-            subscribers: Arc::new(Mutex::new(Vec::new())),
             config: Arc::new(Mutex::new(config)),
             auto_lock_timer: Arc::new(Mutex::new(None)),
             self_ref: Arc::new(Mutex::new(None)),
+            on_state_change: Arc::new(Mutex::new(None)),
         });
 
         // Set self-reference for auto-lock callbacks
         *manager.self_ref.lock().unwrap() = Some(Arc::clone(&manager));
 
         manager
+    }
+
+    /// Set the state change callback (can be used after construction)
+    pub fn set_on_state_change<F>(&self, callback: F)
+    where
+        F: Fn(&UnlockState, &UnlockState) + Send + Sync + 'static,
+    {
+        *self.on_state_change.lock().unwrap() = Some(Box::new(callback));
     }
 
     /// Get current state snapshot
@@ -301,7 +302,7 @@ impl UnifiedUnlockManager {
         }
         let old_state = state.clone();
         state.status = UnlockStatus::Unlocking;
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         Ok(())
     }
 
@@ -323,7 +324,7 @@ impl UnifiedUnlockManager {
         state.unlocked_at = Some(Instant::now());
         state.unlock_method = Some(method);
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         self.start_auto_lock_timer().await?;
         Ok(())
     }
@@ -345,7 +346,7 @@ impl UnifiedUnlockManager {
         state.unlocked_at = Some(Instant::now());
         state.unlock_method = Some(method);
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         self.start_auto_lock_timer().await?;
         Ok(())
     }
@@ -361,8 +362,28 @@ impl UnifiedUnlockManager {
         state.status = UnlockStatus::Locked;
         // Keep account_context for quick re-unlock
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         self.stop_auto_lock_timer().await?;
+        Ok(())
+    }
+
+    /// Check if lock_on_sleep is enabled in config
+    pub fn is_lock_on_sleep_enabled(&self) -> bool {
+        self.config.lock().unwrap().lock_on_sleep
+    }
+
+    /// Handle system resume event - locks vault if lock_on_sleep is enabled
+    pub async fn handle_system_resume(&self) -> AppResult<()> {
+        if self.is_lock_on_sleep_enabled() {
+            let status = self.current_status().await;
+            if status.is_vault_unlocked() {
+                self.lock().await?;
+                log::info!(
+                    target: "vanguard::unlock_state",
+                    "Vault auto-locked on system resume (lock_on_sleep enabled)"
+                );
+            }
+        }
         Ok(())
     }
 
@@ -379,7 +400,7 @@ impl UnifiedUnlockManager {
         state.unlocked_at = None;
         state.unlock_method = None;
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         self.stop_auto_lock_timer().await?;
         Ok(())
     }
@@ -395,7 +416,7 @@ impl UnifiedUnlockManager {
             state.status = UnlockStatus::FullyUnlocked;
         }
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         Ok(())
     }
 
@@ -409,7 +430,7 @@ impl UnifiedUnlockManager {
             state.status = UnlockStatus::VaultUnlockedSessionExpired;
         }
 
-        self.notify_subscribers(&old_state, &state);
+        self.notify_state_change(&old_state, &state);
         Ok(())
     }
 
@@ -438,36 +459,8 @@ impl UnifiedUnlockManager {
         Ok(())
     }
 
-    /// Subscribe to state changes
-    /// Returns a handle that will unsubscribe when dropped
-    pub fn subscribe<F>(&self, callback: F) -> SubscriptionHandle
-    where
-        F: Fn(&StateChangeEvent) + Send + Sync + 'static,
-    {
-        let callback_id = SubscriptionHandle::generate_id();
-        let callback_arc: Arc<dyn Fn(&StateChangeEvent) + Send + Sync> = Arc::new(callback);
-
-        let mut subscribers = self.subscribers.lock().unwrap();
-        subscribers.push(SubscriberEntry {
-            _id: callback_id,
-            callback: Arc::clone(&callback_arc),
-        });
-
-        SubscriptionHandle {
-            id: callback_id,
-            _callback: callback_arc,
-        }
-    }
-
-    #[allow(dead_code)]
-    /// Unsubscribe a specific subscriber by ID
-    fn unsubscribe(&self, id: u64) {
-        let mut subscribers = self.subscribers.lock().unwrap();
-        subscribers.retain(|entry| entry._id != id);
-    }
-
-    /// Notify all subscribers of state change
-    fn notify_subscribers(&self, old_state: &UnlockState, new_state: &UnlockState) {
+    /// Notify state change callback if one is set
+    fn notify_state_change(&self, old_state: &UnlockState, new_state: &UnlockState) {
         // Skip if no actual change (dirty check)
         if old_state.status == new_state.status
             && old_state.account_context == new_state.account_context
@@ -477,16 +470,11 @@ impl UnifiedUnlockManager {
             return;
         }
 
-        let event = StateChangeEvent {
-            old_state: old_state.clone(),
-            new_state: new_state.clone(),
-            timestamp: Instant::now(),
-        };
-
-        let subscribers = self.subscribers.lock().unwrap();
-        for entry in subscribers.iter() {
-            // Call the callback
-            (entry.callback)(&event);
+        // Call the callback if set
+        if let Ok(callback_guard) = self.on_state_change.lock() {
+            if let Some(callback) = callback_guard.as_ref() {
+                (callback)(old_state, new_state);
+            }
         }
     }
 
@@ -826,31 +814,6 @@ impl AutoLockTimer {
 impl Drop for AutoLockTimer {
     fn drop(&mut self) {
         self.cancel();
-    }
-}
-
-/// Subscriber entry for internal tracking
-struct SubscriberEntry {
-    _id: u64,
-    callback: Arc<dyn Fn(&StateChangeEvent) + Send + Sync>,
-}
-
-/// Subscription handle - dropping it unsubscribes
-pub struct SubscriptionHandle {
-    id: u64,
-    _callback: Arc<dyn Fn(&StateChangeEvent) + Send + Sync>,
-}
-
-impl SubscriptionHandle {
-    fn generate_id() -> u64 {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static COUNTER: AtomicU64 = AtomicU64::new(1);
-        COUNTER.fetch_add(1, Ordering::Relaxed)
-    }
-
-    /// Get the subscription ID
-    pub fn id(&self) -> u64 {
-        self.id
     }
 }
 

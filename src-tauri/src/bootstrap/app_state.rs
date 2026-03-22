@@ -264,7 +264,7 @@ impl AppState {
             }
         };
 
-        // Initialize unified unlock manager with config
+        // Initialize unified unlock manager with config (no callback yet, set in lib.rs setup)
         let unlock_manager = UnifiedUnlockManager::new(config);
 
         Self {
