@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   commands,
   type VaultCipherDetailDto,
@@ -47,6 +47,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const inlineSearchInputRef = useRef<HTMLInputElement | null>(null);
   const [headerSearchQuery, setHeaderSearchQuery] = useState("");
+  const deferredHeaderSearchQuery = useDeferredValue(headerSearchQuery);
   const [cipherSearchQuery, setCipherSearchQuery] = useState("");
   const [isInlineSearchOpen, setIsInlineSearchOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<CipherTypeFilter>("all");
@@ -289,7 +290,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
   // Header search results - search across all non-deleted ciphers
   const headerSearchResults = useMemo<CipherWithIcon[]>(() => {
-    const query = headerSearchQuery.trim().toLowerCase();
+    const query = deferredHeaderSearchQuery.trim().toLowerCase();
     if (!query) return [];
 
     const allCiphers = viewData?.ciphers ?? [];
@@ -316,7 +317,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
         iconHostname,
       };
     });
-  }, [headerSearchQuery, viewData?.ciphers]);
+  }, [deferredHeaderSearchQuery, viewData?.ciphers]);
 
   // Placeholder callbacks - icon loading is now handled by useIcon hook
   const setCipherRowVisible = useCallback(
