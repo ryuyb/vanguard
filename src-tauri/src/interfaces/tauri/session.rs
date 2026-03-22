@@ -201,13 +201,22 @@ async fn refresh_auth_session_locked(
     };
 
     state.set_auth_session(next.clone()).await?;
-    if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
-        log::warn!(
+    // Only persist if we have auth_wrap_runtime (i.e., unlocked with master password)
+    if state.auth_wrap_runtime()?.is_some() {
+        if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
+            log::warn!(
+                target: "vanguard::tauri::session",
+                "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
+                next.account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
+    } else {
+        log::debug!(
             target: "vanguard::tauri::session",
-            "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
-            next.account_id,
-            error.code(),
-            error.log_message()
+            "skip persist auth state (no wrap runtime) account_id={}",
+            next.account_id
         );
     }
     start_background_sync(state, &next).await;
@@ -341,13 +350,22 @@ pub async fn restore_auth_session_with_refresh_token(
     };
 
     state.set_auth_session(next.clone()).await?;
-    if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
-        log::warn!(
+    // Only persist if we have auth_wrap_runtime (i.e., unlocked with master password)
+    if state.auth_wrap_runtime()?.is_some() {
+        if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
+            log::warn!(
+                target: "vanguard::tauri::session",
+                "failed to refresh persisted auth state account_id={}: [{}] {}",
+                next.account_id,
+                error.code(),
+                error.log_message()
+            );
+        }
+    } else {
+        log::debug!(
             target: "vanguard::tauri::session",
-            "failed to refresh persisted auth state account_id={}: [{}] {}",
-            next.account_id,
-            error.code(),
-            error.log_message()
+            "skip persist auth state (no wrap runtime) account_id={}",
+            next.account_id
         );
     }
     start_background_sync(state, &next).await;

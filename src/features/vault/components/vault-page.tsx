@@ -216,6 +216,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     userBaseUrl,
     userEmail,
     viewData,
+    isVaultUnlockedSessionExpired,
   } = useVaultPageModel({ navigateTo });
 
   const folderActions = useFolderActions({
@@ -556,6 +557,21 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       </header>
 
       <section className="mx-auto flex w-full max-w-7xl min-h-0 flex-1 flex-col gap-4 p-4">
+        {/* Session expired warning - allow local operations but warn user */}
+        {isVaultUnlockedSessionExpired && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <span className="font-medium">
+                {t("vault.page.states.sessionExpired.title")}
+              </span>
+            </div>
+            <p className="mt-1 text-amber-800">
+              {t("vault.page.states.sessionExpired.description")}
+            </p>
+          </div>
+        )}
+
         {pageState === "loading" && (
           <div className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm border border-slate-200">
             {t("vault.page.states.loading")}

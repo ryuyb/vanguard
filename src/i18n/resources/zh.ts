@@ -376,6 +376,10 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         loadError: "加载密码库数据失败。",
         emptyFiltered: "当前筛选条件下没有条目。",
         loadingCipherDetail: "正在加载条目详情...",
+        sessionExpired: {
+          title: "会话已过期",
+          description: "API 会话已过期，本地数据仍可访问。请使用主密码重新解锁以恢复同步功能。",
+        },
       },
     },
     dialogs: {

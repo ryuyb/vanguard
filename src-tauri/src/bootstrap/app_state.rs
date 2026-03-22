@@ -264,8 +264,21 @@ impl AppState {
             }
         };
 
-        // Initialize unified unlock manager with config (no callback yet, set in lib.rs setup)
-        let unlock_manager = UnifiedUnlockManager::new(config);
+        // Build initial account context from persisted auth state if available
+        let initial_account = persisted_auth_state
+            .as_ref()
+            .map(|persisted| AccountContext {
+                account_id: persisted.account_id.clone(),
+                email: persisted.email.clone(),
+                base_url: persisted.base_url.clone(),
+                kdf: persisted.kdf,
+                kdf_iterations: persisted.kdf_iterations,
+                kdf_memory: persisted.kdf_memory,
+                kdf_parallelism: persisted.kdf_parallelism,
+            });
+
+        // Initialize unified unlock manager with config and initial account context
+        let unlock_manager = UnifiedUnlockManager::new(config, initial_account);
 
         Self {
             auth_service,
@@ -683,36 +696,21 @@ impl VaultRuntimePort for AppState {
     }
 
     fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
-        // Use tokio's runtime to call async method from sync context
-        let rt = tokio::runtime::Handle::try_current();
-        match rt {
-            Ok(handle) => {
-                let account_ctx = handle.block_on(self.unlock_manager.account_context());
-                Ok(account_ctx.map(|ctx| VaultUnlockContext {
-                    account_id: ctx.account_id,
-                    base_url: ctx.base_url,
-                    email: ctx.email,
-                    kdf: ctx.kdf,
-                    kdf_iterations: ctx.kdf_iterations,
-                    kdf_memory: ctx.kdf_memory,
-                    kdf_parallelism: ctx.kdf_parallelism,
-                }))
-            }
-            Err(_) => {
-                // No runtime available, fall back to checking persisted context
-                AppState::persisted_auth_context(self).map(|value| {
-                    value.map(|persisted| VaultUnlockContext {
-                        account_id: persisted.account_id,
-                        base_url: persisted.base_url,
-                        email: persisted.email,
-                        kdf: persisted.kdf,
-                        kdf_iterations: persisted.kdf_iterations,
-                        kdf_memory: persisted.kdf_memory,
-                        kdf_parallelism: persisted.kdf_parallelism,
-                    })
-                })
-            }
-        }
+        // Use block_in_place to allow calling async code from sync context
+        // even when already inside a tokio runtime
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            let account_ctx = handle.block_on(self.unlock_manager.account_context());
+            Ok(account_ctx.map(|ctx| VaultUnlockContext {
+                account_id: ctx.account_id,
+                base_url: ctx.base_url,
+                email: ctx.email,
+                kdf: ctx.kdf,
+                kdf_iterations: ctx.kdf_iterations,
+                kdf_memory: ctx.kdf_memory,
+                kdf_parallelism: ctx.kdf_parallelism,
+            }))
+        })
     }
 
     fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
@@ -733,15 +731,11 @@ impl VaultRuntimePort for AppState {
         &self,
         _account_id: &str,
     ) -> AppResult<Option<VaultUserKeyMaterial>> {
-        // Use tokio's runtime to call async method from sync context
-        let rt = tokio::runtime::Handle::try_current();
-        match rt {
-            Ok(handle) => {
-                let key_material = handle.block_on(self.unlock_manager.key_material_dto());
-                Ok(key_material)
-            }
-            Err(_) => Ok(None),
-        }
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            let key_material = handle.block_on(self.unlock_manager.key_material_dto());
+            Ok(key_material)
+        })
     }
 
     fn set_vault_user_key_material(
@@ -749,42 +743,26 @@ impl VaultRuntimePort for AppState {
         _account_id: String,
         key: VaultUserKeyMaterial,
     ) -> AppResult<()> {
-        // Use tokio's runtime to call async method from sync context
-        let rt = tokio::runtime::Handle::try_current();
-        match rt {
-            Ok(handle) => {
-                let key_material: VaultKeyMaterial = key.into();
-                handle.block_on(self.unlock_manager.set_key_material(key_material))?;
-                Ok(())
-            }
-            Err(_) => Err(AppError::InternalUnexpected {
-                message: "No tokio runtime available".to_string(),
-            }),
-        }
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            let key_material: VaultKeyMaterial = key.into();
+            handle.block_on(self.unlock_manager.set_key_material(key_material))
+        })
     }
 
     fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
-        // Use tokio's runtime to call async method from sync context
-        let rt = tokio::runtime::Handle::try_current();
-        match rt {
-            Ok(handle) => {
-                handle.block_on(self.unlock_manager.remove_key_material())?;
-                Ok(())
-            }
-            Err(_) => Ok(()), // Silently succeed if no runtime
-        }
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            handle.block_on(self.unlock_manager.remove_key_material())
+        })
     }
 
     fn get_refresh_token(&self) -> AppResult<Option<String>> {
-        // Use tokio's runtime to call async method from sync context
-        let rt = tokio::runtime::Handle::try_current();
-        match rt {
-            Ok(handle) => {
-                let token = handle.block_on(self.unlock_manager.refresh_token());
-                Ok(token)
-            }
-            Err(_) => Ok(None),
-        }
+        tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            let token = handle.block_on(self.unlock_manager.refresh_token());
+            Ok(token)
+        })
     }
 }
 

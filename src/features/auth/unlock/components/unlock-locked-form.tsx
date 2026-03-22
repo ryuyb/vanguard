@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { SubmitEventHandler } from "react";
 import { useTranslation } from "react-i18next";
-import type { RestoreAuthStateResponseDto } from "@/bindings";
+import type { AccountContextDto } from "@/bindings";
 import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
@@ -21,7 +21,7 @@ type UnlockMethod = "pin" | "masterPassword";
 
 type UnlockLockedFormProps = {
   form: UnlockForm;
-  restoreState: RestoreAuthStateResponseDto | null;
+  account: AccountContextDto | null;
   biometricSupported: boolean;
   biometricEnabled: boolean;
   canBiometricUnlock: boolean;
@@ -43,7 +43,7 @@ type UnlockLockedFormProps = {
 
 export function UnlockLockedForm({
   form,
-  restoreState,
+  account,
   biometricSupported,
   biometricEnabled,
   canBiometricUnlock,
@@ -73,7 +73,7 @@ export function UnlockLockedForm({
             {t("auth.unlock.form.account.label")}
           </span>
           <span className="text-slate-700">
-            {restoreState?.email ?? t("auth.unlock.form.account.unknown")}
+            {account?.email ?? t("auth.unlock.form.account.unknown")}
           </span>
         </div>
         <div className="flex items-center justify-between text-xs">
@@ -81,7 +81,7 @@ export function UnlockLockedForm({
             {t("auth.unlock.form.server.label")}
           </span>
           <span className="text-slate-700">
-            {restoreState?.baseUrl ?? t("auth.unlock.form.server.unknown")}
+            {account?.baseUrl ?? t("auth.unlock.form.server.unknown")}
           </span>
         </div>
       </div>

@@ -1,10 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useState } from "react";
 import { commands } from "@/bindings";
+import { useUnifiedUnlock } from "@/features/auth/unlock/hooks";
 import type { SpotlightItem } from "@/features/spotlight/types";
 import { toCipherItem } from "@/features/spotlight/utils";
 import { errorHandler } from "@/lib/error-handler";
-import { resolveSessionRoute } from "@/lib/route-session";
 
 type UseSpotlightSessionResult = {
   hideSpotlight: () => Promise<void>;
@@ -16,6 +16,8 @@ type UseSpotlightSessionResult = {
 export function useSpotlightSession(): UseSpotlightSessionResult {
   const [vaultItems, setVaultItems] = useState<SpotlightItem[]>([]);
   const [isLoadingVault, setIsLoadingVault] = useState(false);
+
+  const { isVaultUnlocked } = useUnifiedUnlock();
 
   const hideSpotlight = useCallback(async () => {
     try {
@@ -40,19 +42,19 @@ export function useSpotlightSession(): UseSpotlightSessionResult {
 
   const ensureSpotlightSession = useCallback(async () => {
     try {
-      const target = await resolveSessionRoute();
-      if (target === "/vault") {
-        return true;
+      // Check unified unlock state
+      if (!isVaultUnlocked) {
+        await openMainWindow();
+        return false;
       }
 
-      await openMainWindow();
-      return false;
+      return true;
     } catch (error) {
       errorHandler.handle(error);
       await hideSpotlight();
       return false;
     }
-  }, [hideSpotlight, openMainWindow]);
+  }, [hideSpotlight, openMainWindow, isVaultUnlocked]);
 
   const loadVaultItems = useCallback(async () => {
     setIsLoadingVault(true);

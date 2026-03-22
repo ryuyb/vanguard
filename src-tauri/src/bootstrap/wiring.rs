@@ -219,7 +219,7 @@ fn resolve_auth_state_path<R: Runtime, M: Manager<R>>(
 fn setup_state_event_emitter<R: Runtime>(app_handle: tauri::AppHandle<R>, app_state: &AppState) {
     let manager = app_state.unlock_manager();
 
-    manager.set_on_state_change(move |old_state: &UnlockState, new_state: &UnlockState| {
+    manager.on_state_change(move |old_state: &UnlockState, new_state: &UnlockState| {
         let old_status = unlock_status_to_dto(old_state.status);
         let new_status = unlock_status_to_dto(new_state.status);
 

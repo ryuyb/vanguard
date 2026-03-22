@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { KeyRound, LoaderCircle } from "lucide-react";
-import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +18,7 @@ export function UnlockPage({
   const { t } = useTranslation();
   const {
     form,
+    account,
     biometricEnabled,
     biometricSupported,
     canBiometricUnlock,
@@ -29,6 +29,7 @@ export function UnlockPage({
     isPinUnlocking,
     isRestoring,
     isVaultUnlocked,
+    needsLogin,
     onBiometricUnlock,
     onLogout,
     onPinUnlock,
@@ -36,32 +37,12 @@ export function UnlockPage({
     onShowPinUnlock,
     onToggleShowPassword,
     pinEnabled,
-    restoreState,
     showPassword,
     unlockMethod,
   } = useUnlockFlow({
     navigateToHome,
     navigateToVault,
   });
-
-  const redirectToVaultIfUnlocked = useCallback(async () => {
-    await navigateToVault();
-  }, [navigateToVault]);
-
-  useEffect(() => {
-    if (
-      !isRestoring &&
-      restoreState?.status !== "needsLogin" &&
-      isVaultUnlocked
-    ) {
-      void redirectToVaultIfUnlocked();
-    }
-  }, [
-    isRestoring,
-    isVaultUnlocked,
-    redirectToVaultIfUnlocked,
-    restoreState?.status,
-  ]);
 
   return (
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-6">
@@ -93,7 +74,7 @@ export function UnlockPage({
               </div>
             )}
 
-            {!isRestoring && restoreState?.status === "needsLogin" && (
+            {!isRestoring && needsLogin && (
               <div className="space-y-4">
                 <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-3.5 text-sm text-amber-900">
                   <p className="font-medium">
@@ -109,40 +90,36 @@ export function UnlockPage({
               </div>
             )}
 
-            {!isRestoring &&
-              restoreState?.status !== "needsLogin" &&
-              isVaultUnlocked && (
-                <div className="flex items-center justify-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-6 text-sm text-emerald-700">
-                  <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
-                  <span>{t("auth.unlock.states.unlocked")}</span>
-                </div>
-              )}
+            {!isRestoring && !needsLogin && isVaultUnlocked && (
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-6 text-sm text-emerald-700">
+                <LoaderCircle className="h-5 w-5 animate-spin text-emerald-600" />
+                <span>{t("auth.unlock.states.unlocked")}</span>
+              </div>
+            )}
 
-            {!isRestoring &&
-              restoreState?.status !== "needsLogin" &&
-              !isVaultUnlocked && (
-                <UnlockLockedForm
-                  form={form}
-                  restoreState={restoreState}
-                  biometricSupported={biometricSupported}
-                  biometricEnabled={biometricEnabled}
-                  canBiometricUnlock={canBiometricUnlock}
-                  feedback={feedback}
-                  isActionBlocked={isActionBlocked}
-                  isBiometricUnlocking={isBiometricUnlocking}
-                  isLoggingOut={isLoggingOut}
-                  isPinUnlocking={isPinUnlocking}
-                  onBiometricUnlock={onBiometricUnlock}
-                  onLogout={onLogout}
-                  onPinUnlock={onPinUnlock}
-                  onShowMasterPasswordUnlock={onShowMasterPasswordUnlock}
-                  onShowPinUnlock={onShowPinUnlock}
-                  onToggleShowPassword={onToggleShowPassword}
-                  pinEnabled={pinEnabled}
-                  showPassword={showPassword}
-                  unlockMethod={unlockMethod}
-                />
-              )}
+            {!isRestoring && !needsLogin && !isVaultUnlocked && (
+              <UnlockLockedForm
+                form={form}
+                account={account ?? null}
+                biometricSupported={biometricSupported}
+                biometricEnabled={biometricEnabled}
+                canBiometricUnlock={canBiometricUnlock}
+                feedback={feedback}
+                isActionBlocked={isActionBlocked}
+                isBiometricUnlocking={isBiometricUnlocking}
+                isLoggingOut={isLoggingOut}
+                isPinUnlocking={isPinUnlocking}
+                onBiometricUnlock={onBiometricUnlock}
+                onLogout={onLogout}
+                onPinUnlock={onPinUnlock}
+                onShowMasterPasswordUnlock={onShowMasterPasswordUnlock}
+                onShowPinUnlock={onShowPinUnlock}
+                onToggleShowPassword={onToggleShowPassword}
+                pinEnabled={pinEnabled}
+                showPassword={showPassword}
+                unlockMethod={unlockMethod}
+              />
+            )}
           </CardContent>
         </Card>
       </section>

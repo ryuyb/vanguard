@@ -272,12 +272,12 @@ pub async fn vault_lock(
     state: State<'_, AppState>,
     _request: VaultLockRequestDto,
 ) -> Result<(), ErrorPayload> {
-    VaultBiometricUseCase::new(
-        state.master_password_unlock_data_port(),
-        state.biometric_unlock_port(),
-    )
-    .lock(&*state)
-    .map_err(|error| log_command_error("vault_lock", &error))?;
+    // Use unlock_manager to properly lock the vault and update state
+    state
+        .unlock_manager()
+        .lock()
+        .await
+        .map_err(|error| log_command_error("vault_lock", &error))?;
 
     // 更新托盘菜单状态
     #[cfg(desktop)]

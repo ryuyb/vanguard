@@ -1,10 +1,18 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   commands,
   type VaultCipherDetailDto,
   type VaultViewDataResponseDto,
 } from "@/bindings";
+import { useUnifiedUnlock } from "@/features/auth/unlock/hooks";
 import {
   ALL_ITEMS_ID,
   FAVORITES_ID,
@@ -54,12 +62,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const [sortBy, setSortBy] = useState<CipherSortBy>("modified");
   const [sortDirection, setSortDirection] =
     useState<CipherSortDirection>("desc");
-  const [userEmail, setUserEmail] = useState(
-    appI18n.t("vault.page.user.notSignedIn"),
-  );
-  const [userBaseUrl, setUserBaseUrl] = useState(
-    appI18n.t("vault.page.user.unknownService"),
-  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -73,6 +75,34 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     new Set<string>(),
   );
 
+  // Unified unlock state
+  const {
+    state: unlockState,
+    isLoading: isUnlockStateLoading,
+    isVaultUnlocked,
+    isFullyUnlocked,
+    isVaultUnlockedSessionExpired,
+    lock,
+    logout,
+    refreshState: refreshUnlockState,
+  } = useUnifiedUnlock();
+
+  // Debounced session expired warning to prevent flicker during unlock
+  const [showSessionExpiredWarning, setShowSessionExpiredWarning] = useState(false);
+  useEffect(() => {
+    if (!isVaultUnlockedSessionExpired) {
+      setShowSessionExpiredWarning(false);
+      return;
+    }
+    // Delay showing the warning to avoid flicker during unlock
+    const timer = setTimeout(() => {
+      if (isVaultUnlockedSessionExpired) {
+        setShowSessionExpiredWarning(true);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [isVaultUnlockedSessionExpired]);
+
   const {
     cipherDetailError,
     isCipherDetailLoading,
@@ -84,6 +114,20 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
   const selectedCipherIdRef = useRef(selectedCipherId);
   selectedCipherIdRef.current = selectedCipherId;
+
+  // User info from unified state
+  const userEmail = useMemo(() => {
+    return (
+      unlockState?.account?.email ?? appI18n.t("vault.page.user.notSignedIn")
+    );
+  }, [unlockState?.account?.email]);
+
+  const userBaseUrl = useMemo(() => {
+    return (
+      unlockState?.account?.baseUrl ??
+      appI18n.t("vault.page.user.unknownService")
+    );
+  }, [unlockState?.account?.baseUrl]);
 
   const loadCiphersList = useCallback(async () => {
     try {
@@ -117,22 +161,19 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
         return;
       }
 
-      const restore = await commands.authRestoreState({});
-      if (restore.status === "error") {
-        setPageState("error");
-        errorHandler.handle(restore.error);
-        setUserEmail(appI18n.t("vault.page.user.notSignedIn"));
-        setUserBaseUrl(appI18n.t("vault.page.user.unknownService"));
+      // Check unified unlock state and use the returned fresh state
+      const freshState = await refreshUnlockState();
+      const vaultUnlocked =
+        freshState.status === "fullyUnlocked" ||
+        freshState.status === "vaultUnlockedSessionExpired";
+
+      if (!vaultUnlocked) {
+        // Not unlocked, redirect to unlock page
+        await navigateTo("/unlock");
         return;
       }
 
-      setUserEmail(
-        restore.data.email ?? appI18n.t("vault.page.user.notSignedIn"),
-      );
-      setUserBaseUrl(
-        restore.data.baseUrl ?? appI18n.t("vault.page.user.unknownService"),
-      );
-
+      // Vault is unlocked, load data
       const result = await commands.vaultGetViewData();
 
       if (result.status === "error") {
@@ -142,6 +183,7 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
           await navigateTo("/unlock");
         } else {
           setPageState("error");
+          setErrorText(errorStr);
         }
         setViewData(null);
         return;
@@ -149,18 +191,26 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
 
       setViewData(result.data);
       setPageState("ready");
-    } catch (error) {
+    } catch (err) {
       setPageState("error");
-      errorHandler.handle(error);
+      errorHandler.handle(err);
       setViewData(null);
     } finally {
       setIsRefreshing(false);
     }
-  }, [navigateTo]);
+  }, [navigateTo, refreshUnlockState]);
 
   useEffect(() => {
     void loadVaultData();
   }, [loadVaultData]);
+
+  // Listen for lock state changes and redirect if locked
+  useEffect(() => {
+    if (!isUnlockStateLoading && !isVaultUnlocked && pageState === "ready") {
+      // State changed to locked while on vault page, redirect to unlock
+      void navigateTo("/unlock");
+    }
+  }, [isUnlockStateLoading, isVaultUnlocked, pageState, navigateTo]);
 
   // 监听 folders 同步事件，只更新 folders 数据
   useFoldersSync({
@@ -209,8 +259,8 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const onLock = async () => {
     setIsLocking(true);
     try {
-      const result = await commands.vaultLock({});
-      if (result.status === "ok") {
+      const success = await lock();
+      if (success) {
         await navigateTo("/unlock");
       }
     } finally {
@@ -221,8 +271,8 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
   const onLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const result = await commands.authLogout({});
-      if (result.status === "ok") {
+      const success = await logout();
+      if (success) {
         await navigateTo("/");
       }
     } finally {
@@ -428,11 +478,13 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     headerSearchResults,
     inlineSearchInputRef,
     isCipherDetailLoading,
+    isFullyUnlocked,
     isHeaderActionBusy,
     isInlineSearchOpen,
     isLocking,
     isLoggingOut,
     isRefreshing,
+    isVaultUnlockedSessionExpired: showSessionExpiredWarning,
     loadCipherDetail,
     loadVaultData,
     lockLabel,
@@ -478,11 +530,13 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     headerSearchResults: CipherWithIcon[];
     inlineSearchInputRef: typeof inlineSearchInputRef;
     isCipherDetailLoading: boolean;
+    isFullyUnlocked: boolean;
     isHeaderActionBusy: boolean;
     isInlineSearchOpen: boolean;
     isLocking: boolean;
     isLoggingOut: boolean;
     isRefreshing: boolean;
+    isVaultUnlockedSessionExpired: boolean;
     loadCipherDetail: (cipherId: string) => Promise<void>;
     loadVaultData: () => Promise<void>;
     lockLabel: string;

@@ -389,6 +389,10 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         loadError: "Failed to load vault data.",
         emptyFiltered: "No items match the current filters.",
         loadingCipherDetail: "Loading item details...",
+        sessionExpired: {
+          title: "Session Expired",
+          description: "API session has expired, local data is still accessible. Please unlock with master password to restore sync functionality.",
+        },
       },
     },
     dialogs: {

@@ -157,7 +157,11 @@ export function useSpotlightHotkeys({
     const handleGlobalKeyDown = (event: globalThis.KeyboardEvent) => {
       // 忽略输入框有焦点的情况（避免与 onCommandInputKeyDown 重复触发）
       const activeElement = document.activeElement;
-      if (activeElement?.tagName === "INPUT" || activeElement?.getAttribute("role") === "combobox") return;
+      if (
+        activeElement?.tagName === "INPUT" ||
+        activeElement?.getAttribute("role") === "combobox"
+      )
+        return;
 
       // ========== 列表页模式 ==========
       if (!detailItem && hasVisibleResults) {
@@ -195,13 +199,17 @@ export function useSpotlightHotkeys({
           );
           if (currentIndex === -1) currentIndex = 0;
 
-          const newIndex = event.key === "ArrowDown"
-            ? (currentIndex + 1) % items.length
-            : (currentIndex - 1 + items.length) % items.length;
+          const newIndex =
+            event.key === "ArrowDown"
+              ? (currentIndex + 1) % items.length
+              : (currentIndex - 1 + items.length) % items.length;
 
           // 更新 cmdk 的选中状态
           items.forEach((item, i) => {
-            item.setAttribute("data-selected", i === newIndex ? "true" : "false");
+            item.setAttribute(
+              "data-selected",
+              i === newIndex ? "true" : "false",
+            );
           });
 
           // 滚动到可见
