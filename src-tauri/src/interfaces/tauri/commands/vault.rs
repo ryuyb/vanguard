@@ -45,7 +45,7 @@ fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
+pub async fn has_local_unlock_data(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
     let account_id = match state.active_account_id() {
         Ok(value) => value,
         Err(
@@ -54,7 +54,7 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, ErrorP
             | AppError::ValidationRequired { .. },
         ) => return Ok(false),
         Err(error) => {
-            return Err(log_command_error("vault_can_unlock", &error));
+            return Err(log_command_error("has_local_unlock_data", &error));
         }
     };
 
@@ -62,7 +62,7 @@ pub async fn vault_can_unlock(state: State<'_, AppState>) -> Result<bool, ErrorP
         .master_password_unlock_data_port()
         .load_master_password_unlock_data(&account_id)
         .await
-        .map_err(|error| log_command_error("vault_can_unlock", &error))?;
+        .map_err(|error| log_command_error("has_local_unlock_data", &error))?;
 
     Ok(unlock_data.is_some())
 }

@@ -36,7 +36,7 @@ pub fn run() {
             interfaces::tauri::commands::sync::vault_sync_check_revision,
             interfaces::tauri::commands::unlock_state::get_unlock_state,
             interfaces::tauri::commands::unlock_state::refresh_session,
-            interfaces::tauri::commands::vault::vault_can_unlock,
+            interfaces::tauri::commands::vault::has_local_unlock_data,
             interfaces::tauri::commands::vault::vault_get_biometric_status,
             interfaces::tauri::commands::vault::vault_get_pin_status,
             interfaces::tauri::commands::vault::vault_can_unlock_with_biometric,

@@ -2,8 +2,8 @@ import { useForm } from "@tanstack/react-form";
 import { useEffect, useState } from "react";
 import { CUSTOM_SERVER_URL_OPTION } from "@/features/auth/login/constants";
 import {
-  canVaultUnlockAfterLogin,
   formatTwoFactorProviders,
+  hasLocalUnlockData,
   loginWithPassword,
   normalizeBaseUrl,
   restoreLoginHints,
@@ -85,13 +85,13 @@ export function useLoginFlow({ navigateToVault }: UseLoginFlowParams) {
           );
           setTwoFactorState(null);
 
-          const canUnlockResult = await canVaultUnlockAfterLogin();
-          if (canUnlockResult.status === "error") {
-            errorHandler.handle(canUnlockResult.error);
+          const localUnlockResult = await hasLocalUnlockData();
+          if (localUnlockResult.status === "error") {
+            errorHandler.handle(localUnlockResult.error);
             return;
           }
 
-          if (canUnlockResult.data) {
+          if (localUnlockResult.data) {
             setSubmitProgressText(
               appI18n.t("auth.login.progress.unlockingLocalVault"),
             );

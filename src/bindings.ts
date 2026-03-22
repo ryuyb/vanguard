@@ -166,9 +166,9 @@ async refreshSession(request: RefreshSessionRequestDto) : Promise<Result<Refresh
     else return { status: "error", error: e  as any };
 }
 },
-async vaultCanUnlock() : Promise<Result<boolean, ErrorPayload>> {
+async hasLocalUnlockData() : Promise<Result<boolean, ErrorPayload>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("vault_can_unlock") };
+    return { status: "ok", data: await TAURI_INVOKE("has_local_unlock_data") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

@@ -3,7 +3,6 @@ import {
   CUSTOM_SERVER_URL_OPTION,
   SERVER_URL_OPTIONS,
 } from "@/features/auth/login/constants";
-import { toErrorText } from "@/features/auth/shared/utils";
 import { appI18n } from "@/i18n";
 
 export function normalizeBaseUrl(value: string): string {
@@ -57,11 +56,6 @@ export function toProviderId(provider: string): number | null {
   }
   return parsed;
 }
-
-export function toLoginErrorText(error: unknown): string {
-  return toErrorText(error, appI18n.t("auth.login.messages.loginFailed"));
-}
-
 export async function restoreLoginHints() {
   return commands.authRestoreState({});
 }
@@ -92,8 +86,8 @@ export async function sendEmailLoginCode(input: {
   });
 }
 
-export async function canVaultUnlockAfterLogin() {
-  return commands.vaultCanUnlock();
+export async function hasLocalUnlockData() {
+  return commands.hasLocalUnlockData();
 }
 
 export async function unlockVaultAfterLogin(masterPassword: string) {
