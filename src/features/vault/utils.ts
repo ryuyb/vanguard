@@ -1,5 +1,4 @@
 import type { VaultCipherItemDto, VaultFolderItemDto } from "@/bindings";
-import { toErrorText } from "@/features/auth/shared/utils";
 import type {
   CipherTypeFilter,
   FolderTreeNode,
@@ -25,11 +24,6 @@ export function toTypeFilterLabel(filter: CipherTypeFilter): string {
   }
   return appI18n.t("vault.page.filters.types.all");
 }
-
-export function toVaultErrorText(error: unknown): string {
-  return toErrorText(error, appI18n.t("vault.feedback.loadError"));
-}
-
 export function toAvatarText(email: string | null | undefined): string {
   const normalized = (email ?? "").trim();
   if (!normalized) {
