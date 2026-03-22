@@ -338,8 +338,8 @@ impl AppState {
     pub fn require_auth_session(&self) -> AppResult<AuthSession> {
         self.auth_session()?
             .ok_or_else(|| AppError::ValidationFieldError {
-                field: "unknown".to_string(),
-                message: "no authenticated session in backend, please login first".to_string(),
+                field: "session".to_string(),
+                message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
             })
     }
 

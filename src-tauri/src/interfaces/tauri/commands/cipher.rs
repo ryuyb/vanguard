@@ -289,8 +289,9 @@ pub async fn create_cipher(
         .ok_or_else(|| {
             log_command_error(
                 "create_cipher",
-                &AppError::ValidationRequired {
+                &AppError::ValidationFieldError {
                     field: "session".to_string(),
+                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
                 },
             )
         })?;
@@ -342,8 +343,9 @@ pub async fn update_cipher(
         .ok_or_else(|| {
             log_command_error(
                 "update_cipher",
-                &AppError::ValidationRequired {
+                &AppError::ValidationFieldError {
                     field: "session".to_string(),
+                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
                 },
             )
         })?;
@@ -396,8 +398,9 @@ pub async fn delete_cipher(
         .ok_or_else(|| {
             log_command_error(
                 "delete_cipher",
-                &AppError::ValidationRequired {
+                &AppError::ValidationFieldError {
                     field: "session".to_string(),
+                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
                 },
             )
         })?;
@@ -432,8 +435,9 @@ pub async fn soft_delete_cipher(
         .ok_or_else(|| {
             log_command_error(
                 "soft_delete_cipher",
-                &AppError::ValidationRequired {
+                &AppError::ValidationFieldError {
                     field: "session".to_string(),
+                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
                 },
             )
         })?;
@@ -471,8 +475,9 @@ pub async fn restore_cipher(
         .ok_or_else(|| {
             log_command_error(
                 "restore_cipher",
-                &AppError::ValidationRequired {
+                &AppError::ValidationFieldError {
                     field: "session".to_string(),
+                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
                 },
             )
         })?;

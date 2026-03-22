@@ -126,7 +126,7 @@ pub async fn vault_unlock(
         }
     } else {
         // PIN 或生物识别解锁时，检查 auth_session 是否存在
-        // 如果不存在（例如应用重启后），需要用户使用主密码重新解锁
+        // 如果不存在（例如应用重启后），记录警告（允许本地操作，但 API 调用会失败）
         if state
             .auth_session()
             .map_err(|error| log_command_error("vault_unlock", &error))?
