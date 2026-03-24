@@ -31,6 +31,13 @@ pub struct SessionWrapRuntime {
     salt_b64: String,
 }
 
+impl SessionWrapRuntime {
+    /// Get the encryption key
+    pub fn key(&self) -> &[u8; WRAP_KEY_LEN] {
+        &self.key
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedAuthState {
@@ -237,7 +244,7 @@ pub fn encrypt_refresh_token_with_runtime(
     let mut nonce = [0u8; WRAP_NONCE_LEN];
     rand::rng().fill(&mut nonce);
     let aad = build_aad(account_id, base_url, email);
-    let cipher = XChaCha20Poly1305::new((&runtime.key).into());
+    let cipher = XChaCha20Poly1305::new((runtime.key()).into());
     let ciphertext = cipher
         .encrypt(
             XNonce::from_slice(&nonce),

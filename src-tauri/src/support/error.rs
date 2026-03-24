@@ -16,6 +16,7 @@ pub enum ErrorSeverity {
 #[derive(Debug)]
 pub enum AppError {
     // === 认证错误 ===
+    AuthNotAuthenticated,
     AuthInvalidCredentials,
     AuthTokenExpired,
     AuthTokenInvalid,
@@ -68,6 +69,7 @@ impl AppError {
     pub fn code(&self) -> &'static str {
         match self {
             // 认证
+            Self::AuthNotAuthenticated => "AUTH_NOT_AUTHENTICATED",
             Self::AuthInvalidCredentials => "AUTH_INVALID_CREDENTIALS",
             Self::AuthTokenExpired => "AUTH_TOKEN_EXPIRED",
             Self::AuthTokenInvalid => "AUTH_TOKEN_INVALID",
@@ -127,6 +129,7 @@ impl AppError {
     pub fn message(&self) -> String {
         match self {
             // 认证
+            Self::AuthNotAuthenticated => "Not authenticated. Please log in.".to_string(),
             Self::AuthInvalidCredentials => "Invalid credentials".to_string(),
             Self::AuthTokenExpired => "Authentication token expired".to_string(),
             Self::AuthTokenInvalid => "Invalid authentication token".to_string(),

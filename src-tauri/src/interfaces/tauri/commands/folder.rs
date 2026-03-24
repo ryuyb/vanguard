@@ -5,11 +5,11 @@ use crate::application::dto::sync::SyncVaultCommand;
 use crate::application::dto::vault::{
     CreateFolderRequest, DeleteFolderRequest, RenameFolderRequest,
 };
+use crate::application::ports::unlock_context_port::UnlockContextProvider;
 use crate::application::vault_crypto;
-use crate::bootstrap::app_state::AppState;
+use crate::bootstrap::app_state::{AppState, VaultUserKey};
 use crate::domain::sync::SyncTrigger;
 use crate::interfaces::tauri::dto::folder::FolderDto;
-use crate::interfaces::tauri::session;
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
 
@@ -28,31 +28,27 @@ fn log_command_error(command: &str, error: &AppError) -> ErrorPayload {
 #[specta]
 #[tauri::command]
 pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderDto>, ErrorPayload> {
-    // 获取当前 session
-    let auth_session = session::ensure_fresh_auth_session(&state)
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
         .await
         .map_err(|error| log_command_error("list_folders", &error))?;
 
-    // 获取 vault_user_key 用于解密
-    let user_key = state
-        .get_vault_user_key(&auth_session.account_id)
-        .await
-        .map_err(|error| log_command_error("list_folders", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "list_folders",
-                &AppError::ValidationFieldError {
-                    field: "unknown".to_string(),
-                    message: "vault is locked, please unlock first".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id.clone();
+
+    // Get key material from the same context
+    let user_key = VaultUserKey {
+        enc_key: ctx.key.enc_key.clone(),
+        mac_key: ctx.key.mac_key.clone(),
+    };
 
     // 从本地数据库获取 folders
     let folders = state
         .sync_service()
         .vault_repository()
-        .list_live_folders(&auth_session.account_id)
+        .list_live_folders(&account_id)
         .await
         .map_err(|error| log_command_error("list_folders", &error))?;
 
@@ -90,25 +86,23 @@ pub async fn create_folder(
     state: State<'_, AppState>,
     request: CreateFolderRequest,
 ) -> Result<(), ErrorPayload> {
-    // 获取当前 session
-    let auth_session = session::ensure_fresh_auth_session(&state)
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
         .await
         .map_err(|error| log_command_error("create_folder", &error))?;
 
-    // 获取 vault_user_key 用于加密
-    let user_key = state
-        .get_vault_user_key(&auth_session.account_id)
-        .await
-        .map_err(|error| log_command_error("create_folder", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "create_folder",
-                &AppError::ValidationFieldError {
-                    field: "unknown".to_string(),
-                    message: "vault is locked, please unlock first".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id.clone();
+    let base_url = ctx.account.base_url.clone();
+    let access_token = ctx.session.access_token.clone();
+
+    // Get key material from the same context
+    let user_key = VaultUserKey {
+        enc_key: ctx.key.enc_key.clone(),
+        mac_key: ctx.key.mac_key.clone(),
+    };
 
     // 加密文件夹名称
     let encrypted_name = vault_crypto::encrypt_cipher_string(&request.name, &(&user_key).into())
@@ -117,11 +111,7 @@ pub async fn create_folder(
     // 调用 Vaultwarden API 创建文件夹
     state
         .vaultwarden_client()
-        .create_folder(
-            &auth_session.base_url,
-            &auth_session.access_token,
-            encrypted_name,
-        )
+        .create_folder(&base_url, &access_token, encrypted_name)
         .await
         .map_err(|error| {
             log_command_error(
@@ -137,9 +127,9 @@ pub async fn create_folder(
     state
         .sync_service()
         .sync_folders_only(SyncVaultCommand {
-            account_id: auth_session.account_id.clone(),
-            base_url: auth_session.base_url.clone(),
-            access_token: auth_session.access_token.clone(),
+            account_id,
+            base_url,
+            access_token,
             exclude_domains: false,
             trigger: SyncTrigger::Manual,
         })
@@ -155,25 +145,23 @@ pub async fn rename_folder(
     state: State<'_, AppState>,
     request: RenameFolderRequest,
 ) -> Result<(), ErrorPayload> {
-    // 获取当前 session
-    let auth_session = session::ensure_fresh_auth_session(&state)
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
         .await
         .map_err(|error| log_command_error("rename_folder", &error))?;
 
-    // 获取 vault_user_key 用于加密
-    let user_key = state
-        .get_vault_user_key(&auth_session.account_id)
-        .await
-        .map_err(|error| log_command_error("rename_folder", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "rename_folder",
-                &AppError::ValidationFieldError {
-                    field: "unknown".to_string(),
-                    message: "vault is locked, please unlock first".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id.clone();
+    let base_url = ctx.account.base_url.clone();
+    let access_token = ctx.session.access_token.clone();
+
+    // Get key material from the same context
+    let user_key = VaultUserKey {
+        enc_key: ctx.key.enc_key.clone(),
+        mac_key: ctx.key.mac_key.clone(),
+    };
 
     // 加密新文件夹名称
     let encrypted_name =
@@ -183,12 +171,7 @@ pub async fn rename_folder(
     // 调用 Vaultwarden API 更新文件夹
     state
         .vaultwarden_client()
-        .update_folder(
-            &auth_session.base_url,
-            &auth_session.access_token,
-            &request.folder_id,
-            encrypted_name,
-        )
+        .update_folder(&base_url, &access_token, &request.folder_id, encrypted_name)
         .await
         .map_err(|error| {
             log_command_error(
@@ -204,9 +187,9 @@ pub async fn rename_folder(
     state
         .sync_service()
         .sync_folders_only(SyncVaultCommand {
-            account_id: auth_session.account_id.clone(),
-            base_url: auth_session.base_url.clone(),
-            access_token: auth_session.access_token.clone(),
+            account_id,
+            base_url,
+            access_token,
             exclude_domains: false,
             trigger: SyncTrigger::Manual,
         })
@@ -222,19 +205,22 @@ pub async fn delete_folder(
     state: State<'_, AppState>,
     request: DeleteFolderRequest,
 ) -> Result<(), ErrorPayload> {
-    // 获取当前 session
-    let auth_session = session::ensure_fresh_auth_session(&state)
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
         .await
         .map_err(|error| log_command_error("delete_folder", &error))?;
+
+    let account_id = ctx.account.account_id.clone();
+    let base_url = ctx.account.base_url.clone();
+    let access_token = ctx.session.access_token.clone();
 
     // 调用 Vaultwarden API 删除文件夹
     state
         .vaultwarden_client()
-        .delete_folder(
-            &auth_session.base_url,
-            &auth_session.access_token,
-            &request.folder_id,
-        )
+        .delete_folder(&base_url, &access_token, &request.folder_id)
         .await
         .map_err(|error| {
             log_command_error(
@@ -250,9 +236,9 @@ pub async fn delete_folder(
     state
         .sync_service()
         .sync_folders_only(SyncVaultCommand {
-            account_id: auth_session.account_id.clone(),
-            base_url: auth_session.base_url.clone(),
-            access_token: auth_session.access_token.clone(),
+            account_id,
+            base_url,
+            access_token,
             exclude_domains: false,
             trigger: SyncTrigger::Manual,
         })

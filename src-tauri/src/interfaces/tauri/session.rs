@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::auth::{RefreshTokenCommand, SessionInfo};
+use crate::application::ports::unlock_context_port::{FullUnlockContext, UnlockContextProvider};
 use crate::bootstrap::app_state::{AppState, AuthSession};
+use crate::bootstrap::unlock_state::{AccountContext, SessionContext};
 use crate::interfaces::tauri::account_id;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -50,18 +52,19 @@ pub async fn restore_auth_session_with_master_password(
     state: &AppState,
     master_password: &str,
 ) -> AppResult<AuthSession> {
-    let persisted = state
-        .decrypt_persisted_auth_secret(master_password)?
+    let unlock_manager = state.unlock_manager();
+    let (persisted_ctx, refresh_token) = unlock_manager
+        .decrypt_refresh_token(master_password)
+        .await?
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
             message: "no persisted login state found in backend, please login first".to_string(),
         })?;
-    let refresh_token = persisted.refresh_token.clone();
     let refreshed = match state
         .auth_service()
         .refresh_token(RefreshTokenCommand {
-            base_url: persisted.context.base_url.clone(),
-            refresh_token,
+            base_url: persisted_ctx.base_url.clone(),
+            refresh_token: refresh_token.clone(),
         })
         .await
     {
@@ -70,70 +73,92 @@ pub async fn restore_auth_session_with_master_password(
             if matches!(error.status(), Some(401 | 403)) {
                 let _ = state
                     .sync_service()
-                    .stop_polling_for_account(&persisted.context.account_id);
+                    .stop_polling_for_account(&persisted_ctx.account_id);
                 let _ = state
                     .realtime_sync_service()
-                    .stop_for_account(&persisted.context.account_id)
+                    .stop_for_account(&persisted_ctx.account_id)
                     .await;
-                let _ = state.clear_all_auth_state().await;
+                let _ = state.unlock_manager().logout().await;
             }
             return Err(error);
         }
     };
 
     let account_id = account_id::derive_account_id_from_access_token(
-        &persisted.context.base_url,
+        &persisted_ctx.base_url,
         &refreshed.access_token,
     )?;
+
+    // Build AuthSession for backward compatibility
     let next = AuthSession {
-        account_id,
-        base_url: persisted.context.base_url,
-        email: persisted.context.email,
-        access_token: refreshed.access_token,
-        refresh_token: refreshed.refresh_token.or(Some(persisted.refresh_token)),
+        account_id: account_id.clone(),
+        base_url: persisted_ctx.base_url.clone(),
+        email: persisted_ctx.email.clone(),
+        access_token: refreshed.access_token.clone(),
+        refresh_token: refreshed.refresh_token.clone(),
         expires_at_ms: calc_expires_at_ms(refreshed.expires_in)?,
-        kdf: refreshed.kdf.or(persisted.context.kdf),
-        kdf_iterations: refreshed
-            .kdf_iterations
-            .or(persisted.context.kdf_iterations),
-        kdf_memory: refreshed.kdf_memory.or(persisted.context.kdf_memory),
-        kdf_parallelism: refreshed
-            .kdf_parallelism
-            .or(persisted.context.kdf_parallelism),
+        kdf: refreshed.kdf.or(persisted_ctx.kdf),
+        kdf_iterations: refreshed.kdf_iterations.or(persisted_ctx.kdf_iterations),
+        kdf_memory: refreshed.kdf_memory.or(persisted_ctx.kdf_memory),
+        kdf_parallelism: refreshed.kdf_parallelism.or(persisted_ctx.kdf_parallelism),
     };
 
-    state.set_auth_session(next.clone()).await?;
-    if let Err(error) = state.persist_auth_state(&next, master_password) {
+    // Update unlock_manager with new session
+    let account_context = AccountContext {
+        account_id: account_id.clone(),
+        email: persisted_ctx.email,
+        base_url: persisted_ctx.base_url,
+        kdf: next.kdf,
+        kdf_iterations: next.kdf_iterations,
+        kdf_memory: next.kdf_memory,
+        kdf_parallelism: next.kdf_parallelism,
+    };
+    let session_context = build_session_context(&refreshed, refresh_token)?;
+    unlock_manager.set_account_context(account_context).await?;
+    unlock_manager.set_session_context(session_context).await?;
+
+    // Persist auth state
+    if let Err(error) = unlock_manager.persist_with_password(master_password).await {
         log::warn!(
             target: "vanguard::tauri::session",
             "failed to refresh persisted auth state account_id={}: [{}] {}",
-            next.account_id,
+            account_id,
             error.code(),
             error.log_message()
         );
     }
+
     start_background_sync(state, &next).await;
     Ok(next)
 }
 
 async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSession> {
+    let unlock_manager = state.unlock_manager();
+
     loop {
-        let current = state.require_auth_session().await?;
-        if !force && !current.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
-            return Ok(current);
+        let current = unlock_manager
+            .require_fully_unlocked()
+            .await
+            .map_err(|_| AppError::AuthTokenExpired)?;
+
+        if !force && !is_session_expiring_soon(&current, REFRESH_GRACE_PERIOD_MS) {
+            return Ok(full_unlock_context_to_auth_session(current));
         }
 
-        let account_id = current.account_id.clone();
+        let account_id = current.account.account_id.clone();
         let singleflight_lock = acquire_refresh_singleflight_lock(&account_id)?;
         let decision = {
             let _guard = singleflight_lock.lock().await;
-            let latest = state.require_auth_session().await?;
-            if latest.account_id != account_id {
+            let latest = unlock_manager
+                .require_fully_unlocked()
+                .await
+                .map_err(|_| AppError::AuthTokenExpired)?;
+            if latest.account.account_id != account_id {
                 RefreshDecision::Retry
-            } else if !force && !latest.is_expiring_within(REFRESH_GRACE_PERIOD_MS) {
-                RefreshDecision::Return(latest)
+            } else if !force && !is_session_expiring_soon(&latest, REFRESH_GRACE_PERIOD_MS) {
+                RefreshDecision::Return(full_unlock_context_to_auth_session(latest))
             } else {
-                let refreshed = refresh_auth_session_locked(state, latest).await?;
+                let refreshed = refresh_auth_session_locked(state, &latest).await?;
                 RefreshDecision::Return(refreshed)
             }
         };
@@ -146,12 +171,49 @@ async fn refresh_auth_session(state: &AppState, force: bool) -> AppResult<AuthSe
     }
 }
 
+/// Check if session is expiring within the given grace period
+fn is_session_expiring_soon(ctx: &FullUnlockContext, grace_period_ms: i64) -> bool {
+    use std::time::{Duration, Instant};
+    let now = Instant::now();
+    let expires_at = ctx.session.expires_at;
+    let grace = Duration::from_millis(grace_period_ms.max(0) as u64);
+    now + grace >= expires_at
+}
+
+/// Convert FullUnlockContext to AuthSession for backward compatibility
+fn full_unlock_context_to_auth_session(ctx: FullUnlockContext) -> AuthSession {
+    let now = std::time::Instant::now();
+    let expires_at = ctx.session.expires_at;
+
+    let ttl_ms: i64 = if expires_at > now {
+        expires_at.duration_since(now).as_millis() as i64
+    } else {
+        0
+    };
+
+    let expires_at_ms = now_unix_ms().unwrap_or(0).saturating_add(ttl_ms);
+
+    AuthSession {
+        account_id: ctx.account.account_id,
+        base_url: ctx.account.base_url,
+        email: ctx.account.email,
+        access_token: ctx.session.access_token,
+        refresh_token: ctx.session.refresh_token,
+        expires_at_ms,
+        kdf: ctx.account.kdf,
+        kdf_iterations: ctx.account.kdf_iterations,
+        kdf_memory: ctx.account.kdf_memory,
+        kdf_parallelism: ctx.account.kdf_parallelism,
+    }
+}
+
 async fn refresh_auth_session_locked(
     state: &AppState,
-    current: AuthSession,
+    current: &FullUnlockContext,
 ) -> AppResult<AuthSession> {
     let refresh_token =
         current
+            .session
             .refresh_token
             .clone()
             .ok_or_else(|| AppError::ValidationFieldError {
@@ -162,7 +224,7 @@ async fn refresh_auth_session_locked(
     let refreshed = match state
         .auth_service()
         .refresh_token(RefreshTokenCommand {
-            base_url: current.base_url.clone(),
+            base_url: current.account.base_url.clone(),
             refresh_token,
         })
         .await
@@ -172,51 +234,66 @@ async fn refresh_auth_session_locked(
             if matches!(error.status(), Some(401 | 403)) {
                 let _ = state
                     .sync_service()
-                    .stop_polling_for_account(&current.account_id);
+                    .stop_polling_for_account(&current.account.account_id);
                 let _ = state
                     .realtime_sync_service()
-                    .stop_for_account(&current.account_id)
+                    .stop_for_account(&current.account.account_id)
                     .await;
-                let _ = state.clear_all_auth_state().await;
+                let _ = state.unlock_manager().logout().await;
             }
             return Err(error);
         }
     };
 
     let account_id = account_id::derive_account_id_from_access_token(
-        &current.base_url,
+        &current.account.base_url,
         &refreshed.access_token,
     )?;
+    // Extract values before moving
+    let refresh_token_for_session = refreshed
+        .refresh_token
+        .clone()
+        .or(current.session.refresh_token.clone())
+        .unwrap_or_default();
+
     let next = AuthSession {
         account_id,
-        base_url: current.base_url,
-        email: current.email,
-        access_token: refreshed.access_token,
-        refresh_token: refreshed.refresh_token.or(current.refresh_token),
+        base_url: current.account.base_url.clone(),
+        email: current.account.email.clone(),
+        access_token: refreshed.access_token.clone(),
+        refresh_token: Some(refresh_token_for_session.clone()),
         expires_at_ms: calc_expires_at_ms(refreshed.expires_in)?,
-        kdf: refreshed.kdf.or(current.kdf),
-        kdf_iterations: refreshed.kdf_iterations.or(current.kdf_iterations),
-        kdf_memory: refreshed.kdf_memory.or(current.kdf_memory),
-        kdf_parallelism: refreshed.kdf_parallelism.or(current.kdf_parallelism),
+        kdf: refreshed.kdf.or(current.account.kdf),
+        kdf_iterations: refreshed.kdf_iterations.or(current.account.kdf_iterations),
+        kdf_memory: refreshed.kdf_memory.or(current.account.kdf_memory),
+        kdf_parallelism: refreshed
+            .kdf_parallelism
+            .or(current.account.kdf_parallelism),
     };
 
-    state.set_auth_session(next.clone()).await?;
-    // Only persist if we have auth_wrap_runtime (i.e., unlocked with master password)
-    if state.auth_wrap_runtime()?.is_some() {
-        if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
-            log::warn!(
-                target: "vanguard::tauri::session",
-                "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
-                next.account_id,
-                error.code(),
-                error.log_message()
-            );
-        }
-    } else {
-        log::debug!(
+    // Update unlock_manager with refreshed session
+    let unlock_manager = state.unlock_manager();
+    let account_ctx = AccountContext {
+        account_id: next.account_id.clone(),
+        email: next.email.clone(),
+        base_url: next.base_url.clone(),
+        kdf: next.kdf,
+        kdf_iterations: next.kdf_iterations,
+        kdf_memory: next.kdf_memory,
+        kdf_parallelism: next.kdf_parallelism,
+    };
+    let session_ctx = build_session_context(&refreshed, refresh_token_for_session)?;
+    unlock_manager.set_account_context(account_ctx).await?;
+    unlock_manager.set_session_context(session_ctx).await?;
+
+    // Persist auth state (will only persist if wrap runtime is available)
+    if let Err(error) = unlock_manager.persist_with_runtime().await {
+        log::warn!(
             target: "vanguard::tauri::session",
-            "skip persist auth state (no wrap runtime) account_id={}",
-            next.account_id
+            "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
+            next.account_id,
+            error.code(),
+            error.log_message()
         );
     }
     start_background_sync(state, &next).await;
@@ -322,7 +399,7 @@ pub async fn restore_auth_session_with_refresh_token(
                     .realtime_sync_service()
                     .stop_for_account(&persisted_context.account_id)
                     .await;
-                let _ = state.clear_all_auth_state().await;
+                let _ = state.unlock_manager().logout().await;
             }
             return Err(error);
         }
@@ -332,12 +409,17 @@ pub async fn restore_auth_session_with_refresh_token(
         &persisted_context.base_url,
         &refreshed.access_token,
     )?;
+
+    // Build AuthSession for backward compatibility
     let next = AuthSession {
-        account_id,
-        base_url: persisted_context.base_url,
-        email: persisted_context.email,
-        access_token: refreshed.access_token,
-        refresh_token: refreshed.refresh_token.or(Some(refresh_token.to_string())),
+        account_id: account_id.clone(),
+        base_url: persisted_context.base_url.clone(),
+        email: persisted_context.email.clone(),
+        access_token: refreshed.access_token.clone(),
+        refresh_token: refreshed
+            .refresh_token
+            .clone()
+            .or(Some(refresh_token.to_string())),
         expires_at_ms: calc_expires_at_ms(refreshed.expires_in)?,
         kdf: refreshed.kdf.or(persisted_context.kdf),
         kdf_iterations: refreshed
@@ -349,27 +431,52 @@ pub async fn restore_auth_session_with_refresh_token(
             .or(persisted_context.kdf_parallelism),
     };
 
-    state.set_auth_session(next.clone()).await?;
-    // Only persist if we have auth_wrap_runtime (i.e., unlocked with master password)
-    if state.auth_wrap_runtime()?.is_some() {
-        if let Err(error) = state.persist_auth_state_with_cached_wrap(&next) {
-            log::warn!(
-                target: "vanguard::tauri::session",
-                "failed to refresh persisted auth state account_id={}: [{}] {}",
-                next.account_id,
-                error.code(),
-                error.log_message()
-            );
-        }
-    } else {
-        log::debug!(
+    // Update unlock_manager with new session
+    let unlock_manager = state.unlock_manager();
+    let account_context = AccountContext {
+        account_id: account_id.clone(),
+        email: persisted_context.email,
+        base_url: persisted_context.base_url,
+        kdf: next.kdf,
+        kdf_iterations: next.kdf_iterations,
+        kdf_memory: next.kdf_memory,
+        kdf_parallelism: next.kdf_parallelism,
+    };
+    let session_context = build_session_context(&refreshed, refresh_token.to_string())?;
+    unlock_manager.set_account_context(account_context).await?;
+    unlock_manager.set_session_context(session_context).await?;
+
+    // Persist auth state (will only persist if wrap runtime is available)
+    if let Err(error) = unlock_manager.persist_with_runtime().await {
+        log::warn!(
             target: "vanguard::tauri::session",
-            "skip persist auth state (no wrap runtime) account_id={}",
-            next.account_id
+            "failed to refresh persisted auth state account_id={}: [{}] {}",
+            account_id,
+            error.code(),
+            error.log_message()
         );
     }
+
     start_background_sync(state, &next).await;
     Ok(next)
+}
+
+/// Build SessionContext from SessionInfo and refresh token
+fn build_session_context(
+    session_info: &SessionInfo,
+    refresh_token: String,
+) -> AppResult<SessionContext> {
+    use std::time::{Duration, Instant};
+
+    let expires_at = Instant::now()
+        + Duration::from_millis(session_info.expires_in.max(0).saturating_mul(1000) as u64);
+
+    Ok(SessionContext {
+        access_token: session_info.access_token.clone(),
+        refresh_token: Some(refresh_token),
+        expires_at,
+        last_activity: Instant::now(),
+    })
 }
 
 fn calc_expires_at_ms(expires_in_seconds: i64) -> AppResult<i64> {

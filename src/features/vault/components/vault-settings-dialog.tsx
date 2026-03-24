@@ -281,42 +281,33 @@ export function VaultSettingsDialog({
     [isPinBusy],
   );
 
-  const onLanguageChange = useCallback(
-    async (value: string) => {
-      const newLocale = value as AppLocale;
-      try {
-        await changeAppLocale(newLocale);
-        setLanguage(newLocale);
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onLanguageChange = useCallback(async (value: string) => {
+    const newLocale = value as AppLocale;
+    try {
+      await changeAppLocale(newLocale);
+      setLanguage(newLocale);
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
-  const onLaunchOnLoginChange = useCallback(
-    async (checked: boolean) => {
-      setLaunchOnLogin(checked);
-      try {
-        await commands.configUpdateAppConfig({ launchOnLogin: checked });
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onLaunchOnLoginChange = useCallback(async (checked: boolean) => {
+    setLaunchOnLogin(checked);
+    try {
+      await commands.configUpdateAppConfig({ launchOnLogin: checked });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
-  const onShowWebsiteIconChange = useCallback(
-    async (checked: boolean) => {
-      setShowWebsiteIcon(checked);
-      try {
-        await commands.configUpdateAppConfig({ showWebsiteIcon: checked });
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onShowWebsiteIconChange = useCallback(async (checked: boolean) => {
+    setShowWebsiteIcon(checked);
+    try {
+      await commands.configUpdateAppConfig({ showWebsiteIcon: checked });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
   const onSpotlightAutofillChange = useCallback(
     async (checked: boolean) => {
@@ -347,27 +338,21 @@ export function VaultSettingsDialog({
     [t],
   );
 
-  const onQuickAccessShortcutSave = useCallback(
-    async (shortcut: string) => {
-      try {
-        await commands.configUpdateAppConfig({ quickAccessShortcut: shortcut });
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onQuickAccessShortcutSave = useCallback(async (shortcut: string) => {
+    try {
+      await commands.configUpdateAppConfig({ quickAccessShortcut: shortcut });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
-  const onLockShortcutSave = useCallback(
-    async (shortcut: string) => {
-      try {
-        await commands.configUpdateAppConfig({ lockShortcut: shortcut });
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onLockShortcutSave = useCallback(async (shortcut: string) => {
+    try {
+      await commands.configUpdateAppConfig({ lockShortcut: shortcut });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
   const onRequireMasterPasswordChange = useCallback(
     async (value: RequireMasterPasswordOption) => {
@@ -380,20 +365,17 @@ export function VaultSettingsDialog({
         errorHandler.handle(error);
       }
     },
-    [t],
+    [],
   );
 
-  const onLockOnSleepChange = useCallback(
-    async (checked: boolean) => {
-      setLockWhenDeviceSleep(checked);
-      try {
-        await commands.configUpdateAppConfig({ lockOnSleep: checked });
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    },
-    [t],
-  );
+  const onLockOnSleepChange = useCallback(async (checked: boolean) => {
+    setLockWhenDeviceSleep(checked);
+    try {
+      await commands.configUpdateAppConfig({ lockOnSleep: checked });
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  }, []);
 
   const onAutoLockIdleDelayChange = useCallback(
     async (value: AutoLockIdleOption) => {
@@ -404,7 +386,7 @@ export function VaultSettingsDialog({
         errorHandler.handle(error);
       }
     },
-    [t],
+    [],
   );
 
   const onClipboardClearAfterChange = useCallback(
@@ -416,7 +398,7 @@ export function VaultSettingsDialog({
         errorHandler.handle(error);
       }
     },
-    [t],
+    [],
   );
 
   const onBiometricCheckedChange = useCallback(

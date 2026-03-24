@@ -4,6 +4,7 @@ use crate::application::dto::vault::{
     CopyCipherFieldCommand, GetCipherDetailQuery, GetCipherTotpCodeCommand, VaultCopyField,
     VaultUserKeyMaterial,
 };
+use crate::application::ports::unlock_context_port::UnlockContextProvider;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::use_cases::copy_cipher_field_use_case::CopyCipherFieldUseCase;
 use crate::application::use_cases::get_cipher_totp_code_use_case::GetCipherTotpCodeUseCase;
@@ -129,10 +130,12 @@ pub async fn vault_get_cipher_detail(
         ));
     }
 
-    let user_key = state
-        .get_vault_user_key(&account_id)
-        .await
-        .map_err(|error| log_command_error("vault_get_cipher_detail", &error))?
+    let key_material = state.unlock_manager().key_material().await;
+    let user_key = key_material
+        .map(|k| VaultUserKey {
+            enc_key: k.enc_key.clone(),
+            mac_key: k.mac_key.clone(),
+        })
         .ok_or_else(|| {
             log_command_error(
                 "vault_get_cipher_detail",
@@ -280,44 +283,30 @@ pub async fn create_cipher(
     request: CreateCipherRequestDto,
     state: State<'_, AppState>,
 ) -> Result<CipherMutationResponseDto, ErrorPayload> {
-    let account_id = state
-        .active_account_id()
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
         .map_err(|error| log_command_error("create_cipher", &error))?;
 
-    let session = state
-        .auth_session()
-        .await
-        .map_err(|error| log_command_error("create_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "create_cipher",
-                &AppError::ValidationFieldError {
-                    field: "session".to_string(),
-                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
 
-    let user_key = state
-        .get_vault_user_key(&account_id)
-        .await
-        .map_err(|error| log_command_error("create_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "create_cipher",
-                &AppError::ValidationFieldError {
-                    field: "unknown".to_string(),
-                    message: "vault is locked, please unlock first".to_string(),
-                },
-            )
-        })?;
+    // Get key material from the same context
+    let user_key = VaultUserKey {
+        enc_key: ctx.key.enc_key.clone(),
+        mac_key: ctx.key.mac_key.clone(),
+    };
 
     let result = state
         .create_cipher_use_case()
         .execute(
             account_id,
-            session.base_url,
-            session.access_token,
+            base_url,
+            access_token,
             request.cipher,
             (&user_key).into(),
         )
@@ -336,44 +325,30 @@ pub async fn update_cipher(
     request: UpdateCipherRequestDto,
     state: State<'_, AppState>,
 ) -> Result<CipherMutationResponseDto, ErrorPayload> {
-    let account_id = state
-        .active_account_id()
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
         .map_err(|error| log_command_error("update_cipher", &error))?;
 
-    let session = state
-        .auth_session()
-        .await
-        .map_err(|error| log_command_error("update_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "update_cipher",
-                &AppError::ValidationFieldError {
-                    field: "session".to_string(),
-                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
 
-    let user_key = state
-        .get_vault_user_key(&account_id)
-        .await
-        .map_err(|error| log_command_error("update_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "update_cipher",
-                &AppError::ValidationFieldError {
-                    field: "unknown".to_string(),
-                    message: "vault is locked, please unlock first".to_string(),
-                },
-            )
-        })?;
+    // Get key material from the same context
+    let user_key = VaultUserKey {
+        enc_key: ctx.key.enc_key.clone(),
+        mac_key: ctx.key.mac_key.clone(),
+    };
 
     let result = state
         .update_cipher_use_case()
         .execute(
             account_id,
-            session.base_url,
-            session.access_token,
+            base_url,
+            access_token,
             request.cipher_id,
             request.cipher,
             (&user_key).into(),
@@ -393,32 +368,21 @@ pub async fn delete_cipher(
     request: DeleteCipherRequestDto,
     state: State<'_, AppState>,
 ) -> Result<(), ErrorPayload> {
-    let account_id = state
-        .active_account_id()
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
         .map_err(|error| log_command_error("delete_cipher", &error))?;
 
-    let session = state
-        .auth_session()
-        .await
-        .map_err(|error| log_command_error("delete_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "delete_cipher",
-                &AppError::ValidationFieldError {
-                    field: "session".to_string(),
-                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
 
     state
         .delete_cipher_use_case()
-        .execute(
-            account_id,
-            session.base_url,
-            session.access_token,
-            request.cipher_id,
-        )
+        .execute(account_id, base_url, access_token, request.cipher_id)
         .await
         .map_err(|error| log_command_error("delete_cipher", &error))?;
 
@@ -431,32 +395,21 @@ pub async fn soft_delete_cipher(
     request: SoftDeleteCipherRequestDto,
     state: State<'_, AppState>,
 ) -> Result<CipherMutationResponseDto, ErrorPayload> {
-    let account_id = state
-        .active_account_id()
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
         .map_err(|error| log_command_error("soft_delete_cipher", &error))?;
 
-    let session = state
-        .auth_session()
-        .await
-        .map_err(|error| log_command_error("soft_delete_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "soft_delete_cipher",
-                &AppError::ValidationFieldError {
-                    field: "session".to_string(),
-                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
 
     let result = state
         .soft_delete_cipher_use_case()
-        .execute(
-            account_id,
-            session.base_url,
-            session.access_token,
-            request.cipher_id,
-        )
+        .execute(account_id, base_url, access_token, request.cipher_id)
         .await
         .map_err(|error| log_command_error("soft_delete_cipher", &error))?;
 
@@ -472,32 +425,21 @@ pub async fn restore_cipher(
     request: RestoreCipherRequestDto,
     state: State<'_, AppState>,
 ) -> Result<(), ErrorPayload> {
-    let account_id = state
-        .active_account_id()
+    let unlock_manager = state.unlock_manager();
+
+    // Require fully unlocked state (vault + valid session)
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
         .map_err(|error| log_command_error("restore_cipher", &error))?;
 
-    let session = state
-        .auth_session()
-        .await
-        .map_err(|error| log_command_error("restore_cipher", &error))?
-        .ok_or_else(|| {
-            log_command_error(
-                "restore_cipher",
-                &AppError::ValidationFieldError {
-                    field: "session".to_string(),
-                    message: "API session expired. Please lock and unlock with master password to restore API access.".to_string(),
-                },
-            )
-        })?;
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
 
     state
         .restore_cipher_use_case()
-        .execute(
-            account_id,
-            session.base_url,
-            session.access_token,
-            request.cipher_id,
-        )
+        .execute(account_id, base_url, access_token, request.cipher_id)
         .await
         .map_err(|error| log_command_error("restore_cipher", &error))?;
 

@@ -38,7 +38,7 @@ aes = "0.8"
 cbc = { version = "0.1", features = ["std"] }
 hmac = "0.12"
 uuid = { version = "1", features = ["v4"] }
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "fs"] }
 rusqlite = { version = "0.38", features = ["bundled"] }
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"

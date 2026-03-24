@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::application::dto::sync::SyncVaultCommand;
+use crate::application::ports::unlock_context_port::UnlockContextProvider;
 use crate::bootstrap::app_state::AppState;
 use crate::domain::sync::SyncTrigger;
 use crate::interfaces::tauri::dto::sync::{
@@ -66,10 +67,11 @@ pub async fn vault_sync_status(
     state: State<'_, AppState>,
     _request: SyncStatusRequestDto,
 ) -> Result<SyncStatusResponseDto, ErrorPayload> {
-    let account_id = state
-        .require_auth_session()
+    let unlock_manager = state.unlock_manager();
+    let account_id = unlock_manager
+        .require_unlocked()
         .await
-        .map(|value| value.account_id)
+        .map(|ctx| ctx.account.account_id)
         .map_err(|error| log_command_error("vault_sync_status", error))?;
     let context = state
         .sync_service()

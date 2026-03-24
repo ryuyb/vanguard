@@ -44,19 +44,17 @@ pub struct TrayFeature;
 impl TrayFeature {
     /// 更新托盘菜单(包括语言和锁定状态)
     pub fn update_menu<R: Runtime>(app_handle: &AppHandle<R>) {
-        // 检查是否已解锁 - 使用 block_in_place 允许在异步上下文中调用
+        // Check if unlocked - use block_in_place to allow async calls
         let is_unlocked = tokio::task::block_in_place(|| {
             app_handle
                 .try_state::<AppState>()
-                .and_then(|state| {
-                    state.active_account_id().ok().and_then(|account_id| {
-                        let handle = tokio::runtime::Handle::current();
-                        handle
-                            .block_on(state.get_vault_user_key(&account_id))
-                            .unwrap_or_default()
-                    })
+                .map(|state| {
+                    let handle = tokio::runtime::Handle::current();
+                    handle
+                        .block_on(state.unlock_manager().key_material())
+                        .is_some()
                 })
-                .is_some()
+                .unwrap_or(false)
         });
 
         // 重建托盘菜单

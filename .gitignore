@@ -30,3 +30,4 @@ src-tauri/target
 *.sln
 *.sw?
 .alma-snapshots
+.alma
