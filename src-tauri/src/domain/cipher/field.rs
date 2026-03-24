@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use specta::Type;
+use specta::{datatype::DataType, Generics, Type, TypeCollection};
 use std::marker::PhantomData;
 
 use super::state::{CipherState, Decrypted, Encrypted};
@@ -8,14 +8,12 @@ use super::state::{CipherState, Decrypted, Encrypted};
 ///
 /// This type provides type-safe encapsulation of cipher fields,
 /// ensuring that encrypted and decrypted data are tracked at compile time.
-#[derive(Debug, Clone, PartialEq, Eq, Type)]
-#[specta(inline)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncryptedField<S, T>
 where
     S: CipherState,
 {
     inner: Option<T>,
-    #[serde(skip)]
     _state: PhantomData<S>,
 }
 
@@ -165,6 +163,35 @@ where
 {
     fn from(value: T) -> Self {
         Self::new(Some(value))
+    }
+}
+
+/// Custom Type implementation for EncryptedField
+/// This makes EncryptedField transparent - it generates the same TypeScript type as Option<T>
+impl<S, T> Type for EncryptedField<S, T>
+where
+    S: CipherState,
+    T: Type,
+{
+    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
+        // We need to extract the second generic parameter (T) and use it
+        // For EncryptedField<S, T>, generics contains [S_type, T_type]
+        // We only care about T, and we want to generate Option<T>
+
+        // Get the DataType for T from generics, or use T::inline if no generics provided
+        let t_type = match &generics {
+            Generics::Provided(types) if types.len() >= 2 => {
+                // We have concrete types: types[0] is S, types[1] is T
+                types[1].clone()
+            }
+            _ => {
+                // No concrete types provided, inline T without generics
+                T::inline(type_map, Generics::Provided(&[]))
+            }
+        };
+
+        // Wrap it in Option (which is nullable in TypeScript)
+        specta::datatype::DataType::Nullable(Box::new(t_type))
     }
 }
 

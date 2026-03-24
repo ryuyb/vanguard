@@ -23,6 +23,7 @@ use crate::support::error::AppError;
 /// Main cipher structure with type-state pattern
 #[derive(Debug, Clone, Type)]
 #[serde(bound = "")]
+#[specta(rename_all = "camelCase")]
 pub struct Cipher<S: CipherState> {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]

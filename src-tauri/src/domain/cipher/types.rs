@@ -7,6 +7,7 @@ use super::state::CipherState;
 /// Cipher login data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherLogin<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub uri: EncryptedField<S, String>,
@@ -30,6 +31,7 @@ pub struct CipherLogin<S: CipherState> {
 /// Cipher login URI
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherLoginUri<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub uri: EncryptedField<S, String>,
@@ -43,6 +45,7 @@ pub struct CipherLoginUri<S: CipherState> {
 /// Cipher login FIDO2 credential
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherLoginFido2Credential<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub credential_id: EncryptedField<S, String>,
@@ -75,6 +78,7 @@ pub struct CipherLoginFido2Credential<S: CipherState> {
 /// Cipher card data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherCard<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub cardholder_name: EncryptedField<S, String>,
@@ -93,6 +97,7 @@ pub struct CipherCard<S: CipherState> {
 /// Cipher identity data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherIdentity<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub title: EncryptedField<S, String>,
@@ -135,6 +140,7 @@ pub struct CipherIdentity<S: CipherState> {
 /// Cipher SSH key data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherSshKey<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub private_key: EncryptedField<S, String>,
@@ -154,6 +160,7 @@ pub struct CipherSecureNote {
 /// Cipher attachment data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherAttachment<S: CipherState> {
     pub id: String,
     /// Plain text field - not encrypted
@@ -177,6 +184,7 @@ pub struct CipherAttachment<S: CipherState> {
 /// Cipher custom field
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherField<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub name: EncryptedField<S, String>,
@@ -191,6 +199,7 @@ pub struct CipherField<S: CipherState> {
 /// Cipher password history entry
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherPasswordHistory<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub password: EncryptedField<S, String>,
@@ -211,6 +220,7 @@ pub struct CipherPermissions {
 /// Cipher data (legacy structure containing all fields)
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(bound = "", rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct CipherData<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub name: EncryptedField<S, String>,
