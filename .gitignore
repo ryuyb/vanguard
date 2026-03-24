@@ -31,3 +31,6 @@ src-tauri/target
 *.sw?
 .alma-snapshots
 .alma
+
+# Claude worktrees
+.claude/worktrees
