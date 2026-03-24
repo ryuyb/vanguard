@@ -64,7 +64,7 @@ pub struct Cipher<S: CipherState> {
     pub fields: Vec<CipherField<S>>,
     #[serde(default)]
     pub password_history: Vec<CipherPasswordHistory<S>>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub collection_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<CipherData<S>>,
@@ -78,7 +78,7 @@ pub struct Cipher<S: CipherState> {
     pub identity: Option<CipherIdentity<S>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ssh_key: Option<CipherSshKey<S>>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub attachments: Vec<CipherAttachment<S>>,
     #[serde(skip)]
     _state: PhantomData<S>,
@@ -799,6 +799,25 @@ mod tests {
             value["passwordHistory"].as_array().unwrap().len(),
             0,
             "passwordHistory should be empty array"
+        );
+        // Verify collectionIds and attachments are present as empty arrays
+        assert!(
+            value["collectionIds"].is_array(),
+            "collectionIds should be serialized as array"
+        );
+        assert_eq!(
+            value["collectionIds"].as_array().unwrap().len(),
+            0,
+            "collectionIds should be empty array"
+        );
+        assert!(
+            value["attachments"].is_array(),
+            "attachments should be serialized as array"
+        );
+        assert_eq!(
+            value["attachments"].as_array().unwrap().len(),
+            0,
+            "attachments should be empty array"
         );
     }
 

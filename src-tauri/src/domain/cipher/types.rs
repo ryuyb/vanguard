@@ -6,11 +6,11 @@ use super::state::CipherState;
 
 /// Cipher login data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherLogin<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub uri: EncryptedField<S, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub uris: Vec<CipherLoginUri<S>>,
     #[serde(skip_serializing_if = "should_skip_field")]
     pub username: EncryptedField<S, String>,
@@ -23,13 +23,13 @@ pub struct CipherLogin<S: CipherState> {
     pub totp: EncryptedField<S, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autofill_on_page_load: Option<bool>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub fido2_credentials: Vec<CipherLoginFido2Credential<S>>,
 }
 
 /// Cipher login URI
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherLoginUri<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub uri: EncryptedField<S, String>,
@@ -42,7 +42,7 @@ pub struct CipherLoginUri<S: CipherState> {
 
 /// Cipher login FIDO2 credential
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherLoginFido2Credential<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub credential_id: EncryptedField<S, String>,
@@ -74,7 +74,7 @@ pub struct CipherLoginFido2Credential<S: CipherState> {
 
 /// Cipher card data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherCard<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub cardholder_name: EncryptedField<S, String>,
@@ -92,7 +92,7 @@ pub struct CipherCard<S: CipherState> {
 
 /// Cipher identity data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherIdentity<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub title: EncryptedField<S, String>,
@@ -134,7 +134,7 @@ pub struct CipherIdentity<S: CipherState> {
 
 /// Cipher SSH key data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherSshKey<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub private_key: EncryptedField<S, String>,
@@ -153,7 +153,7 @@ pub struct CipherSecureNote {
 
 /// Cipher attachment data
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherAttachment<S: CipherState> {
     pub id: String,
     /// Plain text field - not encrypted
@@ -176,7 +176,7 @@ pub struct CipherAttachment<S: CipherState> {
 
 /// Cipher custom field
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherField<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub name: EncryptedField<S, String>,
@@ -190,7 +190,7 @@ pub struct CipherField<S: CipherState> {
 
 /// Cipher password history entry
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherPasswordHistory<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub password: EncryptedField<S, String>,
@@ -223,7 +223,7 @@ pub struct CipherData<S: CipherState> {
     // Login fields
     #[serde(skip_serializing_if = "should_skip_field")]
     pub uri: EncryptedField<S, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub uris: Vec<CipherLoginUri<S>>,
     #[serde(skip_serializing_if = "should_skip_field")]
     pub username: EncryptedField<S, String>,
@@ -236,7 +236,7 @@ pub struct CipherData<S: CipherState> {
     pub totp: EncryptedField<S, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub autofill_on_page_load: Option<bool>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub fido2_credentials: Vec<CipherLoginFido2Credential<S>>,
     // Card fields
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -345,5 +345,113 @@ mod tests {
             restore: Some(false),
         };
         assert_eq!(permissions.delete, Some(true));
+    }
+
+    #[test]
+    fn test_cipher_login_empty_arrays() {
+        // Test that empty uris and fido2_credentials are serialized as [] not skipped
+        let login: CipherLogin<Decrypted> = CipherLogin {
+            uri: EncryptedField::new(Some("uri".to_string())),
+            uris: vec![],
+            username: EncryptedField::new(Some("username".to_string())),
+            password: EncryptedField::new(Some("password".to_string())),
+            password_revision_date: None,
+            totp: EncryptedField::none(),
+            autofill_on_page_load: None,
+            fido2_credentials: vec![],
+        };
+
+        let json = serde_json::to_string(&login).unwrap();
+        eprintln!("JSON: {}", json);
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // Verify uris and fido2Credentials are present as empty arrays
+        assert!(
+            value["uris"].is_array(),
+            "uris should be serialized as array"
+        );
+        assert_eq!(
+            value["uris"].as_array().unwrap().len(),
+            0,
+            "uris should be empty array"
+        );
+        assert!(
+            value["fido2Credentials"].is_array(),
+            "fido2Credentials should be serialized as array"
+        );
+        assert_eq!(
+            value["fido2Credentials"].as_array().unwrap().len(),
+            0,
+            "fido2Credentials should be empty array"
+        );
+    }
+
+    #[test]
+    fn test_cipher_data_empty_arrays() {
+        // Test that CipherData's empty uris and fido2_credentials are serialized as []
+        let data: CipherData<Decrypted> = CipherData {
+            name: EncryptedField::new(Some("name".to_string())),
+            notes: EncryptedField::none(),
+            fields: vec![],
+            password_history: vec![],
+            uri: EncryptedField::none(),
+            uris: vec![],
+            username: EncryptedField::none(),
+            password: EncryptedField::none(),
+            password_revision_date: None,
+            totp: EncryptedField::none(),
+            autofill_on_page_load: None,
+            fido2_credentials: vec![],
+            r#type: None,
+            cardholder_name: EncryptedField::none(),
+            brand: EncryptedField::none(),
+            number: EncryptedField::none(),
+            exp_month: EncryptedField::none(),
+            exp_year: EncryptedField::none(),
+            code: EncryptedField::none(),
+            title: EncryptedField::none(),
+            first_name: EncryptedField::none(),
+            middle_name: EncryptedField::none(),
+            last_name: EncryptedField::none(),
+            address1: EncryptedField::none(),
+            address2: EncryptedField::none(),
+            address3: EncryptedField::none(),
+            city: EncryptedField::none(),
+            state: EncryptedField::none(),
+            postal_code: EncryptedField::none(),
+            country: EncryptedField::none(),
+            company: EncryptedField::none(),
+            email: EncryptedField::none(),
+            phone: EncryptedField::none(),
+            ssn: EncryptedField::none(),
+            passport_number: EncryptedField::none(),
+            license_number: EncryptedField::none(),
+            private_key: EncryptedField::none(),
+            public_key: EncryptedField::none(),
+            key_fingerprint: EncryptedField::none(),
+        };
+
+        let json = serde_json::to_string(&data).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // Verify uris and fido2Credentials are present as empty arrays
+        assert!(
+            value["uris"].is_array(),
+            "CipherData uris should be serialized as array"
+        );
+        assert_eq!(
+            value["uris"].as_array().unwrap().len(),
+            0,
+            "CipherData uris should be empty array"
+        );
+        assert!(
+            value["fido2Credentials"].is_array(),
+            "CipherData fido2Credentials should be serialized as array"
+        );
+        assert_eq!(
+            value["fido2Credentials"].as_array().unwrap().len(),
+            0,
+            "CipherData fido2Credentials should be empty array"
+        );
     }
 }
