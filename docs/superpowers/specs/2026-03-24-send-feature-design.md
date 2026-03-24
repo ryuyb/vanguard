@@ -412,6 +412,7 @@ impl SyncVaultUseCase {
 1. **主动同步** - 用户手动同步或自动定时同步
 2. **创建/更新/删除操作后** - 操作成功后更新本地缓存
 3. **查看详情时** - 更新 access_count
+4. **WebSocket 实时更新** - 收到服务器推送时更新缓存
 
 **缓存清理**：
 - 定期清理已过期的 Send（deletion_date < now）
@@ -422,7 +423,191 @@ impl SyncVaultUseCase {
 - 创建/更新/删除操作需要在线
 - 提示用户"离线模式，数据可能不是最新"
 
+### Real-time Updates via WebSocket
+
+**WebSocket 支持**：
+
+Vanguard 已通过 WebSocket 支持实时同步，Send 功能需要集成到现有机制中。
+
+**PushType 支持**：
+
+```rust
+pub enum PushType {
+    // ... 现有类型 ...
+    SyncSendCreate = 12,  // Send 创建
+    SyncSendUpdate = 13,  // Send 更新
+    SyncSendDelete = 14,  // Send 删除
+}
+```
+
+**增量同步流程**：
+
+当收到 WebSocket 推送的 Send 事件时：
+
+1. **SyncSendCreate/SyncSendUpdate**：
+   - 从服务器获取单个 Send 的最新数据
+   - 更新本地 SQLite 缓存
+   - 发送 `SendCreated` 或 `SendUpdated` Event 通知前端
+
+2. **SyncSendDelete**：
+   - 从本地 SQLite 删除 Send
+   - 发送 `SendDeleted` Event 通知前端
+
+**集成点**：
+
+现有的 `RealtimeSyncService` 已有 `trigger_websocket_incremental_send_sync` 方法，需要实现：
+
+```rust
+async fn trigger_websocket_incremental_send_sync(
+    &self,
+    account_id: &str,
+    base_url: &str,
+    access_token: &str,
+    push_type: PushType,
+    send_id: Option<&str>,
+) -> EventOutcome {
+    // 已有框架，需要补充具体实现
+}
+```
+
 ## Interfaces Layer Design
+
+### Send Events
+
+**Event 定义**：
+
+需要新增 Send 相关的 Event，用于通知前端 Send 的变化：
+
+```rust
+// interfaces/tauri/events/send.rs
+use serde::Serialize;
+use specta::Type;
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SendCreated {
+    pub account_id: String,
+    pub send_id: String,
+}
+
+impl tauri_specta::Event for SendCreated {
+    const NAME: &'static str = "send:created";
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SendUpdated {
+    pub account_id: String,
+    pub send_id: String,
+}
+
+impl tauri_specta::Event for SendUpdated {
+    const NAME: &'static str = "send:updated";
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SendDeleted {
+    pub account_id: String,
+    pub send_id: String,
+}
+
+impl tauri_specta::Event for SendDeleted {
+    const NAME: &'static str = "send:deleted";
+}
+```
+
+**注册 Events**：
+
+在 `lib.rs` 中注册新的 Events：
+
+```rust
+.events(tauri_specta::collect_events![
+    // ... 现有 events ...
+    interfaces::tauri::events::send::SendCreated,
+    interfaces::tauri::events::send::SendUpdated,
+    interfaces::tauri::events::send::SendDeleted
+])
+```
+
+**扩展 SyncEventPort**：
+
+```rust
+// application/ports/sync_event_port.rs
+pub trait SyncEventPort: Send + Sync {
+    // ... 现有方法 ...
+
+    fn emit_send_created(&self, account_id: &str, send_id: &str);
+    fn emit_send_updated(&self, account_id: &str, send_id: &str);
+    fn emit_send_deleted(&self, account_id: &str, send_id: &str);
+}
+```
+
+**实现 Event Adapter**：
+
+```rust
+// interfaces/tauri/events/sync_event_adapter.rs
+impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
+    // ... 现有实现 ...
+
+    fn emit_send_created(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendCreated {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:created for account_id={account_id} send_id={send_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_send_updated(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendUpdated {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:updated for account_id={account_id} send_id={send_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_send_deleted(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendDeleted {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:deleted for account_id={account_id} send_id={send_id}: {error}"
+            );
+        }
+    }
+}
+```
+
+**Event 触发时机**：
+
+1. **SendCreated**：
+   - 创建 Send 成功后（CreateSendUseCase）
+   - WebSocket 收到 SyncSendCreate 事件后
+
+2. **SendUpdated**：
+   - 更新 Send 成功后（UpdateSendUseCase）
+   - WebSocket 收到 SyncSendUpdate 事件后
+   - 访问次数更新后（可选，视需求而定）
+
+3. **SendDeleted**：
+   - 删除 Send 成功后（DeleteSendUseCase）
+   - WebSocket 收到 SyncSendDelete 事件后
 
 ### Tauri Commands
 
@@ -697,6 +882,144 @@ export function useSendFileUpload() {
 
   return { selectedFile, fileSize, selectFile, readFileData };
 }
+```
+
+### Event Listening
+
+**监听 Send Events**：
+
+前端需要监听后端发送的 Send 相关事件，实时更新 UI：
+
+```tsx
+// src/features/send/hooks/use-send-events.ts
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { listen } from '@tauri-apps/api/event';
+
+export function useSendEvents() {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unlisteners: Array<() => void> = [];
+
+    // 监听 Send 创建事件
+    listen<{ accountId: string; sendId: string }>('send:created', (event) => {
+      const { sendId } = event.payload;
+
+      // 刷新 Send 列表
+      queryClient.invalidateQueries({ queryKey: ['sends'] });
+
+      // 可选：如果当前正在查看 Send 列表，显示提示
+      toast.success(t('send.createdRemotely'));
+
+      console.log('Send created:', sendId);
+    }).then(unlisten => unlisteners.push(unlisten));
+
+    // 监听 Send 更新事件
+    listen<{ accountId: string; sendId: string }>('send:updated', (event) => {
+      const { sendId } = event.payload;
+
+      // 刷新 Send 列表和详情
+      queryClient.invalidateQueries({ queryKey: ['sends'] });
+      queryClient.invalidateQueries({ queryKey: ['send', sendId] });
+
+      console.log('Send updated:', sendId);
+    }).then(unlisten => unlisteners.push(unlisten));
+
+    // 监听 Send 删除事件
+    listen<{ accountId: string; sendId: string }>('send:deleted', (event) => {
+      const { sendId } = event.payload;
+
+      // 刷新 Send 列表
+      queryClient.invalidateQueries({ queryKey: ['sends'] });
+
+      // 如果当前正在查看被删除的 Send，关闭详情面板
+      queryClient.removeQueries({ queryKey: ['send', sendId] });
+
+      toast.info(t('send.deletedRemotely'));
+
+      console.log('Send deleted:', sendId);
+    }).then(unlisten => unlisteners.push(unlisten));
+
+    // 清理监听器
+    return () => {
+      unlisteners.forEach(unlisten => unlisten());
+    };
+  }, [queryClient]);
+}
+```
+
+**在顶层组件中使用**：
+
+```tsx
+// src/app.tsx 或主页面组件
+import { useSendEvents } from '@/features/send/hooks/use-send-events';
+
+export function App() {
+  // 启用 Send Events 监听
+  useSendEvents();
+
+  return (
+    // ... 应用内容
+  );
+}
+```
+
+**Event 处理策略**：
+
+1. **SendCreated**：
+   - 刷新 Send 列表
+   - 显示提示："新 Send 已创建"
+   - 不自动打开详情（让用户主动查看）
+
+2. **SendUpdated**：
+   - 刷新 Send 列表
+   - 刷新对应 Send 的详情
+   - 如果正在查看该 Send，更新显示内容
+
+3. **SendDeleted**：
+   - 刷新 Send 列表
+   - 移除该 Send 的详情缓存
+   - 如果正在查看该 Send，返回列表
+   - 显示提示："Send 已被删除"
+
+**避免循环更新**：
+
+为防止自己创建的 Send 触发 WebSocket 事件后重复刷新，可以在 mutation 成功后跳过 event 处理：
+
+```tsx
+export function useSendMutations() {
+  const queryClient = useQueryClient();
+  const lastMutationTime = useRef<number>(0);
+
+  const createSend = useMutation({
+    mutationFn: async (data: CreateSendRequestDto) => {
+      const result = await commands.createSend(data);
+      if (result.status === 'error') throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: () => {
+      lastMutationTime.current = Date.now();
+
+      // 立即刷新列表
+      queryClient.invalidateQueries({ queryKey: ['sends'] });
+      toast.success(t('send.created'));
+    },
+  });
+
+  return { createSend, lastMutationTime };
+}
+
+// 在 event 监听中检查
+listen('send:created', (event) => {
+  // 如果是自己的操作触发的 event，跳过处理
+  if (Date.now() - lastMutationTime.current < 1000) {
+    return;
+  }
+
+  // 其他设备或用户的操作，正常处理
+  queryClient.invalidateQueries({ queryKey: ['sends'] });
+});
 ```
 
 ## Security Considerations
