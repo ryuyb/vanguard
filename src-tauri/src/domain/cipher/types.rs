@@ -210,15 +210,15 @@ pub struct CipherPermissions {
 
 /// Cipher data (legacy structure containing all fields)
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-#[serde(bound = "")]
+#[serde(bound = "", rename_all = "camelCase")]
 pub struct CipherData<S: CipherState> {
     #[serde(skip_serializing_if = "should_skip_field")]
     pub name: EncryptedField<S, String>,
     #[serde(skip_serializing_if = "should_skip_field")]
     pub notes: EncryptedField<S, String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub fields: Vec<CipherField<S>>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub password_history: Vec<CipherPasswordHistory<S>>,
     // Login fields
     #[serde(skip_serializing_if = "should_skip_field")]

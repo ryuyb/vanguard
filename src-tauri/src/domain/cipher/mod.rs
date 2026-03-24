@@ -60,9 +60,9 @@ pub struct Cipher<S: CipherState> {
     pub permissions: Option<CipherPermissions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub object: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub fields: Vec<CipherField<S>>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub password_history: Vec<CipherPasswordHistory<S>>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub collection_ids: Vec<String>,
@@ -741,5 +741,133 @@ mod tests {
         };
 
         assert!(!cipher.has_totp());
+    }
+
+    #[test]
+    fn test_cipher_decrypted_serializes_empty_fields() {
+        // Test that empty fields and password_history are serialized as [] not skipped
+        let cipher: Cipher<Decrypted> = Cipher {
+            id: "test".to_string(),
+            organization_id: None,
+            folder_id: None,
+            r#type: Some(1),
+            name: EncryptedField::new(Some("name".to_string())),
+            notes: EncryptedField::none(),
+            key: None,
+            favorite: None,
+            edit: None,
+            view_password: None,
+            organization_use_totp: None,
+            creation_date: None,
+            revision_date: None,
+            deleted_date: None,
+            archived_date: None,
+            reprompt: None,
+            permissions: None,
+            object: None,
+            fields: vec![],           // Empty vec
+            password_history: vec![], // Empty vec
+            collection_ids: vec![],
+            data: None,
+            login: None,
+            secure_note: None,
+            card: None,
+            identity: None,
+            ssh_key: None,
+            attachments: vec![],
+            _state: PhantomData,
+        };
+
+        let json = serde_json::to_string(&cipher).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // Verify fields and passwordHistory are present as empty arrays
+        assert!(
+            value["fields"].is_array(),
+            "fields should be serialized as array"
+        );
+        assert_eq!(
+            value["fields"].as_array().unwrap().len(),
+            0,
+            "fields should be empty array"
+        );
+        assert!(
+            value["passwordHistory"].is_array(),
+            "passwordHistory should be serialized as array"
+        );
+        assert_eq!(
+            value["passwordHistory"].as_array().unwrap().len(),
+            0,
+            "passwordHistory should be empty array"
+        );
+    }
+
+    #[test]
+    fn test_cipher_data_serializes_empty_fields() {
+        // Test that CipherData's empty fields and password_history are serialized as []
+        let data: CipherData<Decrypted> = CipherData {
+            name: EncryptedField::new(Some("name".to_string())),
+            notes: EncryptedField::none(),
+            fields: vec![],           // Empty vec
+            password_history: vec![], // Empty vec
+            uri: EncryptedField::none(),
+            uris: vec![],
+            username: EncryptedField::none(),
+            password: EncryptedField::none(),
+            password_revision_date: None,
+            totp: EncryptedField::none(),
+            autofill_on_page_load: None,
+            fido2_credentials: vec![],
+            r#type: None,
+            cardholder_name: EncryptedField::none(),
+            brand: EncryptedField::none(),
+            number: EncryptedField::none(),
+            exp_month: EncryptedField::none(),
+            exp_year: EncryptedField::none(),
+            code: EncryptedField::none(),
+            title: EncryptedField::none(),
+            first_name: EncryptedField::none(),
+            middle_name: EncryptedField::none(),
+            last_name: EncryptedField::none(),
+            address1: EncryptedField::none(),
+            address2: EncryptedField::none(),
+            address3: EncryptedField::none(),
+            city: EncryptedField::none(),
+            state: EncryptedField::none(),
+            postal_code: EncryptedField::none(),
+            country: EncryptedField::none(),
+            company: EncryptedField::none(),
+            email: EncryptedField::none(),
+            phone: EncryptedField::none(),
+            ssn: EncryptedField::none(),
+            passport_number: EncryptedField::none(),
+            license_number: EncryptedField::none(),
+            private_key: EncryptedField::none(),
+            public_key: EncryptedField::none(),
+            key_fingerprint: EncryptedField::none(),
+        };
+
+        let json = serde_json::to_string(&data).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        // Verify fields and passwordHistory are present as empty arrays
+        assert!(
+            value["fields"].is_array(),
+            "CipherData fields should be serialized as array"
+        );
+        assert_eq!(
+            value["fields"].as_array().unwrap().len(),
+            0,
+            "CipherData fields should be empty array"
+        );
+        assert!(
+            value["passwordHistory"].is_array(),
+            "CipherData passwordHistory should be serialized as array"
+        );
+        assert_eq!(
+            value["passwordHistory"].as_array().unwrap().len(),
+            0,
+            "CipherData passwordHistory should be empty array"
+        );
     }
 }
