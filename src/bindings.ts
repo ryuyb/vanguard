@@ -419,7 +419,7 @@ export type CipherAttachment<S> = { id: string;
 /**
  * Plain text field - not encrypted
  */
-key?: string | null; file_name: { inner: string | null }; 
+key?: string | null; fileName: { inner: string | null }; 
 /**
  * Plain text field - not encrypted
  */
@@ -427,7 +427,7 @@ size?: string | null;
 /**
  * Plain text field - not encrypted
  */
-size_name?: string | null; 
+sizeName?: string | null; 
 /**
  * Plain text field - not encrypted
  */
@@ -435,7 +435,7 @@ url?: string | null; object?: string | null }
 /**
  * Cipher card data
  */
-export type CipherCard<S> = { cardholder_name: { inner: string | null }; brand: { inner: string | null }; number: { inner: string | null }; exp_month: { inner: string | null }; exp_year: { inner: string | null }; code: { inner: string | null } }
+export type CipherCard<S> = { cardholderName: { inner: string | null }; brand: { inner: string | null }; number: { inner: string | null }; expMonth: { inner: string | null }; expYear: { inner: string | null }; code: { inner: string | null } }
 export type CipherCreated = { accountId: string; cipherId: string }
 /**
  * Cipher data (legacy structure containing all fields)
@@ -449,11 +449,11 @@ export type CipherDeleted = { accountId: string; cipherId: string }
 /**
  * Cipher custom field
  */
-export type CipherField<S> = { name: { inner: string | null }; value: { inner: string | null }; type?: number | null; linked_id?: number | null }
+export type CipherField<S> = { name: { inner: string | null }; value: { inner: string | null }; type?: number | null; linkedId?: number | null }
 /**
  * Cipher identity data
  */
-export type CipherIdentity<S> = { title: { inner: string | null }; first_name: { inner: string | null }; middle_name: { inner: string | null }; last_name: { inner: string | null }; address1: { inner: string | null }; address2: { inner: string | null }; address3: { inner: string | null }; city: { inner: string | null }; state: { inner: string | null }; postal_code: { inner: string | null }; country: { inner: string | null }; company: { inner: string | null }; email: { inner: string | null }; phone: { inner: string | null }; ssn: { inner: string | null }; username: { inner: string | null }; passport_number: { inner: string | null }; license_number: { inner: string | null } }
+export type CipherIdentity<S> = { title: { inner: string | null }; firstName: { inner: string | null }; middleName: { inner: string | null }; lastName: { inner: string | null }; address1: { inner: string | null }; address2: { inner: string | null }; address3: { inner: string | null }; city: { inner: string | null }; state: { inner: string | null }; postalCode: { inner: string | null }; country: { inner: string | null }; company: { inner: string | null }; email: { inner: string | null }; phone: { inner: string | null }; ssn: { inner: string | null }; username: { inner: string | null }; passportNumber: { inner: string | null }; licenseNumber: { inner: string | null } }
 /**
  * Cipher login data
  */
@@ -461,11 +461,11 @@ export type CipherLogin<S> = { uri: { inner: string | null }; uris?: CipherLogin
 /**
  * Plain text field - not encrypted
  */
-password_revision_date?: string | null; totp: { inner: string | null }; autofill_on_page_load?: boolean | null; fido2_credentials?: CipherLoginFido2Credential<S>[] }
+passwordRevisionDate?: string | null; totp: { inner: string | null }; autofillOnPageLoad?: boolean | null; fido2Credentials?: CipherLoginFido2Credential<S>[] }
 /**
  * Cipher login FIDO2 credential
  */
-export type CipherLoginFido2Credential<S> = { credential_id: { inner: string | null }; key_type: { inner: string | null }; key_algorithm: { inner: string | null }; key_curve: { inner: string | null }; key_value: { inner: string | null }; rp_id: { inner: string | null }; rp_name: { inner: string | null }; counter: { inner: string | null }; user_handle: { inner: string | null }; user_name: { inner: string | null }; user_display_name: { inner: string | null }; discoverable: { inner: string | null }; creation_date: { inner: string | null } }
+export type CipherLoginFido2Credential<S> = { credentialId: { inner: string | null }; keyType: { inner: string | null }; keyAlgorithm: { inner: string | null }; keyCurve: { inner: string | null }; keyValue: { inner: string | null }; rpId: { inner: string | null }; rpName: { inner: string | null }; counter: { inner: string | null }; userHandle: { inner: string | null }; userName: { inner: string | null }; userDisplayName: { inner: string | null }; discoverable: { inner: string | null }; creationDate: { inner: string | null } }
 /**
  * Cipher login URI
  */
@@ -473,7 +473,7 @@ export type CipherLoginUri<S> = { uri: { inner: string | null }; match?: number 
 /**
  * Plain text field - not encrypted
  */
-uri_checksum?: string | null }
+uriChecksum?: string | null }
 export type CipherMutationResponseDto = { cipherId: string; revisionDate: string }
 /**
  * Cipher password history entry
@@ -482,7 +482,7 @@ export type CipherPasswordHistory<S> = { password: { inner: string | null };
 /**
  * Plain text field - not encrypted
  */
-last_used_date?: string | null }
+lastUsedDate?: string | null }
 /**
  * Cipher permissions (no encrypted fields)
  */
@@ -494,7 +494,7 @@ export type CipherSecureNote = { type?: number | null }
 /**
  * Cipher SSH key data
  */
-export type CipherSshKey<S> = { private_key: { inner: string | null }; public_key: { inner: string | null }; key_fingerprint: { inner: string | null } }
+export type CipherSshKey<S> = { privateKey: { inner: string | null }; publicKey: { inner: string | null }; keyFingerprint: { inner: string | null } }
 export type CipherUpdated = { accountId: string; cipherId: string }
 export type CreateCipherRequestDto = { cipher: SyncCipher }
 export type CreateFolderRequest = { name: string }
