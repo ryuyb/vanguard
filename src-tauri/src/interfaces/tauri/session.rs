@@ -118,7 +118,7 @@ pub async fn restore_auth_session_with_master_password(
     unlock_manager.set_session_context(session_context).await?;
 
     // Persist auth state
-    if let Err(error) = unlock_manager.persist_with_password(master_password).await {
+    if let Err(error) = unlock_manager.persist(Some(master_password)).await {
         log::warn!(
             target: "vanguard::tauri::session",
             "failed to refresh persisted auth state account_id={}: [{}] {}",
@@ -287,7 +287,7 @@ async fn refresh_auth_session_locked(
     unlock_manager.set_session_context(session_ctx).await?;
 
     // Persist auth state (will only persist if wrap runtime is available)
-    if let Err(error) = unlock_manager.persist_with_runtime().await {
+    if let Err(error) = unlock_manager.persist(None).await {
         log::warn!(
             target: "vanguard::tauri::session",
             "skip persisted auth refresh due to missing/invalid wrap runtime account_id={}: [{}] {}",
@@ -447,7 +447,7 @@ pub async fn restore_auth_session_with_refresh_token(
     unlock_manager.set_session_context(session_context).await?;
 
     // Persist auth state (will only persist if wrap runtime is available)
-    if let Err(error) = unlock_manager.persist_with_runtime().await {
+    if let Err(error) = unlock_manager.persist(None).await {
         log::warn!(
             target: "vanguard::tauri::session",
             "failed to refresh persisted auth state account_id={}: [{}] {}",

@@ -409,14 +409,6 @@ impl UnifiedUnlockManager {
             if new_state.status.is_vault_unlocked() {
                 self.start_auto_lock_timer().await?;
             }
-            // Auto-persist state changes
-            if let Err(e) = self.auto_persist().await {
-                log::warn!(
-                    target: "vanguard::unlock_state",
-                    "Failed to auto-persist after account context change: {}",
-                    e.log_message()
-                );
-            }
         }
         Ok(())
     }
@@ -434,14 +426,6 @@ impl UnifiedUnlockManager {
 
         if changed {
             self.notify_state_change(&old_state, &new_state);
-            // Auto-persist state changes
-            if let Err(e) = self.auto_persist().await {
-                log::warn!(
-                    target: "vanguard::unlock_state",
-                    "Failed to auto-persist after session context change: {}",
-                    e.log_message()
-                );
-            }
         }
         Ok(())
     }
@@ -657,16 +641,33 @@ impl UnifiedUnlockManager {
 
     // ==================== Persistence Methods ====================
 
-    /// Persist auth state using master password to encrypt refresh token
-    /// - Encrypt refresh token using master password
-    /// - Cache the SessionWrapRuntime
-    /// - Call AuthPersistence.save_auth_state()
-    pub async fn persist_with_password(&self, master_password: &str) -> AppResult<()> {
-        use crate::bootstrap::auth_persistence::encrypt_refresh_token;
-
+    /// Persist current authentication state
+    ///
+    /// Automatically selects the appropriate encryption method:
+    /// - If `master_password` is provided, encrypts with password and generates a new runtime key
+    /// - If no password but runtime key exists, re-encrypts with cached runtime key
+    /// - If neither is available, returns an error
+    ///
+    /// # Arguments
+    /// - `master_password`: Optional master password for initial encryption or re-encryption
+    ///
+    /// # Examples
+    /// ```ignore
+    /// // Initial login - provide password
+    /// unlock_manager.persist(Some(&password)).await?;
+    ///
+    /// // Session refresh - no password needed
+    /// unlock_manager.persist(None).await?;
+    /// ```
+    ///
+    /// # Errors
+    /// Returns error if:
+    /// - No active account to persist
+    /// - Cannot encrypt (no password and no runtime key available)
+    pub async fn persist(&self, master_password: Option<&str>) -> AppResult<()> {
         let state = self.state.read().await;
 
-        // Get required data from state
+        // Get necessary data
         let account =
             state
                 .account_context
@@ -679,13 +680,57 @@ impl UnifiedUnlockManager {
         let refresh_token = state
             .session_context
             .as_ref()
-            .and_then(|s| s.refresh_token.as_deref())
-            .ok_or_else(|| AppError::ValidationFieldError {
-                field: "refresh_token".to_string(),
-                message: "No refresh token available to persist".to_string(),
-            })?;
+            .and_then(|s| s.refresh_token.as_deref());
 
-        // Encrypt refresh token using master password
+        // If no refresh_token, nothing to persist
+        let refresh_token = match refresh_token {
+            Some(token) => token,
+            None => {
+                log::debug!(
+                    target: "vanguard::unlock_state",
+                    "No refresh_token to persist"
+                );
+                return Ok(());
+            }
+        };
+
+        // Clone account to avoid borrowing issues after drop
+        let account = account.clone();
+        let refresh_token = refresh_token.to_string();
+
+        // Release lock to avoid holding it during encryption
+        drop(state);
+
+        // Select encryption method
+        if let Some(password) = master_password {
+            // Encrypt with master password (generates new runtime_key)
+            self.persist_with_password_internal(password, &account, &refresh_token)
+                .await?;
+        } else if let Some(runtime_key) = self.persistence.runtime_key()? {
+            // Encrypt with cached runtime_key
+            self.persistence
+                .save_auth_state(&account, Some(&refresh_token), Some(&runtime_key))
+                .await?;
+        } else {
+            // Cannot encrypt
+            return Err(AppError::ValidationFieldError {
+                field: "persist".to_string(),
+                message: "Cannot persist: either provide master_password or ensure runtime_key is available".to_string(),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Internal implementation: encrypt with password and persist
+    async fn persist_with_password_internal(
+        &self,
+        master_password: &str,
+        account: &AccountContext,
+        refresh_token: &str,
+    ) -> AppResult<()> {
+        use crate::bootstrap::auth_persistence::encrypt_refresh_token;
+
         let (_encrypted_session, runtime_key) = encrypt_refresh_token(
             master_password,
             &account.account_id,
@@ -694,59 +739,10 @@ impl UnifiedUnlockManager {
             refresh_token,
         )?;
 
-        // Save auth state with the encrypted session
         self.persistence
             .save_auth_state(account, Some(refresh_token), Some(&runtime_key))
             .await?;
-
-        // Cache runtime_key in persistence
         self.persistence.set_runtime_key(Some(runtime_key))?;
-
-        Ok(())
-    }
-
-    /// Persist auth state using cached runtime key to re-encrypt
-    /// - Use cached runtime_key to re-encrypt
-    /// - Handle case where runtime_key is missing
-    /// - Call AuthPersistence.save_auth_state()
-    pub async fn persist_with_runtime(&self) -> AppResult<()> {
-        let state = self.state.read().await;
-
-        // Get required data from state
-        let account =
-            state
-                .account_context
-                .clone()
-                .ok_or_else(|| AppError::ValidationFieldError {
-                    field: "account".to_string(),
-                    message: "No active account to persist".to_string(),
-                })?;
-
-        let refresh_token = state
-            .session_context
-            .as_ref()
-            .and_then(|s| s.refresh_token.clone());
-
-        drop(state);
-
-        // Get runtime_key from persistence
-        let runtime_key =
-            self.persistence
-                .runtime_key()?
-                .ok_or_else(|| {
-                    AppError::ValidationFieldError {
-                field: "runtime_key".to_string(),
-                message:
-                    "No runtime key available for persistence. Call persist_with_password first."
-                        .to_string(),
-            }
-                })?;
-
-        // Save auth state with the cached runtime key
-        let refresh_token_ref = refresh_token.as_deref();
-        self.persistence
-            .save_auth_state(&account, refresh_token_ref, Some(&runtime_key))
-            .await?;
 
         Ok(())
     }
@@ -861,30 +857,6 @@ impl UnifiedUnlockManager {
         timer.stop();
         Ok(())
     }
-
-    /// Auto-persist current state
-    async fn auto_persist(&self) -> AppResult<()> {
-        let state = self.state.read().await;
-
-        // Only persist when account context exists
-        if let Some(ref account) = state.account_context {
-            // Get refresh_token from session_context
-            let refresh_token = state
-                .session_context
-                .as_ref()
-                .and_then(|s| s.refresh_token.as_deref());
-
-            // Get runtime key from persistence
-            let runtime_key = self.persistence.runtime_key()?;
-
-            // Call persistence
-            self.persistence
-                .save_auth_state(account, refresh_token, runtime_key.as_ref())
-                .await?;
-        }
-
-        Ok(())
-    }
 }
 
 /// Auto-lock timer that runs in background
@@ -978,4 +950,40 @@ fn parse_idle_auto_lock_delay(delay: &str) -> AppResult<Duration> {
             message: format!("Invalid duration unit: {}", unit),
         }),
     }
+}
+
+#[cfg(test)]
+mod tests {
+    // TODO: Add tests for persist() method
+    // Tests require mocking AuthPersistence trait, which needs:
+    // - Mock implementation of AuthPersistence trait
+    // - Test setup to create UnifiedUnlockManager with mock persistence
+    //
+    // Test cases to implement:
+    // 1. test_persist_with_master_password
+    //    - Create unlock manager with mock persistence
+    //    - Set account_context and session_context with refresh_token
+    //    - Call persist(Some("password"))
+    //    - Verify persistence.save_auth_state was called with encrypted data
+    //    - Verify runtime_key was cached
+    //
+    // 2. test_persist_with_runtime_key
+    //    - Create unlock manager with mock persistence
+    //    - Set account_context and session_context
+    //    - Set runtime_key in persistence
+    //    - Call persist(None)
+    //    - Verify persistence.save_auth_state was called with runtime_key
+    //
+    // 3. test_persist_without_password_or_runtime_key
+    //    - Create unlock manager with mock persistence
+    //    - Set account_context and session_context
+    //    - Ensure no runtime_key available
+    //    - Call persist(None)
+    //    - Verify error is returned
+    //
+    // 4. test_persist_without_refresh_token
+    //    - Create unlock manager with mock persistence
+    //    - Set account_context but no session_context
+    //    - Call persist(Some("password"))
+    //    - Verify returns Ok(()) without persisting
 }

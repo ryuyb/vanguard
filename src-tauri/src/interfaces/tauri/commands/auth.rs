@@ -163,7 +163,7 @@ async fn initialize_authenticated_session(
     // Persist auth state via unlock_manager
     // Note: refresh_token may be None if the server doesn't support it
     if session_info.refresh_token.is_some() {
-        if let Err(error) = unlock_manager.persist_with_password(master_password).await {
+        if let Err(error) = unlock_manager.persist(Some(master_password)).await {
             log::warn!(
                 target: "vanguard::tauri::auth",
                 "failed to persist encrypted auth state account_id={}: [{}] {}",
