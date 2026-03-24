@@ -531,24 +531,25 @@ export function CipherDetailPanel({
               )}
 
               {password && (
-                <button
-                  type="button"
-                  className="group w-full px-3.5 py-3 text-left hover:bg-slate-50 transition-colors"
-                  onClick={() => copyField("password")}
-                >
+                <div className="group w-full px-3.5 py-3 hover:bg-slate-50 transition-colors">
                   <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                     {t("vault.detail.fields.password")}
                   </div>
                   <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                    <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
-                      {isPasswordVisible ? password : "••••••••••••"}
-                    </div>
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => copyField("password")}
+                    >
+                      <div className="min-w-0 break-all font-mono text-sm text-slate-900 font-semibold">
+                        {isPasswordVisible ? password : "••••••••••••"}
+                      </div>
+                    </button>
                     <Button
                       type="button"
                       variant="ghost"
                       className="size-8 shrink-0 rounded-full p-0 hover:bg-slate-200"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      onClick={() => {
                         setIsPasswordVisible((visible) => !visible);
                       }}
                       aria-label={
@@ -569,7 +570,7 @@ export function CipherDetailPanel({
                       )}
                     </Button>
                   </div>
-                </button>
+                </div>
               )}
 
               {hasOneTimePassword && (
@@ -701,11 +702,9 @@ export function CipherDetailPanel({
                         field.fieldType === CUSTOM_FIELD_TYPE_HIDDEN;
 
                       return canCopy ? (
-                        <button
-                          type="button"
+                        <div
                           key={field.key}
                           className="group relative w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm hover:shadow-md transition-all text-left"
-                          onClick={() => copyField({ customField: index })}
                         >
                           <div className="flex items-center justify-between">
                             <div className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
@@ -713,16 +712,21 @@ export function CipherDetailPanel({
                             </div>
                           </div>
                           <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-                            <div className="min-w-0 break-all text-sm font-medium text-slate-900">
-                              {displayValue}
-                            </div>
+                            <button
+                              type="button"
+                              className="min-w-0 flex-1 text-left"
+                              onClick={() => copyField({ customField: index })}
+                            >
+                              <div className="min-w-0 break-all text-sm font-medium text-slate-900">
+                                {displayValue}
+                              </div>
+                            </button>
                             {isHiddenType && (
                               <Button
                                 type="button"
                                 variant="outline"
                                 className="size-8 shrink-0 rounded-full p-0 border-slate-300 hover:bg-slate-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                onClick={() => {
                                   setRevealedCustomFieldKeys((previous) => {
                                     const next = new Set(previous);
                                     if (next.has(field.key)) {
@@ -752,7 +756,7 @@ export function CipherDetailPanel({
                               </Button>
                             )}
                           </div>
-                        </button>
+                        </div>
                       ) : (
                         <div
                           key={field.key}
