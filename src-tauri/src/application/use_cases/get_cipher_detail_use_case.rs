@@ -1,19 +1,13 @@
 use std::sync::Arc;
 
-use crate::application::dto::sync::{
-    SyncAttachment, SyncCipher, SyncCipherCard, SyncCipherData, SyncCipherField,
-    SyncCipherIdentity, SyncCipherLogin, SyncCipherLoginFido2Credential, SyncCipherLoginUri,
-    SyncCipherPasswordHistory, SyncCipherSshKey,
-};
+use crate::application::dto::sync::SyncCipher;
 use crate::application::dto::vault::{
-    GetCipherDetailQuery, VaultAttachmentDetail, VaultCipherCardDetail, VaultCipherDataDetail,
-    VaultCipherDetail, VaultCipherFieldDetail, VaultCipherIdentityDetail, VaultCipherLoginDetail,
-    VaultCipherLoginFido2CredentialDetail, VaultCipherLoginUriDetail,
-    VaultCipherPasswordHistoryDetail, VaultCipherPermissionsDetail, VaultCipherSecureNoteDetail,
-    VaultCipherSshKeyDetail, VaultUserKeyMaterial,
+    GetCipherDetailQuery, VaultCipherDetail, VaultCipherPermissionsDetail,
+    VaultCipherSecureNoteDetail, VaultUserKeyMaterial,
 };
 use crate::application::services::sync_service::SyncService;
 use crate::application::vault_crypto;
+use crate::domain::crypto::Decryptable;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -59,8 +53,8 @@ fn decrypt_cipher_detail(
         organization_id: cipher.organization_id,
         folder_id: cipher.folder_id,
         r#type: cipher.r#type,
-        name: vault_crypto::decrypt_optional_field(cipher.name, &detail_key, "cipher.name")?,
-        notes: vault_crypto::decrypt_optional_field(cipher.notes, &detail_key, "cipher.notes")?,
+        name: cipher.name.decrypt(&detail_key, "cipher.name")?,
+        notes: cipher.notes.decrypt(&detail_key, "cipher.notes")?,
         key: cipher.key,
         favorite: cipher.favorite,
         edit: cipher.edit,
@@ -78,22 +72,22 @@ fn decrypt_cipher_detail(
                 restore: permissions.restore,
             }),
         object: cipher.object,
-        fields: decrypt_cipher_fields(cipher.fields, &detail_key, "cipher.fields")?,
-        password_history: decrypt_password_history(
-            cipher.password_history,
-            &detail_key,
-            "cipher.password_history",
-        )?,
+        fields: cipher.fields.decrypt(&detail_key, "cipher.fields")?,
+        password_history: cipher
+            .password_history
+            .decrypt(&detail_key, "cipher.password_history")?,
         collection_ids: cipher.collection_ids,
-        data: decrypt_cipher_data_detail(cipher.data, &detail_key)?,
-        login: decrypt_cipher_login_detail(cipher.login, &detail_key)?,
+        data: cipher.data.decrypt(&detail_key, "cipher.data")?,
+        login: cipher.login.decrypt(&detail_key, "cipher.login")?,
         secure_note: cipher.secure_note.map(|note| VaultCipherSecureNoteDetail {
             r#type: note.r#type,
         }),
-        card: decrypt_cipher_card_detail(cipher.card, &detail_key)?,
-        identity: decrypt_cipher_identity_detail(cipher.identity, &detail_key)?,
-        ssh_key: decrypt_cipher_ssh_key_detail(cipher.ssh_key, &detail_key)?,
-        attachments: decrypt_attachments(cipher.attachments, &detail_key)?,
+        card: cipher.card.decrypt(&detail_key, "cipher.card")?,
+        identity: cipher.identity.decrypt(&detail_key, "cipher.identity")?,
+        ssh_key: cipher.ssh_key.decrypt(&detail_key, "cipher.ssh_key")?,
+        attachments: cipher
+            .attachments
+            .decrypt(&detail_key, "cipher.attachments")?,
     })
 }
 
@@ -133,549 +127,6 @@ fn resolve_cipher_decryption_key(
     })
 }
 
-fn decrypt_cipher_fields(
-    fields: Vec<SyncCipherField>,
-    user_key: &VaultUserKeyMaterial,
-    path: &str,
-) -> Result<Vec<VaultCipherFieldDetail>, AppError> {
-    fields
-        .into_iter()
-        .enumerate()
-        .map(|(index, field)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(VaultCipherFieldDetail {
-                name: vault_crypto::decrypt_optional_field(
-                    field.name,
-                    user_key,
-                    &format!("{entry_path}.name"),
-                )?,
-                value: vault_crypto::decrypt_optional_field(
-                    field.value,
-                    user_key,
-                    &format!("{entry_path}.value"),
-                )?,
-                r#type: field.r#type,
-                linked_id: field.linked_id,
-            })
-        })
-        .collect()
-}
-
-fn decrypt_password_history(
-    entries: Vec<SyncCipherPasswordHistory>,
-    user_key: &VaultUserKeyMaterial,
-    path: &str,
-) -> Result<Vec<VaultCipherPasswordHistoryDetail>, AppError> {
-    entries
-        .into_iter()
-        .enumerate()
-        .map(|(index, entry)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(VaultCipherPasswordHistoryDetail {
-                password: vault_crypto::decrypt_optional_field(
-                    entry.password,
-                    user_key,
-                    &format!("{entry_path}.password"),
-                )?,
-                last_used_date: entry.last_used_date,
-            })
-        })
-        .collect()
-}
-
-fn decrypt_attachments(
-    attachments: Vec<SyncAttachment>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Vec<VaultAttachmentDetail>, AppError> {
-    attachments
-        .into_iter()
-        .enumerate()
-        .map(|(index, attachment)| {
-            let entry_path = format!("cipher.attachments[{index}]");
-            Ok(VaultAttachmentDetail {
-                id: attachment.id,
-                key: attachment.key,
-                file_name: vault_crypto::decrypt_optional_field(
-                    attachment.file_name,
-                    user_key,
-                    &format!("{entry_path}.file_name"),
-                )?,
-                size: attachment.size,
-                size_name: attachment.size_name,
-                url: attachment.url,
-                object: attachment.object,
-            })
-        })
-        .collect()
-}
-
-fn decrypt_cipher_data_detail(
-    data: Option<SyncCipherData>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Option<VaultCipherDataDetail>, AppError> {
-    data.map(|entry| {
-        Ok(VaultCipherDataDetail {
-            name: vault_crypto::decrypt_optional_field(entry.name, user_key, "cipher.data.name")?,
-            notes: vault_crypto::decrypt_optional_field(
-                entry.notes,
-                user_key,
-                "cipher.data.notes",
-            )?,
-            fields: decrypt_cipher_fields(entry.fields, user_key, "cipher.data.fields")?,
-            password_history: decrypt_password_history(
-                entry.password_history,
-                user_key,
-                "cipher.data.password_history",
-            )?,
-            uri: vault_crypto::decrypt_optional_field(entry.uri, user_key, "cipher.data.uri")?,
-            uris: decrypt_login_uris(entry.uris, user_key, "cipher.data.uris")?,
-            username: vault_crypto::decrypt_optional_field(
-                entry.username,
-                user_key,
-                "cipher.data.username",
-            )?,
-            password: vault_crypto::decrypt_optional_field(
-                entry.password,
-                user_key,
-                "cipher.data.password",
-            )?,
-            password_revision_date: entry.password_revision_date,
-            totp: vault_crypto::decrypt_optional_field(entry.totp, user_key, "cipher.data.totp")?,
-            autofill_on_page_load: entry.autofill_on_page_load,
-            fido2_credentials: decrypt_fido2_credentials(
-                entry.fido2_credentials,
-                user_key,
-                "cipher.data.fido2_credentials",
-            )?,
-            r#type: entry.r#type,
-            cardholder_name: vault_crypto::decrypt_optional_field(
-                entry.cardholder_name,
-                user_key,
-                "cipher.data.cardholder_name",
-            )?,
-            brand: vault_crypto::decrypt_optional_field(
-                entry.brand,
-                user_key,
-                "cipher.data.brand",
-            )?,
-            number: vault_crypto::decrypt_optional_field(
-                entry.number,
-                user_key,
-                "cipher.data.number",
-            )?,
-            exp_month: vault_crypto::decrypt_optional_field(
-                entry.exp_month,
-                user_key,
-                "cipher.data.exp_month",
-            )?,
-            exp_year: vault_crypto::decrypt_optional_field(
-                entry.exp_year,
-                user_key,
-                "cipher.data.exp_year",
-            )?,
-            code: vault_crypto::decrypt_optional_field(entry.code, user_key, "cipher.data.code")?,
-            title: vault_crypto::decrypt_optional_field(
-                entry.title,
-                user_key,
-                "cipher.data.title",
-            )?,
-            first_name: vault_crypto::decrypt_optional_field(
-                entry.first_name,
-                user_key,
-                "cipher.data.first_name",
-            )?,
-            middle_name: vault_crypto::decrypt_optional_field(
-                entry.middle_name,
-                user_key,
-                "cipher.data.middle_name",
-            )?,
-            last_name: vault_crypto::decrypt_optional_field(
-                entry.last_name,
-                user_key,
-                "cipher.data.last_name",
-            )?,
-            address1: vault_crypto::decrypt_optional_field(
-                entry.address1,
-                user_key,
-                "cipher.data.address1",
-            )?,
-            address2: vault_crypto::decrypt_optional_field(
-                entry.address2,
-                user_key,
-                "cipher.data.address2",
-            )?,
-            address3: vault_crypto::decrypt_optional_field(
-                entry.address3,
-                user_key,
-                "cipher.data.address3",
-            )?,
-            city: vault_crypto::decrypt_optional_field(entry.city, user_key, "cipher.data.city")?,
-            state: vault_crypto::decrypt_optional_field(
-                entry.state,
-                user_key,
-                "cipher.data.state",
-            )?,
-            postal_code: vault_crypto::decrypt_optional_field(
-                entry.postal_code,
-                user_key,
-                "cipher.data.postal_code",
-            )?,
-            country: vault_crypto::decrypt_optional_field(
-                entry.country,
-                user_key,
-                "cipher.data.country",
-            )?,
-            company: vault_crypto::decrypt_optional_field(
-                entry.company,
-                user_key,
-                "cipher.data.company",
-            )?,
-            email: vault_crypto::decrypt_optional_field(
-                entry.email,
-                user_key,
-                "cipher.data.email",
-            )?,
-            phone: vault_crypto::decrypt_optional_field(
-                entry.phone,
-                user_key,
-                "cipher.data.phone",
-            )?,
-            ssn: vault_crypto::decrypt_optional_field(entry.ssn, user_key, "cipher.data.ssn")?,
-            passport_number: vault_crypto::decrypt_optional_field(
-                entry.passport_number,
-                user_key,
-                "cipher.data.passport_number",
-            )?,
-            license_number: vault_crypto::decrypt_optional_field(
-                entry.license_number,
-                user_key,
-                "cipher.data.license_number",
-            )?,
-            private_key: vault_crypto::decrypt_optional_field(
-                entry.private_key,
-                user_key,
-                "cipher.data.private_key",
-            )?,
-            public_key: vault_crypto::decrypt_optional_field(
-                entry.public_key,
-                user_key,
-                "cipher.data.public_key",
-            )?,
-            key_fingerprint: vault_crypto::decrypt_optional_field(
-                entry.key_fingerprint,
-                user_key,
-                "cipher.data.key_fingerprint",
-            )?,
-        })
-    })
-    .transpose()
-}
-
-fn decrypt_cipher_login_detail(
-    login: Option<SyncCipherLogin>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Option<VaultCipherLoginDetail>, AppError> {
-    login
-        .map(|entry| {
-            Ok(VaultCipherLoginDetail {
-                uri: vault_crypto::decrypt_optional_field(entry.uri, user_key, "cipher.login.uri")?,
-                uris: decrypt_login_uris(entry.uris, user_key, "cipher.login.uris")?,
-                username: vault_crypto::decrypt_optional_field(
-                    entry.username,
-                    user_key,
-                    "cipher.login.username",
-                )?,
-                password: vault_crypto::decrypt_optional_field(
-                    entry.password,
-                    user_key,
-                    "cipher.login.password",
-                )?,
-                password_revision_date: entry.password_revision_date,
-                totp: vault_crypto::decrypt_optional_field(
-                    entry.totp,
-                    user_key,
-                    "cipher.login.totp",
-                )?,
-                autofill_on_page_load: entry.autofill_on_page_load,
-                fido2_credentials: decrypt_fido2_credentials(
-                    entry.fido2_credentials,
-                    user_key,
-                    "cipher.login.fido2_credentials",
-                )?,
-            })
-        })
-        .transpose()
-}
-
-fn decrypt_login_uris(
-    uris: Vec<SyncCipherLoginUri>,
-    user_key: &VaultUserKeyMaterial,
-    path: &str,
-) -> Result<Vec<VaultCipherLoginUriDetail>, AppError> {
-    uris.into_iter()
-        .enumerate()
-        .map(|(index, uri)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(VaultCipherLoginUriDetail {
-                uri: vault_crypto::decrypt_optional_field(
-                    uri.uri,
-                    user_key,
-                    &format!("{entry_path}.uri"),
-                )?,
-                r#match: uri.r#match,
-                uri_checksum: uri.uri_checksum,
-            })
-        })
-        .collect()
-}
-
-fn decrypt_fido2_credentials(
-    credentials: Vec<SyncCipherLoginFido2Credential>,
-    user_key: &VaultUserKeyMaterial,
-    path: &str,
-) -> Result<Vec<VaultCipherLoginFido2CredentialDetail>, AppError> {
-    credentials
-        .into_iter()
-        .enumerate()
-        .map(|(index, credential)| {
-            let entry_path = format!("{path}[{index}]");
-            Ok(VaultCipherLoginFido2CredentialDetail {
-                credential_id: vault_crypto::decrypt_optional_field(
-                    credential.credential_id,
-                    user_key,
-                    &format!("{entry_path}.credential_id"),
-                )?,
-                key_type: vault_crypto::decrypt_optional_field(
-                    credential.key_type,
-                    user_key,
-                    &format!("{entry_path}.key_type"),
-                )?,
-                key_algorithm: vault_crypto::decrypt_optional_field(
-                    credential.key_algorithm,
-                    user_key,
-                    &format!("{entry_path}.key_algorithm"),
-                )?,
-                key_curve: vault_crypto::decrypt_optional_field(
-                    credential.key_curve,
-                    user_key,
-                    &format!("{entry_path}.key_curve"),
-                )?,
-                key_value: vault_crypto::decrypt_optional_field(
-                    credential.key_value,
-                    user_key,
-                    &format!("{entry_path}.key_value"),
-                )?,
-                rp_id: vault_crypto::decrypt_optional_field(
-                    credential.rp_id,
-                    user_key,
-                    &format!("{entry_path}.rp_id"),
-                )?,
-                rp_name: vault_crypto::decrypt_optional_field(
-                    credential.rp_name,
-                    user_key,
-                    &format!("{entry_path}.rp_name"),
-                )?,
-                counter: vault_crypto::decrypt_optional_field(
-                    credential.counter,
-                    user_key,
-                    &format!("{entry_path}.counter"),
-                )?,
-                user_handle: vault_crypto::decrypt_optional_field(
-                    credential.user_handle,
-                    user_key,
-                    &format!("{entry_path}.user_handle"),
-                )?,
-                user_name: vault_crypto::decrypt_optional_field(
-                    credential.user_name,
-                    user_key,
-                    &format!("{entry_path}.user_name"),
-                )?,
-                user_display_name: vault_crypto::decrypt_optional_field(
-                    credential.user_display_name,
-                    user_key,
-                    &format!("{entry_path}.user_display_name"),
-                )?,
-                discoverable: vault_crypto::decrypt_optional_field(
-                    credential.discoverable,
-                    user_key,
-                    &format!("{entry_path}.discoverable"),
-                )?,
-                creation_date: vault_crypto::decrypt_optional_field(
-                    credential.creation_date,
-                    user_key,
-                    &format!("{entry_path}.creation_date"),
-                )?,
-            })
-        })
-        .collect()
-}
-
-fn decrypt_cipher_card_detail(
-    card: Option<SyncCipherCard>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Option<VaultCipherCardDetail>, AppError> {
-    card.map(|entry| {
-        Ok(VaultCipherCardDetail {
-            cardholder_name: vault_crypto::decrypt_optional_field(
-                entry.cardholder_name,
-                user_key,
-                "cipher.card.cardholder_name",
-            )?,
-            brand: vault_crypto::decrypt_optional_field(
-                entry.brand,
-                user_key,
-                "cipher.card.brand",
-            )?,
-            number: vault_crypto::decrypt_optional_field(
-                entry.number,
-                user_key,
-                "cipher.card.number",
-            )?,
-            exp_month: vault_crypto::decrypt_optional_field(
-                entry.exp_month,
-                user_key,
-                "cipher.card.exp_month",
-            )?,
-            exp_year: vault_crypto::decrypt_optional_field(
-                entry.exp_year,
-                user_key,
-                "cipher.card.exp_year",
-            )?,
-            code: vault_crypto::decrypt_optional_field(entry.code, user_key, "cipher.card.code")?,
-        })
-    })
-    .transpose()
-}
-
-fn decrypt_cipher_identity_detail(
-    identity: Option<SyncCipherIdentity>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Option<VaultCipherIdentityDetail>, AppError> {
-    identity
-        .map(|entry| {
-            Ok(VaultCipherIdentityDetail {
-                title: vault_crypto::decrypt_optional_field(
-                    entry.title,
-                    user_key,
-                    "cipher.identity.title",
-                )?,
-                first_name: vault_crypto::decrypt_optional_field(
-                    entry.first_name,
-                    user_key,
-                    "cipher.identity.first_name",
-                )?,
-                middle_name: vault_crypto::decrypt_optional_field(
-                    entry.middle_name,
-                    user_key,
-                    "cipher.identity.middle_name",
-                )?,
-                last_name: vault_crypto::decrypt_optional_field(
-                    entry.last_name,
-                    user_key,
-                    "cipher.identity.last_name",
-                )?,
-                address1: vault_crypto::decrypt_optional_field(
-                    entry.address1,
-                    user_key,
-                    "cipher.identity.address1",
-                )?,
-                address2: vault_crypto::decrypt_optional_field(
-                    entry.address2,
-                    user_key,
-                    "cipher.identity.address2",
-                )?,
-                address3: vault_crypto::decrypt_optional_field(
-                    entry.address3,
-                    user_key,
-                    "cipher.identity.address3",
-                )?,
-                city: vault_crypto::decrypt_optional_field(
-                    entry.city,
-                    user_key,
-                    "cipher.identity.city",
-                )?,
-                state: vault_crypto::decrypt_optional_field(
-                    entry.state,
-                    user_key,
-                    "cipher.identity.state",
-                )?,
-                postal_code: vault_crypto::decrypt_optional_field(
-                    entry.postal_code,
-                    user_key,
-                    "cipher.identity.postal_code",
-                )?,
-                country: vault_crypto::decrypt_optional_field(
-                    entry.country,
-                    user_key,
-                    "cipher.identity.country",
-                )?,
-                company: vault_crypto::decrypt_optional_field(
-                    entry.company,
-                    user_key,
-                    "cipher.identity.company",
-                )?,
-                email: vault_crypto::decrypt_optional_field(
-                    entry.email,
-                    user_key,
-                    "cipher.identity.email",
-                )?,
-                phone: vault_crypto::decrypt_optional_field(
-                    entry.phone,
-                    user_key,
-                    "cipher.identity.phone",
-                )?,
-                ssn: vault_crypto::decrypt_optional_field(
-                    entry.ssn,
-                    user_key,
-                    "cipher.identity.ssn",
-                )?,
-                username: vault_crypto::decrypt_optional_field(
-                    entry.username,
-                    user_key,
-                    "cipher.identity.username",
-                )?,
-                passport_number: vault_crypto::decrypt_optional_field(
-                    entry.passport_number,
-                    user_key,
-                    "cipher.identity.passport_number",
-                )?,
-                license_number: vault_crypto::decrypt_optional_field(
-                    entry.license_number,
-                    user_key,
-                    "cipher.identity.license_number",
-                )?,
-            })
-        })
-        .transpose()
-}
-
-fn decrypt_cipher_ssh_key_detail(
-    ssh_key: Option<SyncCipherSshKey>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<Option<VaultCipherSshKeyDetail>, AppError> {
-    ssh_key
-        .map(|entry| {
-            Ok(VaultCipherSshKeyDetail {
-                private_key: vault_crypto::decrypt_optional_field(
-                    entry.private_key,
-                    user_key,
-                    "cipher.ssh_key.private_key",
-                )?,
-                public_key: vault_crypto::decrypt_optional_field(
-                    entry.public_key,
-                    user_key,
-                    "cipher.ssh_key.public_key",
-                )?,
-                key_fingerprint: vault_crypto::decrypt_optional_field(
-                    entry.key_fingerprint,
-                    user_key,
-                    "cipher.ssh_key.key_fingerprint",
-                )?,
-            })
-        })
-        .transpose()
-}
-
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
     if value.trim().is_empty() {
         return Err(AppError::ValidationFieldError {
@@ -689,6 +140,9 @@ fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::dto::sync::{
+        SyncCipherLogin, SyncCipherLoginUri, SyncCipherPasswordHistory,
+    };
     use aes::Aes256;
     use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
