@@ -43,7 +43,7 @@ impl VaultBiometricUseCase {
             });
         }
 
-        let account_id = match runtime.active_account_id() {
+        let account_id = match runtime.active_account_id().await {
             Ok(value) => value,
             Err(
                 AppError::ValidationFieldError { .. }
@@ -73,7 +73,7 @@ impl VaultBiometricUseCase {
             return Ok(false);
         }
 
-        let account_id = match runtime.active_account_id() {
+        let account_id = match runtime.active_account_id().await {
             Ok(value) => value,
             Err(
                 AppError::ValidationFieldError { .. }
@@ -95,7 +95,7 @@ impl VaultBiometricUseCase {
         self.biometric_unlock_port.has_unlock_bundle(&account_id)
     }
 
-    pub fn enable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
+    pub async fn enable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         if !self.biometric_unlock_port.is_supported() {
             return Err(AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -103,9 +103,10 @@ impl VaultBiometricUseCase {
             });
         }
 
-        let account_id = runtime.active_account_id()?;
+        let account_id = runtime.active_account_id().await?;
         let user_key = runtime
-            .get_vault_user_key_material(&account_id)?
+            .get_vault_user_key_material(&account_id)
+            .await?
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
                 message: "vault is locked, please unlock with password before enabling touch id"
@@ -113,7 +114,7 @@ impl VaultBiometricUseCase {
             })?;
 
         // Get refresh_token from runtime for session restoration
-        let refresh_token = runtime.get_refresh_token()?;
+        let refresh_token = runtime.get_refresh_token().await?;
 
         let bundle = vault_user_key_to_biometric_bundle(&account_id, &user_key, refresh_token)?;
         self.biometric_unlock_port
@@ -133,12 +134,12 @@ impl VaultBiometricUseCase {
         Ok(())
     }
 
-    pub fn disable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
+    pub async fn disable_biometric_unlock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
         if !self.biometric_unlock_port.is_supported() {
             return Ok(());
         }
 
-        let account_id = match runtime.active_account_id() {
+        let account_id = match runtime.active_account_id().await {
             Ok(value) => value,
             Err(
                 AppError::ValidationFieldError { .. }
@@ -158,7 +159,7 @@ impl VaultBiometricUseCase {
         Ok(())
     }
 
-    pub fn unlock_with_biometric(
+    pub async fn unlock_with_biometric(
         &self,
         runtime: &dyn VaultRuntimePort,
     ) -> AppResult<UnlockVaultResult> {
@@ -169,7 +170,7 @@ impl VaultBiometricUseCase {
             });
         }
 
-        let account_id = runtime.active_account_id()?;
+        let account_id = runtime.active_account_id().await?;
         let bundle = self.biometric_unlock_port.load_unlock_bundle(&account_id)?;
         if bundle.account_id != account_id {
             return Err(AppError::ValidationFieldError {
@@ -179,7 +180,9 @@ impl VaultBiometricUseCase {
         }
 
         let user_key = biometric_bundle_to_vault_user_key(&bundle)?;
-        runtime.set_vault_user_key_material(account_id.clone(), user_key.clone())?;
+        runtime
+            .set_vault_user_key_material(account_id.clone(), user_key.clone())
+            .await?;
 
         log::info!(
             target: "vanguard::application::vault_biometric",
@@ -192,9 +195,9 @@ impl VaultBiometricUseCase {
         })
     }
 
-    pub fn lock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
-        let account_id = runtime.active_account_id()?;
-        runtime.remove_vault_user_key_material(&account_id)
+    pub async fn lock(&self, runtime: &dyn VaultRuntimePort) -> AppResult<()> {
+        let account_id = runtime.active_account_id().await?;
+        runtime.remove_vault_user_key_material(&account_id).await
     }
 }
 
@@ -204,7 +207,7 @@ impl BiometricUnlockExecutor for VaultBiometricUseCase {
         &self,
         runtime: &dyn VaultRuntimePort,
     ) -> AppResult<UnlockVaultResult> {
-        self.unlock_with_biometric(runtime)
+        self.unlock_with_biometric(runtime).await
     }
 }
 

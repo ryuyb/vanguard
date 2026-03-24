@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -260,54 +261,45 @@ impl AppState {
         Arc::clone(&self.unlock_manager)
     }
 
-    pub fn active_account_id(&self) -> AppResult<String> {
-        // Get from unlock manager (blocking)
-        self.unlock_manager.active_account_id_blocking()
+    pub async fn active_account_id(&self) -> AppResult<String> {
+        self.unlock_manager.active_account_id().await
     }
 
-    pub fn persisted_auth_context(&self) -> AppResult<Option<PersistedAuthContext>> {
-        // Get from unlock_manager - use block_in_place to call async from sync
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            let account_ctx = handle.block_on(self.unlock_manager.account_context());
-            Ok(account_ctx.map(|ctx| PersistedAuthContext {
-                account_id: ctx.account_id,
-                base_url: ctx.base_url,
-                email: ctx.email,
-                kdf: ctx.kdf,
-                kdf_iterations: ctx.kdf_iterations,
-                kdf_memory: ctx.kdf_memory,
-                kdf_parallelism: ctx.kdf_parallelism,
-            }))
-        })
+    pub async fn persisted_auth_context(&self) -> AppResult<Option<PersistedAuthContext>> {
+        let account_ctx = self.unlock_manager.account_context().await;
+        Ok(account_ctx.map(|ctx| PersistedAuthContext {
+            account_id: ctx.account_id,
+            base_url: ctx.base_url,
+            email: ctx.email,
+            kdf: ctx.kdf,
+            kdf_iterations: ctx.kdf_iterations,
+            kdf_memory: ctx.kdf_memory,
+            kdf_parallelism: ctx.kdf_parallelism,
+        }))
     }
 }
 
+#[async_trait]
 impl VaultRuntimePort for AppState {
-    fn active_account_id(&self) -> AppResult<String> {
-        AppState::active_account_id(self)
+    async fn active_account_id(&self) -> AppResult<String> {
+        self.unlock_manager.active_account_id().await
     }
 
-    fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
-        // Use block_in_place to allow calling async code from sync context
-        // even when already inside a tokio runtime
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            let account_ctx = handle.block_on(self.unlock_manager.account_context());
-            Ok(account_ctx.map(|ctx| VaultUnlockContext {
-                account_id: ctx.account_id,
-                base_url: ctx.base_url,
-                email: ctx.email,
-                kdf: ctx.kdf,
-                kdf_iterations: ctx.kdf_iterations,
-                kdf_memory: ctx.kdf_memory,
-                kdf_parallelism: ctx.kdf_parallelism,
-            }))
-        })
+    async fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        let account_ctx = self.unlock_manager.account_context().await;
+        Ok(account_ctx.map(|ctx| VaultUnlockContext {
+            account_id: ctx.account_id,
+            base_url: ctx.base_url,
+            email: ctx.email,
+            kdf: ctx.kdf,
+            kdf_iterations: ctx.kdf_iterations,
+            kdf_memory: ctx.kdf_memory,
+            kdf_parallelism: ctx.kdf_parallelism,
+        }))
     }
 
-    fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
-        AppState::persisted_auth_context(self).map(|value| {
+    async fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        AppState::persisted_auth_context(self).await.map(|value| {
             value.map(|persisted| VaultUnlockContext {
                 account_id: persisted.account_id,
                 base_url: persisted.base_url,
@@ -320,42 +312,30 @@ impl VaultRuntimePort for AppState {
         })
     }
 
-    fn get_vault_user_key_material(
+    async fn get_vault_user_key_material(
         &self,
         _account_id: &str,
     ) -> AppResult<Option<VaultUserKeyMaterial>> {
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            let key_material = handle.block_on(self.unlock_manager.key_material_dto());
-            Ok(key_material)
-        })
+        let key_material = self.unlock_manager.key_material_dto().await;
+        Ok(key_material)
     }
 
-    fn set_vault_user_key_material(
+    async fn set_vault_user_key_material(
         &self,
         _account_id: String,
         key: VaultUserKeyMaterial,
     ) -> AppResult<()> {
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            let key_material: VaultKeyMaterial = key.into();
-            handle.block_on(self.unlock_manager.set_key_material(key_material))
-        })
+        let key_material: VaultKeyMaterial = key.into();
+        self.unlock_manager.set_key_material(key_material).await
     }
 
-    fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            handle.block_on(self.unlock_manager.remove_key_material())
-        })
+    async fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
+        self.unlock_manager.remove_key_material().await
     }
 
-    fn get_refresh_token(&self) -> AppResult<Option<String>> {
-        tokio::task::block_in_place(|| {
-            let handle = tokio::runtime::Handle::current();
-            let token = handle.block_on(self.unlock_manager.refresh_token());
-            Ok(token)
-        })
+    async fn get_refresh_token(&self) -> AppResult<Option<String>> {
+        let token = self.unlock_manager.refresh_token().await;
+        Ok(token)
     }
 }
 

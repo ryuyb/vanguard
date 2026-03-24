@@ -118,6 +118,7 @@ pub async fn vault_get_cipher_detail(
 ) -> Result<VaultCipherDetailResponseDto, ErrorPayload> {
     let account_id = state
         .active_account_id()
+        .await
         .map_err(|error| log_command_error("vault_get_cipher_detail", &error))?;
     let cipher_id = request.cipher_id.trim();
     if cipher_id.is_empty() {
@@ -203,8 +204,8 @@ pub async fn vault_copy_cipher_field(
     let mut autofill_value: Option<String> = None;
     if autofill_enabled && result.copied {
         // Get the decrypted value for autofill
-        if let Ok(account_id) = state.active_account_id() {
-            if let Ok(Some(user_key)) = state.get_vault_user_key_material(&account_id) {
+        if let Ok(account_id) = state.active_account_id().await {
+            if let Ok(Some(user_key)) = state.get_vault_user_key_material(&account_id).await {
                 if let Ok(cipher) = state
                     .get_cipher_detail_use_case()
                     .execute(GetCipherDetailQuery {

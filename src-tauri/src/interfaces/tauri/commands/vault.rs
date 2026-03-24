@@ -46,7 +46,7 @@ fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
 #[tauri::command]
 #[specta::specta]
 pub async fn has_local_unlock_data(state: State<'_, AppState>) -> Result<bool, ErrorPayload> {
-    let account_id = match state.active_account_id() {
+    let account_id = match state.active_account_id().await {
         Ok(value) => value,
         Err(
             AppError::ValidationFieldError { .. }
@@ -179,6 +179,7 @@ pub async fn vault_enable_biometric_unlock(
         state.biometric_unlock_port(),
     )
     .enable_biometric_unlock(&*state)
+    .await
     .map_err(|error| log_command_error("vault_enable_biometric_unlock", &error))
 }
 
@@ -193,6 +194,7 @@ pub async fn vault_disable_biometric_unlock(
         state.biometric_unlock_port(),
     )
     .disable_biometric_unlock(&*state)
+    .await
     .map_err(|error| log_command_error("vault_disable_biometric_unlock", &error))
 }
 

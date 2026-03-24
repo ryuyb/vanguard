@@ -48,7 +48,7 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
             });
         }
 
-        let unlock_context = resolve_unlock_context(runtime)?;
+        let unlock_context = resolve_unlock_context(runtime).await?;
         let unlock_data = self
             .master_password_unlock_data_port
             .load_master_password_unlock_data(&unlock_context.account_id)
@@ -92,7 +92,9 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
                 }
             })?;
 
-        runtime.set_vault_user_key_material(unlock_context.account_id.clone(), user_key)?;
+        runtime
+            .set_vault_user_key_material(unlock_context.account_id.clone(), user_key)
+            .await?;
 
         log::info!(
             target: "vanguard::application::vault_unlock",
@@ -107,13 +109,14 @@ impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
     }
 }
 
-fn resolve_unlock_context(runtime: &dyn VaultRuntimePort) -> AppResult<VaultUnlockContext> {
-    if let Some(auth_session) = runtime.auth_session_context()? {
+async fn resolve_unlock_context(runtime: &dyn VaultRuntimePort) -> AppResult<VaultUnlockContext> {
+    if let Some(auth_session) = runtime.auth_session_context().await? {
         return Ok(auth_session);
     }
 
     runtime
-        .persisted_auth_context()?
+        .persisted_auth_context()
+        .await?
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
             message: "no authenticated or persisted account state found, please login first".into(),

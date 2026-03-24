@@ -278,6 +278,7 @@ pub async fn auth_restore_state(
     // Check persisted auth context (for restore after app restart)
     if let Some(context) = state
         .persisted_auth_context()
+        .await
         .map_err(|error| log_command_error("auth_restore_state", error))?
     {
         return Ok(RestoreAuthStateResponseDto {
@@ -326,6 +327,7 @@ pub async fn auth_logout(
         .map(|ctx| ctx.account_id);
     let persisted_account_id = state
         .persisted_auth_context()
+        .await
         .map_err(|error| log_command_error("auth_logout", error))?
         .map(|value| value.account_id);
     let account_id = active_account_id.or(persisted_account_id);

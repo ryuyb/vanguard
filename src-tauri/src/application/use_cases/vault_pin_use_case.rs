@@ -47,7 +47,7 @@ impl VaultPinUseCase {
             });
         }
 
-        let account_id = match runtime.active_account_id() {
+        let account_id = match runtime.active_account_id().await {
             Ok(value) => value,
             Err(
                 AppError::ValidationFieldError { .. }
@@ -92,9 +92,10 @@ impl VaultPinUseCase {
             });
         }
 
-        let account_id = runtime.active_account_id()?;
+        let account_id = runtime.active_account_id().await?;
         let user_key = runtime
-            .get_vault_user_key_material(&account_id)?
+            .get_vault_user_key_material(&account_id)
+            .await?
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
                 message:
@@ -103,7 +104,7 @@ impl VaultPinUseCase {
             })?;
 
         // Get refresh_token from runtime for session restoration
-        let refresh_token = runtime.get_refresh_token()?;
+        let refresh_token = runtime.get_refresh_token().await?;
 
         let envelope = encrypt_user_key_with_pin(&pin, &user_key, refresh_token.as_deref())?;
         self.pin_unlock_port
@@ -130,7 +131,7 @@ impl VaultPinUseCase {
             return Ok(());
         }
 
-        let account_id = match runtime.active_account_id() {
+        let account_id = match runtime.active_account_id().await {
             Ok(value) => value,
             Err(
                 AppError::ValidationFieldError { .. }
@@ -195,7 +196,7 @@ impl PinUnlockExecutor for VaultPinUseCase {
     ) -> AppResult<UnlockVaultResult> {
         self.ensure_supported()?;
 
-        let account_id = runtime.active_account_id()?;
+        let account_id = runtime.active_account_id().await?;
         let lock_type = self.resolve_enabled_lock_type(&account_id).await?;
         if lock_type == PinLockType::Disabled {
             return Err(AppError::ValidationFieldError {
@@ -209,7 +210,9 @@ impl PinUnlockExecutor for VaultPinUseCase {
             .load_pin_envelope(&account_id, lock_type)
             .await?;
         let user_key = decrypt_user_key_with_pin(pin.trim(), &envelope)?;
-        runtime.set_vault_user_key_material(account_id.clone(), user_key.clone())?;
+        runtime
+            .set_vault_user_key_material(account_id.clone(), user_key.clone())
+            .await?;
 
         log::info!(
             target: "vanguard::application::vault_pin",
@@ -477,27 +480,28 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl VaultRuntimePort for FakeRuntime {
-        fn active_account_id(&self) -> AppResult<String> {
+        async fn active_account_id(&self) -> AppResult<String> {
             Ok(String::from("account-1"))
         }
 
-        fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        async fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
             Ok(None)
         }
 
-        fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        async fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
             Ok(None)
         }
 
-        fn get_vault_user_key_material(
+        async fn get_vault_user_key_material(
             &self,
             _account_id: &str,
         ) -> AppResult<Option<VaultUserKeyMaterial>> {
             Ok(self.user_key.lock().expect("user_key lock").clone())
         }
 
-        fn set_vault_user_key_material(
+        async fn set_vault_user_key_material(
             &self,
             _account_id: String,
             key: VaultUserKeyMaterial,
@@ -506,12 +510,12 @@ mod tests {
             Ok(())
         }
 
-        fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
+        async fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
             *self.user_key.lock().expect("user_key lock") = None;
             Ok(())
         }
 
-        fn get_refresh_token(&self) -> AppResult<Option<String>> {
+        async fn get_refresh_token(&self) -> AppResult<Option<String>> {
             Ok(None)
         }
     }
@@ -706,6 +710,7 @@ mod tests {
 
         runtime
             .remove_vault_user_key_material("account-1")
+            .await
             .expect("lock vault before unlock test");
         use_case_a
             .execute_pin_unlock(&runtime, String::from("123456"))
@@ -714,6 +719,7 @@ mod tests {
 
         runtime
             .remove_vault_user_key_material("account-1")
+            .await
             .expect("lock vault before restart");
         let use_case_b = VaultPinUseCase::new(Arc::new(
             FakePinUnlockPort::new_with_shared_persistent(true, persistent),
@@ -758,6 +764,7 @@ mod tests {
 
         runtime
             .remove_vault_user_key_material("account-1")
+            .await
             .expect("lock vault");
 
         let use_case_b = VaultPinUseCase::new(Arc::new(
@@ -775,6 +782,7 @@ mod tests {
         assert_eq!(result.account_id, "account-1");
         assert!(runtime
             .get_vault_user_key_material("account-1")
+            .await
             .expect("read user key")
             .is_some());
     }

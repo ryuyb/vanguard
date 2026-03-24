@@ -45,9 +45,10 @@ impl CopyCipherFieldUseCase {
         }
 
         let clear_after_ms = validate_clear_after_ms(command.clear_after_ms)?;
-        let account_id = runtime.active_account_id()?;
+        let account_id = runtime.active_account_id().await?;
         let user_key = runtime
-            .get_vault_user_key_material(&account_id)?
+            .get_vault_user_key_material(&account_id)
+            .await?
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
                 message: "vault is locked, please unlock with master password first".to_string(),

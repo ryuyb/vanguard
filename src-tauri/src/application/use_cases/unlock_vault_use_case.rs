@@ -111,27 +111,28 @@ mod tests {
 
     struct FakeRuntime;
 
+    #[async_trait]
     impl VaultRuntimePort for FakeRuntime {
-        fn active_account_id(&self) -> AppResult<String> {
+        async fn active_account_id(&self) -> AppResult<String> {
             Ok(String::from("account-1"))
         }
 
-        fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        async fn auth_session_context(&self) -> AppResult<Option<VaultUnlockContext>> {
             Ok(None)
         }
 
-        fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
+        async fn persisted_auth_context(&self) -> AppResult<Option<VaultUnlockContext>> {
             Ok(None)
         }
 
-        fn get_vault_user_key_material(
+        async fn get_vault_user_key_material(
             &self,
             _account_id: &str,
         ) -> AppResult<Option<VaultUserKeyMaterial>> {
             Ok(None)
         }
 
-        fn set_vault_user_key_material(
+        async fn set_vault_user_key_material(
             &self,
             _account_id: String,
             _key: VaultUserKeyMaterial,
@@ -139,11 +140,11 @@ mod tests {
             Ok(())
         }
 
-        fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
+        async fn remove_vault_user_key_material(&self, _account_id: &str) -> AppResult<()> {
             Ok(())
         }
 
-        fn get_refresh_token(&self) -> AppResult<Option<String>> {
+        async fn get_refresh_token(&self) -> AppResult<Option<String>> {
             Ok(None)
         }
     }
@@ -164,7 +165,7 @@ mod tests {
                 .expect("master calls lock")
                 .push(master_password);
             Ok(UnlockVaultResult {
-                account_id: runtime.active_account_id()?,
+                account_id: runtime.active_account_id().await?,
                 refresh_token: None,
             })
         }
@@ -183,7 +184,7 @@ mod tests {
         ) -> AppResult<UnlockVaultResult> {
             self.calls.lock().expect("pin calls lock").push(pin);
             Ok(UnlockVaultResult {
-                account_id: runtime.active_account_id()?,
+                account_id: runtime.active_account_id().await?,
                 refresh_token: None,
             })
         }
@@ -199,10 +200,12 @@ mod tests {
             &self,
             runtime: &dyn VaultRuntimePort,
         ) -> AppResult<UnlockVaultResult> {
+            let account_id = runtime.active_account_id().await?;
             let mut guard = self.calls.lock().expect("biometric calls lock");
             *guard += 1;
+            drop(guard); // Release lock before returning
             Ok(UnlockVaultResult {
-                account_id: runtime.active_account_id()?,
+                account_id,
                 refresh_token: None,
             })
         }

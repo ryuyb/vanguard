@@ -374,7 +374,8 @@ pub async fn restore_auth_session_with_refresh_token(
 ) -> AppResult<AuthSession> {
     let persisted_context =
         state
-            .persisted_auth_context()?
+            .persisted_auth_context()
+            .await?
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
                 message: "no persisted login state found in backend, please login first"
