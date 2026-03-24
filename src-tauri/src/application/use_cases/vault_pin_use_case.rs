@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use argon2::{Algorithm, Argon2, Params, Version};
-use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, KeyInit};
@@ -13,7 +12,6 @@ use crate::application::dto::vault::{
 };
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::use_cases::unlock_vault_use_case::PinUnlockExecutor;
 use crate::application::vault_crypto;
 use crate::domain::unlock::{PinLockType, PinProtectedUserKeyEnvelope};
 use crate::support::error::AppError;
@@ -185,11 +183,8 @@ impl VaultPinUseCase {
         }
         Ok(())
     }
-}
 
-#[async_trait]
-impl PinUnlockExecutor for VaultPinUseCase {
-    async fn execute_pin_unlock(
+    pub async fn execute_pin_unlock(
         &self,
         runtime: &dyn VaultRuntimePort,
         pin: String,
@@ -462,7 +457,6 @@ mod tests {
     };
     use crate::application::ports::pin_unlock_port::PinUnlockPort;
     use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-    use crate::application::use_cases::unlock_vault_use_case::PinUnlockExecutor;
     use crate::domain::unlock::{PinLockType, PinProtectedUserKeyEnvelope};
     use crate::support::error::AppError;
     use crate::support::result::AppResult;

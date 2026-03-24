@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use argon2::{Algorithm, Argon2, Params, Version};
-use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac_array;
 use sha2::{Digest, Sha256};
@@ -9,7 +8,6 @@ use sha2::{Digest, Sha256};
 use crate::application::dto::vault::{UnlockVaultResult, VaultUnlockContext, VaultUserKeyMaterial};
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::use_cases::unlock_vault_use_case::MasterPasswordUnlockExecutor;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -31,11 +29,8 @@ impl MasterPasswordUnlockUseCase {
             master_password_unlock_data_port,
         }
     }
-}
 
-#[async_trait]
-impl MasterPasswordUnlockExecutor for MasterPasswordUnlockUseCase {
-    async fn execute_master_password_unlock(
+    pub async fn execute(
         &self,
         runtime: &dyn VaultRuntimePort,
         master_password: String,

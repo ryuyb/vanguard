@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 
@@ -10,7 +9,6 @@ use crate::application::dto::vault::{
 use crate::application::ports::biometric_unlock_port::BiometricUnlockPort;
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
-use crate::application::use_cases::unlock_vault_use_case::BiometricUnlockExecutor;
 use crate::application::vault_crypto;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -199,11 +197,8 @@ impl VaultBiometricUseCase {
         let account_id = runtime.active_account_id().await?;
         runtime.remove_vault_user_key_material(&account_id).await
     }
-}
 
-#[async_trait]
-impl BiometricUnlockExecutor for VaultBiometricUseCase {
-    async fn execute_biometric_unlock(
+    pub async fn execute_biometric_unlock(
         &self,
         runtime: &dyn VaultRuntimePort,
     ) -> AppResult<UnlockVaultResult> {

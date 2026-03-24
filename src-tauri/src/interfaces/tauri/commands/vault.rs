@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use tauri::{AppHandle, State};
 
 use crate::application::dto::vault::{EnablePinUnlockCommand, UnlockVaultCommand};
@@ -32,14 +30,12 @@ fn log_command_error(command: &str, error: &AppError) -> ErrorPayload {
 
 fn build_unlock_use_case(state: &AppState) -> UnlockVaultUseCase {
     UnlockVaultUseCase::new(
-        Arc::new(MasterPasswordUnlockUseCase::new(
-            state.master_password_unlock_data_port(),
-        )),
-        Arc::new(VaultPinUseCase::new(state.pin_unlock_port())),
-        Arc::new(VaultBiometricUseCase::new(
+        MasterPasswordUnlockUseCase::new(state.master_password_unlock_data_port()),
+        VaultPinUseCase::new(state.pin_unlock_port()),
+        VaultBiometricUseCase::new(
             state.master_password_unlock_data_port(),
             state.biometric_unlock_port(),
-        )),
+        ),
     )
 }
 
