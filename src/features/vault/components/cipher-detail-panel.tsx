@@ -243,7 +243,7 @@ export function CipherDetailPanel({
     cipher.data?.passwordRevisionDate,
   );
   const customFields = (() => {
-    const rawFields = [...cipher.fields, ...(cipher.data?.fields ?? [])];
+    const rawFields = [...(cipher.fields ?? []), ...(cipher.data?.fields ?? [])];
     const seen = new Set<string>();
     const normalizedFields: Array<{
       key: string;
@@ -447,7 +447,7 @@ export function CipherDetailPanel({
             className="size-11 bg-white border border-slate-200 text-slate-500 shadow-sm shrink-0"
             iconData={iconData}
           >
-            {toCipherTypeIcon(cipher.type)}
+            {toCipherTypeIcon(cipher.type ?? null)}
           </CipherIcon>
           <div className="min-w-0 flex-1 shrink overflow-hidden">
             <TruncatableText
