@@ -27,6 +27,17 @@ A Tauri-based desktop client for Vaultwarden, aiming for 1Password-like usabilit
 - **边界清晰**：保持领域、应用、基础设施层的职责分明
 - **演进式设计**：在理解充分的基础上渐进优化，避免过早抽象
 
+### Compact Instructions 如何保留关键信息
+
+保留优先级：
+
+1. 架构决策，不得摘要
+2. 已修改文件和关键变更
+3. 验证状态，pass/fail
+4. 未解决的 TODO 和回滚笔记
+5. 工具输出，可删，只保留 pass/fail 结论
+
+
 ## Tech Stack
 
 - **Backend**: Rust + Tauri
