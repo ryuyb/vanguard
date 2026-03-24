@@ -170,9 +170,25 @@ pub struct SendFile<S: SendState> {
 4. 调用 API 创建 Send
 5. 保存到本地缓存
 
-**文件上传**：
-- 两步流程：先创建 Send 记录，再上传文件到服务器返回的 URL
-- 文件大小限制：前端和后端双重验证（默认 100MB）
+**文件上传详细流程**：
+
+1. **第一步：创建 Send 记录**
+   - 前端调用 `create_send` API，传递加密后的 Send 元数据
+   - 服务器创建 Send 记录，返回 `uploadUrl` 和 `sendId`
+
+2. **第二步：上传文件内容**
+   - 前端使用返回的 `uploadUrl` 上传加密后的文件数据
+   - 使用 HTTP POST 请求，Content-Type: `application/octet-stream`
+   - 上传成功后，Send 进入可用状态
+
+3. **错误处理**：
+   - 如果文件上传失败，Send 记录仍保留但状态为"不完整"
+   - 可以通过 `update_send` 重新上传，或通过 `delete_send` 清理
+   - 服务器会定期清理未完成上传的 Send
+
+4. **文件大小限制**：
+   - 前端预检查：100MB
+   - 后端验证：根据 Vaultwarden 配置（默认 100MB）
 
 #### UpdateSendUseCase
 
@@ -439,6 +455,11 @@ pub enum PushType {
     SyncSendDelete = 14,  // Send 删除
 }
 ```
+
+**重要说明**：
+- 这些 PushType 值已在 Bitwarden/Vaultwarden 协议中定义
+- Vanguard 的 `PushType` 枚举已包含这些值
+- 无需修改 Vaultwarden 服务端，只需在客户端实现处理逻辑
 
 **增量同步流程**：
 
@@ -734,9 +755,12 @@ export function SendList() {
           <div className="text-xs font-semibold text-muted-foreground">
             {t('send.type.text')}
           </div>
-          {sends.filter(s => s.type === 'text').map(send => (
-            <SendListItem key={send.id} send={send} />
-          ))}
+          {sends
+            .filter(s => s.type === 'text')
+            .sort((a, b) => new Date(b.revisionDate).getTime() - new Date(a.revisionDate).getTime())
+            .map(send => (
+              <SendListItem key={send.id} send={send} />
+            ))}
         </div>
 
         {/* 文件类型 */}
@@ -744,14 +768,22 @@ export function SendList() {
           <div className="text-xs font-semibold text-muted-foreground">
             {t('send.type.file')}
           </div>
-          {sends.filter(s => s.type === 'file').map(send => (
-            <SendListItem key={send.id} send={send} />
-          ))}
+          {sends
+            .filter(s => s.type === 'file')
+            .sort((a, b) => new Date(b.revisionDate).getTime() - new Date(a.revisionDate).getTime())
+            .map(send => (
+              <SendListItem key={send.id} send={send} />
+            ))}
         </div>
       </ScrollArea>
     </div>
   );
 }
+
+**排序规则**：
+- 默认按 `revisionDate` 降序排列（最新修改的在前）
+- 每个分组（文本/文件）内独立排序
+- 未来可扩展支持用户自定义排序（按名称、删除时间等）
 ```
 
 ### Send Detail Panel
@@ -759,11 +791,33 @@ export function SendList() {
 **功能**：
 - 显示 Send 名称、备注
 - 显示内容（文本或文件信息）
-- 复制 Send 链接
+- 复制 Send 链接（见下方说明）
 - 复制文本内容
 - 下载文件
 - 编辑/删除操作
 - 显示访问控制信息
+
+**Send 链接格式**：
+
+```
+{base_url}/#/send/{send_id}/{send_key}
+```
+
+**链接组成**：
+- `base_url`: Vaultwarden 服务器地址（如 `https://vault.example.com`）
+- `send_id`: Send 的唯一标识符
+- `send_key`: Send 的访问密钥（用于解密 Send 内容）
+
+**获取 send_key**：
+- `send_key` 从 `Send.key` 字段获取（需要用用户密钥解密）
+- 前端在复制链接时需要解密 `Send.key` 并附加到 URL
+- 示例：`https://vault.example.com/#/send/abc123/def456ghi789`
+
+**访问流程**：
+1. 用户点击"复制链接"
+2. 前端从 Send 详情中获取加密的 `key` 字段
+3. 使用用户密钥解密得到明文 `send_key`
+4. 拼接完整 URL 并复制到剪贴板
 
 ### Send Form Dialog
 
@@ -1125,7 +1179,8 @@ listen('send:created', (event) => {
 
 ## References
 
-- [Vaultwarden Send API Documentation](https://github.com/dani-garcia/vaultwarden/wiki)
-- [Bitwarden Send Specification](https://bitwarden.com/help/send/)
-- Vanguard Cipher Implementation
+- [Vaultwarden Wiki](https://github.com/dani-garcia/vaultwarden/wiki)
+- [Bitwarden Send Documentation](https://bitwarden.com/help/send/)
+- [Bitwarden API Specification](https://github.com/bitwarden/server/tree/main/src/Api/Vault/Models/Request/Sends)
+- Vanguard Cipher Implementation (`src-tauri/src/domain/cipher/`)
 - Vanguard Architecture Documentation
