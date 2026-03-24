@@ -1,10 +1,7 @@
 pub use crate::application::dto::cipher::{
     CopyCipherFieldCommand, CopyCipherFieldResult, GetCipherDetailQuery, GetCipherTotpCodeCommand,
-    GetCipherTotpCodeResult, GetVaultViewDataResult, VaultAttachmentDetail, VaultCipherCardDetail,
-    VaultCipherDataDetail, VaultCipherDetail, VaultCipherFieldDetail, VaultCipherIdentityDetail,
-    VaultCipherItem, VaultCipherLoginDetail, VaultCipherLoginFido2CredentialDetail,
-    VaultCipherLoginUriDetail, VaultCipherPasswordHistoryDetail, VaultCipherPermissionsDetail,
-    VaultCipherSecureNoteDetail, VaultCipherSshKeyDetail, VaultCopyField, VaultFolderItem,
+    GetCipherTotpCodeResult, GetVaultViewDataResult, VaultCipherItem, VaultCopyField,
+    VaultFolderItem,
 };
 pub use crate::application::dto::folder::{
     CreateFolderRequest, DeleteFolderRequest, RenameFolderRequest,

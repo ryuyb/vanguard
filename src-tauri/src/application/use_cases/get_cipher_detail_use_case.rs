@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
 use crate::application::dto::sync::SyncCipher;
-use crate::application::dto::vault::{
-    GetCipherDetailQuery, VaultCipherDetail, VaultCipherPermissionsDetail,
-    VaultCipherSecureNoteDetail, VaultUserKeyMaterial,
-};
+use crate::application::dto::vault::{GetCipherDetailQuery, VaultUserKeyMaterial};
 use crate::application::services::sync_service::SyncService;
 use crate::application::vault_crypto;
+use crate::domain::cipher::{Cipher, Decrypted, Encrypted};
 use crate::domain::crypto::Decryptable;
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
@@ -21,7 +19,7 @@ impl GetCipherDetailUseCase {
         Self { sync_service }
     }
 
-    pub async fn execute(&self, query: GetCipherDetailQuery) -> AppResult<VaultCipherDetail> {
+    pub async fn execute(&self, query: GetCipherDetailQuery) -> AppResult<Cipher<Decrypted>> {
         require_non_empty(&query.account_id, "account_id")?;
         require_non_empty(&query.cipher_id, "cipher_id")?;
         vault_crypto::validate_key_lengths(
@@ -45,50 +43,18 @@ impl GetCipherDetailUseCase {
 fn decrypt_cipher_detail(
     cipher: SyncCipher,
     user_key: &VaultUserKeyMaterial,
-) -> Result<VaultCipherDetail, AppError> {
-    let detail_key = resolve_cipher_decryption_key(cipher.key.as_deref(), user_key)?;
+) -> Result<Cipher<Decrypted>, AppError> {
+    // Convert SyncCipher to Cipher<Encrypted>
+    let encrypted: Cipher<Encrypted> = cipher.into();
 
-    Ok(VaultCipherDetail {
-        id: cipher.id,
-        organization_id: cipher.organization_id,
-        folder_id: cipher.folder_id,
-        r#type: cipher.r#type,
-        name: cipher.name.decrypt(&detail_key, "cipher.name")?,
-        notes: cipher.notes.decrypt(&detail_key, "cipher.notes")?,
-        key: cipher.key,
-        favorite: cipher.favorite,
-        edit: cipher.edit,
-        view_password: cipher.view_password,
-        organization_use_totp: cipher.organization_use_totp,
-        creation_date: cipher.creation_date,
-        revision_date: cipher.revision_date,
-        deleted_date: cipher.deleted_date,
-        archived_date: cipher.archived_date,
-        reprompt: cipher.reprompt,
-        permissions: cipher
-            .permissions
-            .map(|permissions| VaultCipherPermissionsDetail {
-                delete: permissions.delete,
-                restore: permissions.restore,
-            }),
-        object: cipher.object,
-        fields: cipher.fields.decrypt(&detail_key, "cipher.fields")?,
-        password_history: cipher
-            .password_history
-            .decrypt(&detail_key, "cipher.password_history")?,
-        collection_ids: cipher.collection_ids,
-        data: cipher.data.decrypt(&detail_key, "cipher.data")?,
-        login: cipher.login.decrypt(&detail_key, "cipher.login")?,
-        secure_note: cipher.secure_note.map(|note| VaultCipherSecureNoteDetail {
-            r#type: note.r#type,
-        }),
-        card: cipher.card.decrypt(&detail_key, "cipher.card")?,
-        identity: cipher.identity.decrypt(&detail_key, "cipher.identity")?,
-        ssh_key: cipher.ssh_key.decrypt(&detail_key, "cipher.ssh_key")?,
-        attachments: cipher
-            .attachments
-            .decrypt(&detail_key, "cipher.attachments")?,
-    })
+    // Resolve the decryption key (cipher-specific key or user key)
+    // cipher.key is a plain Option<String> field
+    let cipher_key_str = encrypted.key.as_deref();
+
+    let detail_key = resolve_cipher_decryption_key(cipher_key_str, user_key)?;
+
+    // Decrypt using the new type-state pattern
+    encrypted.decrypt(&detail_key, "cipher")
 }
 
 fn resolve_cipher_decryption_key(
@@ -244,26 +210,24 @@ mod tests {
 
         let detail = decrypt_cipher_detail(cipher, &user_key).expect("detail deserialize");
         assert_eq!(detail.id, "cipher-1");
-        assert_eq!(detail.name.as_deref(), Some("demo"));
+        assert_eq!(detail.name.as_ref(), Some(&"demo".to_string()));
         assert_eq!(detail.key, None);
         assert_eq!(detail.password_history.len(), 1);
         assert_eq!(
-            detail.password_history[0].password.as_deref(),
-            Some("history-pass")
+            detail.password_history[0].password.as_ref(),
+            Some(&"history-pass".to_string())
         );
         assert_eq!(
-            detail.password_history[0].last_used_date.as_deref(),
-            Some("2026-03-01T00:00:00Z")
+            detail.password_history[0].last_used_date,
+            Some("2026-03-01T00:00:00Z".to_string())
         );
         assert_eq!(
-            detail.login.as_ref().expect("login").uris[0].uri.as_deref(),
-            Some("https://example.com/login")
+            detail.login.as_ref().expect("login").uris[0].uri.as_ref(),
+            Some(&"https://example.com/login".to_string())
         );
         assert_eq!(
-            detail.login.as_ref().expect("login").uris[0]
-                .uri_checksum
-                .as_deref(),
-            Some("2.not-a-cipher|string|shape")
+            detail.login.as_ref().expect("login").uris[0].uri_checksum,
+            Some("2.not-a-cipher|string|shape".to_string())
         );
     }
 
@@ -323,10 +287,10 @@ mod tests {
         };
 
         let detail = decrypt_cipher_detail(cipher, &user_key).expect("detail decrypt");
-        assert_eq!(detail.name.as_deref(), Some("cipher-name"));
+        assert_eq!(detail.name.as_ref(), Some(&"cipher-name".to_string()));
         assert_eq!(
-            detail.password_history[0].password.as_deref(),
-            Some("cipher-pass")
+            detail.password_history[0].password.as_ref(),
+            Some(&"cipher-pass".to_string())
         );
         assert_eq!(detail.key.as_deref(), Some(encrypted_cipher_key.as_str()));
     }

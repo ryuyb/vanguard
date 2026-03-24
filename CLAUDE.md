@@ -8,6 +8,25 @@ A Tauri-based desktop client for Vaultwarden, aiming for 1Password-like usabilit
 - **Keep responses concise** - be brief and to the point, avoid verbose explanations
 - **Use agent teams when needed** - for complex tasks like requirement analysis, code logic analysis, or multi-step workflows
 
+## Core Philosophy
+
+### First Principles Thinking
+
+始终从第一性原理出发，深入理解问题的本质：
+
+- **质疑假设**：不盲目跟随既有模式或流行方案，追溯问题的根本
+- **本质优先**：优先解决核心需求，避免过度设计和不必要的复杂性
+- **简洁优雅**：追求最简单直接的解决方案，减少抽象层级
+- **价值驱动**：每个设计决策都应能清晰追溯到用户价值
+
+### Design Philosophy
+
+结合项目的 DDD 架构，强调：
+
+- **领域为本**：技术实现服务于领域模型，而非相反
+- **边界清晰**：保持领域、应用、基础设施层的职责分明
+- **演进式设计**：在理解充分的基础上渐进优化，避免过早抽象
+
 ## Tech Stack
 
 - **Backend**: Rust + Tauri

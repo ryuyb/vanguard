@@ -2,13 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::application::dto::vault::{
-    CopyCipherFieldCommand, CopyCipherFieldResult, GetCipherDetailQuery, VaultCipherDetail,
-    VaultCopyField,
+    CopyCipherFieldCommand, CopyCipherFieldResult, GetCipherDetailQuery, VaultCopyField,
 };
 use crate::application::ports::clipboard_port::ClipboardPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::totp::{current_unix_seconds, generate_current_totp};
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
+use crate::domain::cipher::{Cipher, Decrypted};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 
@@ -107,21 +107,21 @@ fn validate_clear_after_ms(value: Option<u64>) -> AppResult<Option<u64>> {
     Ok(Some(value))
 }
 
-fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppResult<String> {
+fn resolve_copy_value(cipher: &Cipher<Decrypted>, field: VaultCopyField) -> AppResult<String> {
     match field {
         VaultCopyField::Username => pick_first_non_empty(&[
             cipher
                 .login
                 .as_ref()
-                .and_then(|entry| entry.username.clone()),
+                .and_then(|entry| entry.username.as_ref().cloned()),
             cipher
                 .data
                 .as_ref()
-                .and_then(|entry| entry.username.clone()),
+                .and_then(|entry| entry.username.as_ref().cloned()),
             cipher
                 .identity
                 .as_ref()
-                .and_then(|entry| entry.username.clone()),
+                .and_then(|entry| entry.username.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -131,11 +131,11 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
             cipher
                 .login
                 .as_ref()
-                .and_then(|entry| entry.password.clone()),
+                .and_then(|entry| entry.password.as_ref().cloned()),
             cipher
                 .data
                 .as_ref()
-                .and_then(|entry| entry.password.clone()),
+                .and_then(|entry| entry.password.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -143,8 +143,14 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         }),
         VaultCopyField::Totp => {
             let raw_totp = pick_first_non_empty(&[
-                cipher.login.as_ref().and_then(|entry| entry.totp.clone()),
-                cipher.data.as_ref().and_then(|entry| entry.totp.clone()),
+                cipher
+                    .login
+                    .as_ref()
+                    .and_then(|entry| entry.totp.as_ref().cloned()),
+                cipher
+                    .data
+                    .as_ref()
+                    .and_then(|entry| entry.totp.as_ref().cloned()),
             ])
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -155,7 +161,8 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         }
         VaultCopyField::Notes => cipher
             .notes
-            .clone()
+            .as_ref()
+            .cloned()
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -164,7 +171,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         VaultCopyField::CustomField { index } => cipher
             .fields
             .get(index)
-            .and_then(|f| f.value.clone())
+            .and_then(|f| f.value.as_ref().cloned())
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -175,12 +182,12 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
                 .login
                 .as_ref()
                 .and_then(|login| login.uris.get(index))
-                .and_then(|uri| uri.uri.clone()),
+                .and_then(|uri| uri.uri.as_ref().cloned()),
             cipher
                 .data
                 .as_ref()
                 .and_then(|data| data.uris.get(index))
-                .and_then(|uri| uri.uri.clone()),
+                .and_then(|uri| uri.uri.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -189,7 +196,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         VaultCopyField::CardNumber => cipher
             .card
             .as_ref()
-            .and_then(|card| card.number.clone())
+            .and_then(|card| card.number.as_ref().cloned())
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -198,7 +205,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         VaultCopyField::CardCode => cipher
             .card
             .as_ref()
-            .and_then(|card| card.code.clone())
+            .and_then(|card| card.code.as_ref().cloned())
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -208,8 +215,11 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
             cipher
                 .identity
                 .as_ref()
-                .and_then(|identity| identity.email.clone()),
-            cipher.data.as_ref().and_then(|data| data.email.clone()),
+                .and_then(|identity| identity.email.as_ref().cloned()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|data| data.email.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -219,8 +229,11 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
             cipher
                 .identity
                 .as_ref()
-                .and_then(|identity| identity.phone.clone()),
-            cipher.data.as_ref().and_then(|data| data.phone.clone()),
+                .and_then(|identity| identity.phone.as_ref().cloned()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|data| data.phone.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
@@ -229,7 +242,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         VaultCopyField::SshPrivateKey => cipher
             .ssh_key
             .as_ref()
-            .and_then(|ssh| ssh.private_key.clone())
+            .and_then(|ssh| ssh.private_key.as_ref().cloned())
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),
@@ -238,7 +251,7 @@ fn resolve_copy_value(cipher: &VaultCipherDetail, field: VaultCopyField) -> AppR
         VaultCopyField::SshPublicKey => cipher
             .ssh_key
             .as_ref()
-            .and_then(|ssh| ssh.public_key.clone())
+            .and_then(|ssh| ssh.public_key.as_ref().cloned())
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "unknown".to_string(),

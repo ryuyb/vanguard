@@ -157,8 +157,7 @@ pub async fn vault_get_cipher_detail(
         })
         .await
         .map_err(|error| log_command_error("vault_get_cipher_detail", &error))?;
-    let cipher = mapping::to_vault_cipher_detail_dto(cipher)
-        .map_err(|error| log_command_error("vault_get_cipher_detail", &error))?;
+    let cipher = mapping::to_vault_cipher_detail_dto(cipher);
 
     Ok(VaultCipherDetailResponseDto { account_id, cipher })
 }
@@ -478,7 +477,7 @@ impl From<VaultCopyFieldDto> for VaultCopyField {
 
 /// Resolve the field value from cipher detail for autofill
 fn resolve_field_value(
-    cipher: &crate::application::dto::vault::VaultCipherDetail,
+    cipher: &crate::domain::cipher::Cipher<crate::domain::cipher::Decrypted>,
     field: VaultCopyField,
 ) -> Result<String, AppError> {
     use crate::application::dto::vault::VaultCopyField;
@@ -488,7 +487,7 @@ fn resolve_field_value(
         VaultCopyField::Username => cipher
             .login
             .as_ref()
-            .and_then(|login| login.username.clone())
+            .and_then(|login| login.username.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "username".to_string(),
                 message: "No username available".to_string(),
@@ -496,7 +495,7 @@ fn resolve_field_value(
         VaultCopyField::Password => cipher
             .login
             .as_ref()
-            .and_then(|login| login.password.clone())
+            .and_then(|login| login.password.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "password".to_string(),
                 message: "No password available".to_string(),
@@ -506,7 +505,7 @@ fn resolve_field_value(
             cipher
                 .login
                 .as_ref()
-                .and_then(|login| login.totp.clone())
+                .and_then(|login| login.totp.as_ref().cloned())
                 .and_then(|totp| generate_current_totp(&totp, unix_seconds).ok())
                 .map(|snapshot| snapshot.code)
                 .ok_or_else(|| AppError::ValidationFieldError {
@@ -517,7 +516,8 @@ fn resolve_field_value(
         VaultCopyField::Notes => {
             cipher
                 .notes
-                .clone()
+                .as_ref()
+                .cloned()
                 .ok_or_else(|| AppError::ValidationFieldError {
                     field: "notes".to_string(),
                     message: "No notes available".to_string(),
@@ -526,7 +526,7 @@ fn resolve_field_value(
         VaultCopyField::CustomField { index } => cipher
             .fields
             .get(index)
-            .and_then(|f| f.value.clone())
+            .and_then(|f| f.value.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: format!("custom_field_{}", index),
                 message: "Custom field not found or empty".to_string(),
@@ -535,7 +535,7 @@ fn resolve_field_value(
             .login
             .as_ref()
             .and_then(|login| login.uris.get(index))
-            .and_then(|u| u.uri.clone())
+            .and_then(|u| u.uri.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: format!("uri_{}", index),
                 message: "URI not found or empty".to_string(),
@@ -543,7 +543,7 @@ fn resolve_field_value(
         VaultCopyField::CardNumber => cipher
             .card
             .as_ref()
-            .and_then(|card| card.number.clone())
+            .and_then(|card| card.number.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "card_number".to_string(),
                 message: "No card number available".to_string(),
@@ -551,7 +551,7 @@ fn resolve_field_value(
         VaultCopyField::CardCode => cipher
             .card
             .as_ref()
-            .and_then(|card| card.code.clone())
+            .and_then(|card| card.code.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "card_code".to_string(),
                 message: "No card code available".to_string(),
@@ -559,8 +559,13 @@ fn resolve_field_value(
         VaultCopyField::Email => cipher
             .login
             .as_ref()
-            .and_then(|login| login.username.clone())
-            .or_else(|| cipher.identity.as_ref().and_then(|i| i.email.clone()))
+            .and_then(|login| login.username.as_ref().cloned())
+            .or_else(|| {
+                cipher
+                    .identity
+                    .as_ref()
+                    .and_then(|i| i.email.as_ref().cloned())
+            })
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "email".to_string(),
                 message: "No email available".to_string(),
@@ -568,7 +573,7 @@ fn resolve_field_value(
         VaultCopyField::Phone => cipher
             .identity
             .as_ref()
-            .and_then(|i| i.phone.clone())
+            .and_then(|i| i.phone.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "phone".to_string(),
                 message: "No phone available".to_string(),
@@ -576,7 +581,7 @@ fn resolve_field_value(
         VaultCopyField::SshPrivateKey => cipher
             .ssh_key
             .as_ref()
-            .and_then(|ssh| ssh.private_key.clone())
+            .and_then(|ssh| ssh.private_key.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "ssh_private_key".to_string(),
                 message: "No SSH private key available".to_string(),
@@ -584,7 +589,7 @@ fn resolve_field_value(
         VaultCopyField::SshPublicKey => cipher
             .ssh_key
             .as_ref()
-            .and_then(|ssh| ssh.public_key.clone())
+            .and_then(|ssh| ssh.public_key.as_ref().cloned())
             .ok_or_else(|| AppError::ValidationFieldError {
                 field: "ssh_public_key".to_string(),
                 message: "No SSH public key available".to_string(),

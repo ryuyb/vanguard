@@ -412,12 +412,96 @@ vaultSyncSucceeded: "vault-sync:succeeded"
  */
 export type AccountContextDto = { accountId: string; email: string; baseUrl: string }
 export type AppConfigDto = { deviceIdentifier: string; allowInvalidCerts: boolean; syncPollIntervalSeconds: number; locale: string; launchOnLogin: boolean; showWebsiteIcon: boolean; quickAccessShortcut: string; lockShortcut: string; requireMasterPasswordInterval: string; lockOnSleep: boolean; idleAutoLockDelay: string; clipboardClearDelay: string; spotlightAutofill: boolean }
+/**
+ * Cipher attachment data
+ */
+export type CipherAttachment<S> = { id: string; 
+/**
+ * Plain text field - not encrypted
+ */
+key?: string | null; file_name: { inner: string | null }; 
+/**
+ * Plain text field - not encrypted
+ */
+size?: string | null; 
+/**
+ * Plain text field - not encrypted
+ */
+size_name?: string | null; 
+/**
+ * Plain text field - not encrypted
+ */
+url?: string | null; object?: string | null }
+/**
+ * Cipher card data
+ */
+export type CipherCard<S> = { cardholder_name: { inner: string | null }; brand: { inner: string | null }; number: { inner: string | null }; exp_month: { inner: string | null }; exp_year: { inner: string | null }; code: { inner: string | null } }
 export type CipherCreated = { accountId: string; cipherId: string }
+/**
+ * Cipher data (legacy structure containing all fields)
+ */
+export type CipherData<S> = { name: { inner: string | null }; notes: { inner: string | null }; fields?: CipherField<S>[]; password_history?: CipherPasswordHistory<S>[]; uri: { inner: string | null }; uris?: CipherLoginUri<S>[]; username: { inner: string | null }; password: { inner: string | null }; 
+/**
+ * Plain text field - not encrypted
+ */
+password_revision_date?: string | null; totp: { inner: string | null }; autofill_on_page_load?: boolean | null; fido2_credentials?: CipherLoginFido2Credential<S>[]; type?: number | null; cardholder_name: { inner: string | null }; brand: { inner: string | null }; number: { inner: string | null }; exp_month: { inner: string | null }; exp_year: { inner: string | null }; code: { inner: string | null }; title: { inner: string | null }; first_name: { inner: string | null }; middle_name: { inner: string | null }; last_name: { inner: string | null }; address1: { inner: string | null }; address2: { inner: string | null }; address3: { inner: string | null }; city: { inner: string | null }; state: { inner: string | null }; postal_code: { inner: string | null }; country: { inner: string | null }; company: { inner: string | null }; email: { inner: string | null }; phone: { inner: string | null }; ssn: { inner: string | null }; passport_number: { inner: string | null }; license_number: { inner: string | null }; private_key: { inner: string | null }; public_key: { inner: string | null }; key_fingerprint: { inner: string | null } }
 export type CipherDeleted = { accountId: string; cipherId: string }
+/**
+ * Cipher custom field
+ */
+export type CipherField<S> = { name: { inner: string | null }; value: { inner: string | null }; type?: number | null; linked_id?: number | null }
+/**
+ * Cipher identity data
+ */
+export type CipherIdentity<S> = { title: { inner: string | null }; first_name: { inner: string | null }; middle_name: { inner: string | null }; last_name: { inner: string | null }; address1: { inner: string | null }; address2: { inner: string | null }; address3: { inner: string | null }; city: { inner: string | null }; state: { inner: string | null }; postal_code: { inner: string | null }; country: { inner: string | null }; company: { inner: string | null }; email: { inner: string | null }; phone: { inner: string | null }; ssn: { inner: string | null }; username: { inner: string | null }; passport_number: { inner: string | null }; license_number: { inner: string | null } }
+/**
+ * Cipher login data
+ */
+export type CipherLogin<S> = { uri: { inner: string | null }; uris?: CipherLoginUri<S>[]; username: { inner: string | null }; password: { inner: string | null }; 
+/**
+ * Plain text field - not encrypted
+ */
+password_revision_date?: string | null; totp: { inner: string | null }; autofill_on_page_load?: boolean | null; fido2_credentials?: CipherLoginFido2Credential<S>[] }
+/**
+ * Cipher login FIDO2 credential
+ */
+export type CipherLoginFido2Credential<S> = { credential_id: { inner: string | null }; key_type: { inner: string | null }; key_algorithm: { inner: string | null }; key_curve: { inner: string | null }; key_value: { inner: string | null }; rp_id: { inner: string | null }; rp_name: { inner: string | null }; counter: { inner: string | null }; user_handle: { inner: string | null }; user_name: { inner: string | null }; user_display_name: { inner: string | null }; discoverable: { inner: string | null }; creation_date: { inner: string | null } }
+/**
+ * Cipher login URI
+ */
+export type CipherLoginUri<S> = { uri: { inner: string | null }; match?: number | null; 
+/**
+ * Plain text field - not encrypted
+ */
+uri_checksum?: string | null }
 export type CipherMutationResponseDto = { cipherId: string; revisionDate: string }
+/**
+ * Cipher password history entry
+ */
+export type CipherPasswordHistory<S> = { password: { inner: string | null }; 
+/**
+ * Plain text field - not encrypted
+ */
+last_used_date?: string | null }
+/**
+ * Cipher permissions (no encrypted fields)
+ */
+export type CipherPermissions = { delete?: boolean | null; restore?: boolean | null }
+/**
+ * Cipher secure note data (no encrypted fields)
+ */
+export type CipherSecureNote = { type?: number | null }
+/**
+ * Cipher SSH key data
+ */
+export type CipherSshKey<S> = { private_key: { inner: string | null }; public_key: { inner: string | null }; key_fingerprint: { inner: string | null } }
 export type CipherUpdated = { accountId: string; cipherId: string }
 export type CreateCipherRequestDto = { cipher: SyncCipher }
 export type CreateFolderRequest = { name: string }
+/**
+ * Marker type for decrypted cipher state
+ */
+export type Decrypted = null
 export type DeleteCipherRequestDto = { cipherId: string }
 export type DeleteFolderRequest = { folderId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
@@ -530,23 +614,26 @@ export type UnlockStatusDto =
 "unlocking"
 export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null; spotlightAutofill?: boolean | null }
 export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
-export type VaultAttachmentDetailDto = { id: string; key: string | null; fileName: string | null; size: string | null; sizeName: string | null; url: string | null; object: string | null }
 export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
-export type VaultCipherCardDetailDto = { cardholderName: string | null; brand: string | null; number: string | null; expMonth: string | null; expYear: string | null; code: string | null }
-export type VaultCipherDataDetailDto = { name: string | null; notes: string | null; fields: VaultCipherFieldDetailDto[]; passwordHistory: VaultCipherPasswordHistoryDetailDto[]; uri: string | null; uris: VaultCipherLoginUriDetailDto[]; username: string | null; password: string | null; passwordRevisionDate: string | null; totp: string | null; autofillOnPageLoad: boolean | null; fido2Credentials: VaultCipherLoginFido2CredentialDetailDto[]; type: number | null; cardholderName: string | null; brand: string | null; number: string | null; expMonth: string | null; expYear: string | null; code: string | null; title: string | null; firstName: string | null; middleName: string | null; lastName: string | null; address1: string | null; address2: string | null; address3: string | null; city: string | null; state: string | null; postalCode: string | null; country: string | null; company: string | null; email: string | null; phone: string | null; ssn: string | null; passportNumber: string | null; licenseNumber: string | null; privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
-export type VaultCipherDetailDto = { id: string; organizationId: string | null; folderId: string | null; type: number | null; name: string | null; notes: string | null; key: string | null; favorite: boolean | null; edit: boolean | null; viewPassword: boolean | null; organizationUseTotp: boolean | null; creationDate: string | null; revisionDate: string | null; deletedDate: string | null; archivedDate: string | null; reprompt: number | null; permissions: VaultCipherPermissionsDetailDto | null; object: string | null; fields: VaultCipherFieldDetailDto[]; passwordHistory: VaultCipherPasswordHistoryDetailDto[]; collectionIds: string[]; data: VaultCipherDataDetailDto | null; login: VaultCipherLoginDetailDto | null; secureNote: VaultCipherSecureNoteDetailDto | null; card: VaultCipherCardDetailDto | null; identity: VaultCipherIdentityDetailDto | null; sshKey: VaultCipherSshKeyDetailDto | null; attachments: VaultAttachmentDetailDto[]; hasTotp: boolean }
+/**
+ * Vault cipher detail DTO using domain type with flattened fields
+ */
+export type VaultCipherDetailDto = 
+/**
+ * Flatten all Cipher<Decrypted> fields to the top level
+ */
+({ id: string; organization_id?: string | null; folder_id?: string | null; type?: number | null; name: { inner: string | null }; notes: { inner: string | null }; 
+/**
+ * Cipher key - stored as encrypted string, should not be decrypted like regular fields
+ */
+key?: string | null; favorite?: boolean | null; edit?: boolean | null; view_password?: boolean | null; organization_use_totp?: boolean | null; creation_date?: string | null; revision_date?: string | null; deleted_date?: string | null; archived_date?: string | null; reprompt?: number | null; permissions?: CipherPermissions | null; object?: string | null; fields?: CipherField<Decrypted>[]; password_history?: CipherPasswordHistory<Decrypted>[]; collection_ids?: string[]; data?: CipherData<Decrypted> | null; login?: CipherLogin<Decrypted> | null; secure_note?: CipherSecureNote | null; card?: CipherCard<Decrypted> | null; identity?: CipherIdentity<Decrypted> | null; ssh_key?: CipherSshKey<Decrypted> | null; attachments?: CipherAttachment<Decrypted>[] }) & { 
+/**
+ * Computed field: whether the cipher has TOTP configured
+ */
+hasTotp: boolean }
 export type VaultCipherDetailRequestDto = { cipherId: string }
 export type VaultCipherDetailResponseDto = { accountId: string; cipher: VaultCipherDetailDto }
-export type VaultCipherFieldDetailDto = { name: string | null; value: string | null; type: number | null; linkedId: number | null }
-export type VaultCipherIdentityDetailDto = { title: string | null; firstName: string | null; middleName: string | null; lastName: string | null; address1: string | null; address2: string | null; address3: string | null; city: string | null; state: string | null; postalCode: string | null; country: string | null; company: string | null; email: string | null; phone: string | null; ssn: string | null; username: string | null; passportNumber: string | null; licenseNumber: string | null }
 export type VaultCipherItemDto = { id: string; folderId: string | null; organizationId: string | null; type: number | null; name: string | null; username: string | null; uris: string[]; favorite: boolean | null; creationDate: string | null; revisionDate: string | null; deletedDate: string | null; attachmentCount: number }
-export type VaultCipherLoginDetailDto = { uri: string | null; uris: VaultCipherLoginUriDetailDto[]; username: string | null; password: string | null; passwordRevisionDate: string | null; totp: string | null; autofillOnPageLoad: boolean | null; fido2Credentials: VaultCipherLoginFido2CredentialDetailDto[] }
-export type VaultCipherLoginFido2CredentialDetailDto = { credentialId: string | null; keyType: string | null; keyAlgorithm: string | null; keyCurve: string | null; keyValue: string | null; rpId: string | null; rpName: string | null; counter: string | null; userHandle: string | null; userName: string | null; userDisplayName: string | null; discoverable: string | null; creationDate: string | null }
-export type VaultCipherLoginUriDetailDto = { uri: string | null; match: number | null; uriChecksum: string | null }
-export type VaultCipherPasswordHistoryDetailDto = { password: string | null; lastUsedDate: string | null }
-export type VaultCipherPermissionsDetailDto = { delete: boolean | null; restore: boolean | null }
-export type VaultCipherSecureNoteDetailDto = { type: number | null }
-export type VaultCipherSshKeyDetailDto = { privateKey: string | null; publicKey: string | null; keyFingerprint: string | null }
 export type VaultCipherTotpCodeRequestDto = { cipherId: string }
 export type VaultCipherTotpCodeResponseDto = { code: string; periodSeconds: number; remainingSeconds: number; expiresAtMs: number }
 export type VaultCopyCipherFieldRequestDto = { cipherId: string; field: VaultCopyFieldDto; clearAfterMs: number | null }

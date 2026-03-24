@@ -4,7 +4,7 @@ use crate::application::dto::auth::{
     WebauthnAllowCredential, WebauthnRequestExtensions,
 };
 use crate::application::dto::sync::{SyncMetricsSummary, SyncOutcome};
-use crate::application::dto::vault::VaultCipherDetail;
+use crate::domain::cipher::{Cipher, Decrypted};
 use crate::domain::sync::{SyncContext, SyncState, WsStatus};
 use crate::interfaces::tauri::dto::auth::{
     MasterPasswordPolicyDto, PasswordLoginRequestDto, PasswordLoginResponseDto,
@@ -15,7 +15,6 @@ use crate::interfaces::tauri::dto::cipher::VaultCipherDetailDto;
 use crate::interfaces::tauri::dto::sync::{
     SyncCountsDto, SyncMetricsDto, SyncStateDto, SyncStatusResponseDto, WsStatusDto,
 };
-use crate::support::error::AppError;
 use std::collections::HashMap;
 
 pub fn to_password_login_command(dto: PasswordLoginRequestDto) -> PasswordLoginCommand {
@@ -175,40 +174,8 @@ pub fn to_sync_outcome_dto(outcome: SyncOutcome) -> SyncStatusResponseDto {
     to_sync_status_response_dto(outcome.context, None)
 }
 
-pub fn to_vault_cipher_detail_dto(
-    detail: VaultCipherDetail,
-) -> Result<VaultCipherDetailDto, AppError> {
-    let has_totp = has_cipher_totp(&detail);
-    let mut raw = serde_json::to_value(detail).map_err(|error| AppError::InternalUnexpected {
-        message: format!("failed to serialize application vault cipher detail: {error}"),
-    })?;
-
-    let Some(root) = raw.as_object_mut() else {
-        return Err(AppError::InternalUnexpected {
-            message: "failed to map vault cipher detail dto: expected object payload".to_string(),
-        });
-    };
-
-    root.insert(String::from("hasTotp"), serde_json::Value::Bool(has_totp));
-
-    serde_json::from_value::<VaultCipherDetailDto>(raw).map_err(|error| {
-        AppError::InternalUnexpected {
-            message: format!("failed to deserialize interface vault cipher detail dto: {error}"),
-        }
-    })
-}
-
-fn has_cipher_totp(detail: &VaultCipherDetail) -> bool {
-    has_non_empty_value(
-        detail
-            .login
-            .as_ref()
-            .and_then(|entry| entry.totp.as_deref()),
-    ) || has_non_empty_value(detail.data.as_ref().and_then(|entry| entry.totp.as_deref()))
-}
-
-fn has_non_empty_value(value: Option<&str>) -> bool {
-    value.map(|entry| !entry.trim().is_empty()).unwrap_or(false)
+pub fn to_vault_cipher_detail_dto(cipher: Cipher<Decrypted>) -> VaultCipherDetailDto {
+    cipher.into()
 }
 
 fn to_sync_metrics_dto(metrics: SyncMetricsSummary) -> SyncMetricsDto {

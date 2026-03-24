@@ -53,8 +53,14 @@ impl GetCipherTotpCodeUseCase {
             .await?;
 
         let raw_totp = pick_first_non_empty(&[
-            cipher.login.as_ref().and_then(|entry| entry.totp.clone()),
-            cipher.data.as_ref().and_then(|entry| entry.totp.clone()),
+            cipher
+                .login
+                .as_ref()
+                .and_then(|entry| entry.totp.as_ref().cloned()),
+            cipher
+                .data
+                .as_ref()
+                .and_then(|entry| entry.totp.as_ref().cloned()),
         ])
         .ok_or_else(|| AppError::ValidationFieldError {
             field: "unknown".to_string(),
