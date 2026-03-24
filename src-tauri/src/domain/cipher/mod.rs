@@ -141,11 +141,43 @@ impl Serialize for Cipher<Decrypted> {
     where
         Ser: Serializer,
     {
-        // Use standard derive serialization with camelCase
-        // The serde(rename_all = "camelCase") on the struct will handle this
-        let json = serde_json::to_value(self).map_err(::serde::ser::Error::custom)?;
-        // Keys are already camelCase due to rename_all, no conversion needed
-        json.serialize(serializer)
+        // Use a helper to avoid infinite recursion with flatten
+        // This serializes the struct field by field without calling to_value
+        use serde::ser::SerializeStruct;
+
+        let mut s = serializer.serialize_struct("Cipher", 26)?;
+
+        // Serialize each field manually
+        s.serialize_field("id", &self.id)?;
+        s.serialize_field("organizationId", &self.organization_id)?;
+        s.serialize_field("folderId", &self.folder_id)?;
+        s.serialize_field("type", &self.r#type)?;
+        s.serialize_field("name", &self.name)?;
+        s.serialize_field("notes", &self.notes)?;
+        s.serialize_field("key", &self.key)?;
+        s.serialize_field("favorite", &self.favorite)?;
+        s.serialize_field("edit", &self.edit)?;
+        s.serialize_field("viewPassword", &self.view_password)?;
+        s.serialize_field("organizationUseTotp", &self.organization_use_totp)?;
+        s.serialize_field("creationDate", &self.creation_date)?;
+        s.serialize_field("revisionDate", &self.revision_date)?;
+        s.serialize_field("deletedDate", &self.deleted_date)?;
+        s.serialize_field("archivedDate", &self.archived_date)?;
+        s.serialize_field("reprompt", &self.reprompt)?;
+        s.serialize_field("permissions", &self.permissions)?;
+        s.serialize_field("object", &self.object)?;
+        s.serialize_field("fields", &self.fields)?;
+        s.serialize_field("passwordHistory", &self.password_history)?;
+        s.serialize_field("collectionIds", &self.collection_ids)?;
+        s.serialize_field("data", &self.data)?;
+        s.serialize_field("login", &self.login)?;
+        s.serialize_field("secureNote", &self.secure_note)?;
+        s.serialize_field("card", &self.card)?;
+        s.serialize_field("identity", &self.identity)?;
+        s.serialize_field("sshKey", &self.ssh_key)?;
+        s.serialize_field("attachments", &self.attachments)?;
+
+        s.end()
     }
 }
 

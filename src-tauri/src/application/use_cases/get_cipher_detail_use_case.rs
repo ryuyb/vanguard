@@ -409,4 +409,85 @@ mod tests {
             STANDARD.encode(mac)
         )
     }
+
+    #[test]
+    fn decrypt_cipher_and_serialize_to_dto_no_stack_overflow() {
+        // This test verifies that serializing Cipher<Decrypted> through VaultCipherDetailDto
+        // does not cause stack overflow due to infinite recursion
+
+        let enc_key = [1u8; 32];
+        let mac_key = [2u8; 32];
+        let user_key = VaultUserKeyMaterial {
+            enc_key: enc_key.to_vec(),
+            mac_key: Some(mac_key.to_vec()),
+            refresh_token: None,
+        };
+        let encrypted_name = encrypt_type2("Test Cipher", &enc_key, &mac_key);
+
+        let cipher = SyncCipher {
+            id: String::from("test-serialization"),
+            organization_id: None,
+            folder_id: None,
+            r#type: Some(1),
+            name: Some(encrypted_name),
+            notes: None,
+            key: None,
+            favorite: Some(true),
+            edit: Some(true),
+            view_password: None,
+            organization_use_totp: None,
+            creation_date: Some(String::from("2026-03-01T00:00:00Z")),
+            revision_date: Some(String::from("2026-03-01T00:00:00Z")),
+            deleted_date: None,
+            archived_date: None,
+            reprompt: None,
+            permissions: None,
+            object: Some(String::from("cipher")),
+            fields: Vec::new(),
+            password_history: Vec::new(),
+            collection_ids: Vec::new(),
+            data: None,
+            login: None,
+            secure_note: None,
+            card: None,
+            identity: None,
+            ssh_key: None,
+            attachments: Vec::new(),
+        };
+
+        // Decrypt the cipher
+        let decrypted = decrypt_cipher_detail(cipher, &user_key).expect("decrypt cipher");
+
+        // Convert to DTO (this uses the From trait)
+        let dto: crate::interfaces::tauri::dto::cipher::VaultCipherDetailDto = decrypted.into();
+
+        // Serialize to JSON - this should NOT cause stack overflow
+        let json_result = serde_json::to_string(&dto);
+        assert!(
+            json_result.is_ok(),
+            "Serialization should succeed without stack overflow"
+        );
+
+        let json = json_result.unwrap();
+
+        // Verify the JSON is valid and contains expected fields
+        assert!(
+            json.contains("\"id\":\"test-serialization\""),
+            "JSON should contain id"
+        );
+        assert!(
+            json.contains("\"name\":\"Test Cipher\""),
+            "JSON should contain decrypted name"
+        );
+        assert!(
+            json.contains("\"hasTotp\":false"),
+            "JSON should contain hasTotp field"
+        );
+
+        // Verify it can be parsed back
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse JSON");
+        assert_eq!(parsed["id"], "test-serialization");
+        assert_eq!(parsed["name"], "Test Cipher");
+        assert_eq!(parsed["hasTotp"], false);
+    }
 }
