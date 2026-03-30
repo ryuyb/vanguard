@@ -141,7 +141,9 @@ export function vaultCipherDetailToSyncCipher(
           })),
         }
       : null,
-    secure_note: detail.secureNote ? { type: detail.secureNote.type ?? null } : null,
+    secure_note: detail.secureNote
+      ? { type: detail.secureNote.type ?? null }
+      : null,
     card: detail.card
       ? {
           cardholder_name: detail.card.cardholderName ?? null,

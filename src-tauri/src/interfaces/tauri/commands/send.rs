@@ -4,8 +4,8 @@ use crate::application::ports::unlock_context_port::UnlockContextProvider;
 use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::interfaces::tauri::dto::send::{
-    CreateSendRequestDto, DeleteSendRequestDto, SendItemDto, SendMutationResponseDto,
-    UpdateSendRequestDto, to_send_item_dto,
+    to_send_item_dto, CreateSendRequestDto, DeleteSendRequestDto, SendItemDto,
+    SendMutationResponseDto, UpdateSendRequestDto,
 };
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
@@ -61,7 +61,14 @@ pub async fn create_send(
 
     let result = state
         .create_send_use_case()
-        .execute(account_id, base_url, access_token, request.send, user_key, request.file_data)
+        .execute(
+            account_id,
+            base_url,
+            access_token,
+            request.send,
+            user_key,
+            request.file_data,
+        )
         .await
         .map_err(|e| log_command_error("create_send", &e))?;
 
@@ -90,7 +97,14 @@ pub async fn update_send(
 
     let result = state
         .update_send_use_case()
-        .execute(account_id, base_url, access_token, request.send_id, request.send, user_key)
+        .execute(
+            account_id,
+            base_url,
+            access_token,
+            request.send_id,
+            request.send,
+            user_key,
+        )
         .await
         .map_err(|e| log_command_error("update_send", &e))?;
 

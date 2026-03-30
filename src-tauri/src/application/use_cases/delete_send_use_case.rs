@@ -54,7 +54,9 @@ impl DeleteSendUseCase {
             })
             .await?;
 
-        self.vault_repository.delete_send(&account_id, &send_id).await?;
+        self.vault_repository
+            .delete_send(&account_id, &send_id)
+            .await?;
         self.event_port.emit_send_deleted(&account_id, &send_id);
 
         Ok(())

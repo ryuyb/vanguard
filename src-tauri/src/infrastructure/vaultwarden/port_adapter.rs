@@ -354,9 +354,12 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .await
             .map_err(map_vaultwarden_error)?;
 
-        let send = response.send.ok_or_else(|| crate::support::error::AppError::InternalUnexpected {
-            message: "file send response missing send object".to_string(),
-        })?;
+        let send =
+            response
+                .send
+                .ok_or_else(|| crate::support::error::AppError::InternalUnexpected {
+                    message: "file send response missing send object".to_string(),
+                })?;
 
         Ok(CreateFileSendResult {
             send_id: send.id,

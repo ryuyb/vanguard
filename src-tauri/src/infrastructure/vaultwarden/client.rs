@@ -814,8 +814,9 @@ impl VaultwardenClient {
             return Err(Self::api_error(status, body_text));
         }
 
-        serde_json::from_str::<SendFileUploadDataResponse>(&body_text)
-            .map_err(|error| VaultwardenError::Decode(format!("invalid file send response: {error}")))
+        serde_json::from_str::<SendFileUploadDataResponse>(&body_text).map_err(|error| {
+            VaultwardenError::Decode(format!("invalid file send response: {error}"))
+        })
     }
 
     pub async fn upload_send_file(

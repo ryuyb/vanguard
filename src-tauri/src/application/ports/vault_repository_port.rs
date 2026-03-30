@@ -99,11 +99,7 @@ pub trait VaultRepositoryPort: Send + Sync {
 
     async fn list_live_sends(&self, account_id: &str) -> AppResult<Vec<SyncSend>>;
 
-    async fn get_live_send(
-        &self,
-        account_id: &str,
-        send_id: &str,
-    ) -> AppResult<Option<SyncSend>>;
+    async fn get_live_send(&self, account_id: &str, send_id: &str) -> AppResult<Option<SyncSend>>;
 
     async fn upsert_send(&self, account_id: &str, send: &SyncSend) -> AppResult<()>;
 

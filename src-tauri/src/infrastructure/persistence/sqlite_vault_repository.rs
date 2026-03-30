@@ -1278,11 +1278,12 @@ impl VaultRepositoryPort for SqliteVaultRepository {
                     message: format!("failed to prepare list live sends statement: {error}"),
                 })?;
 
-            let mut rows = statement
-                .query(params![])
-                .map_err(|error| AppError::InternalUnexpected {
-                    message: format!("failed to query live sends: {error}"),
-                })?;
+            let mut rows =
+                statement
+                    .query(params![])
+                    .map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to query live sends: {error}"),
+                    })?;
 
             let mut sends = Vec::new();
             while let Some(row) = rows.next().map_err(|error| AppError::InternalUnexpected {
@@ -1300,11 +1301,7 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         .await
     }
 
-    async fn get_live_send(
-        &self,
-        account_id: &str,
-        send_id: &str,
-    ) -> AppResult<Option<SyncSend>> {
+    async fn get_live_send(&self, account_id: &str, send_id: &str) -> AppResult<Option<SyncSend>> {
         let send_id = send_id.to_string();
         self.with_account_connection(account_id, move |connection, _account_id| {
             let payload_json: Option<String> = connection

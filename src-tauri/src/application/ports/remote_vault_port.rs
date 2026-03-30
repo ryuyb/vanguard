@@ -62,10 +62,8 @@ pub trait RemoteVaultPort: Send + Sync {
 
     async fn create_send(&self, command: CreateSendCommand) -> AppResult<SendMutationResult>;
 
-    async fn create_file_send(
-        &self,
-        command: CreateSendCommand,
-    ) -> AppResult<CreateFileSendResult>;
+    async fn create_file_send(&self, command: CreateSendCommand)
+        -> AppResult<CreateFileSendResult>;
 
     async fn upload_send_file(
         &self,

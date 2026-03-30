@@ -371,50 +371,50 @@
 
 ### 7.1 创建 feature 目录结构
 
-- [ ] `src/features/send/constants.ts` — `SEND_ID = "__send__"`
-- [ ] `src/features/send/types.ts` — `SendTypeFilter = "all" | "text" | "file"`
-- [ ] `src/features/send/utils.ts` — `isSendExpired(send)`, `formatSendSubtitle(send, t)` 工具函数
-- [ ] `src/features/send/index.ts` — 导出
+- [x] `src/features/send/constants.ts` — `SEND_ID = "__send__"`
+- [x] `src/features/send/types.ts` — `SendTypeFilter = "all" | "text" | "file"`
+- [x] `src/features/send/utils.ts` — `isSendExpired(send)`, `formatSendSubtitle(send, t)` 工具函数
+- [x] `src/features/send/index.ts` — 导出
 
 ### 7.2 Hooks
 
 **文件：** `src/features/send/hooks/use-send-list.ts`（新建）
 
-- [ ] 调用 `commands.listSends()` 获取列表
-- [ ] 管理 `sendTypeFilter` 状态（all/text/file）
-- [ ] 管理 `searchQuery` 状态
-- [ ] 返回 `filteredSends`, `sendCount`, `isLoading`, `reload`
+- [x] 调用 `commands.listSends()` 获取列表
+- [x] 管理 `sendTypeFilter` 状态（all/text/file）
+- [x] 管理 `searchQuery` 状态
+- [x] 返回 `filteredSends`, `sendCount`, `isLoading`, `reload`
 
 **文件：** `src/features/send/hooks/use-send-events.ts`（新建）
 
-- [ ] 监听 `events.sendCreated` / `sendUpdated` / `sendDeleted`
-- [ ] 触发列表刷新回调
+- [x] 监听 `events.sendCreated` / `sendUpdated` / `sendDeleted`
+- [x] 触发列表刷新回调
 
 **文件：** `src/features/send/hooks/index.ts`
 
-- [ ] 导出 hooks
+- [x] 导出 hooks
 
 ### 7.3 列表组件
 
 **文件：** `src/features/send/components/send-row.tsx`（新建）
 
-- [ ] Props：`send: SendItemDto`, `selected: boolean`, `onClick`
-- [ ] 左侧图标：type=0 → `FileText`，type=1 → `Paperclip`（9x9 圆角方块，参考 CipherIcon 样式）
-- [ ] 名称行：`text-sm font-semibold`
-- [ ] 副标题行：过期时间 / 访问次数（`text-xs text-slate-500`）
-- [ ] 状态 Badge：disabled → 灰色，expired → 红色
-- [ ] 选中样式：`bg-blue-50 border-blue-200 text-blue-900 shadow-sm`
+- [x] Props：`send: SendItemDto`, `selected: boolean`, `onClick`
+- [x] 左侧图标：type=0 → `FileText`，type=1 → `Paperclip`（9x9 圆角方块，参考 CipherIcon 样式）
+- [x] 名称行：`text-sm font-semibold`
+- [x] 副标题行：过期时间 / 访问次数（`text-xs text-slate-500`）
+- [x] 状态 Badge：disabled → 灰色，expired → 红色
+- [x] 选中样式：`bg-blue-50 border-blue-200 text-blue-900 shadow-sm`
 
 **文件：** `src/features/send/components/send-list-panel.tsx`（新建）
 
-- [ ] 顶部工具栏：类型筛选（DropdownMenuRadioGroup）+ 搜索按钮 + 新建按钮（Plus 图标）
-- [ ] ScrollArea 包裹列表
-- [ ] 空状态：Send 图标 + 提示文字 + 创建按钮
-- [ ] Props：`onSelectSend`, `onCreateSend`, `selectedSendId`
+- [x] 顶部工具栏：类型筛选（DropdownMenuRadioGroup）+ 搜索按钮 + 新建按钮（Plus 图标）
+- [x] ScrollArea 包裹列表
+- [x] 空状态：Send 图标 + 提示文字 + 创建按钮
+- [x] Props：`onSelectSend`, `onCreateSend`, `selectedSendId`
 
 **文件：** `src/features/send/components/index.ts`
 
-- [ ] 导出组件
+- [x] 导出组件
 
 ### 7.4 侧边栏集成
 
@@ -424,33 +424,33 @@
 
 **文件：** `src/features/vault/components/vault-page.tsx`
 
-- [ ] 侧边栏：在 Trash 按钮下方添加 Send 菜单按钮
+- [x] 侧边栏：在 Trash 按钮下方添加 Send 菜单按钮
   - `Send` 图标（lucide-react）
   - 显示 sendCount
   - 选中样式与其他菜单项一致
-- [ ] 中间面板：条件渲染 `selectedMenuId === SEND_ID ? <SendListPanel /> : 现有列表`
-- [ ] 添加 `selectedSendId` 状态
-- [ ] 切换到非 SEND_ID 菜单时清空 `selectedSendId`
+- [x] 中间面板：条件渲染 `selectedMenuId === SEND_ID ? <SendListPanel /> : 现有列表`
+- [x] 添加 `selectedSendId` 状态
+- [x] 切换到非 SEND_ID 菜单时清空 `selectedSendId`
 
 ### 7.5 i18n
 
 **文件：** `src/i18n/resources/en.ts` + `src/i18n/resources/zh.ts`
 
-- [ ] `vault.page.menus.send` — "Send" / "Send"
-- [ ] `send.list.empty.title` — "No sends yet" / "暂无 Send"
-- [ ] `send.list.empty.description` — "Create a send to share text or files securely" / "创建 Send 安全分享文本或文件"
-- [ ] `send.list.empty.action` — "Create Send" / "创建 Send"
-- [ ] `send.types.all` — "All types" / "所有类型"
-- [ ] `send.types.text` — "Text" / "文本"
-- [ ] `send.types.file` — "File" / "文件"
+- [x] `vault.page.menus.send` — "Send" / "Send"
+- [x] `send.list.empty.title` — "No sends yet" / "暂无 Send"
+- [x] `send.list.empty.description` — "Create a send to share text or files securely" / "创建 Send 安全分享文本或文件"
+- [x] `send.list.empty.action` — "Create Send" / "创建 Send"
+- [x] `send.types.all` — "All types" / "所有类型"
+- [x] `send.types.text` — "Text" / "文本"
+- [x] `send.types.file` — "File" / "文件"
 
 ### 验收标准
 
-- [ ] `pnpm build` — 通过
-- [ ] 侧边栏显示 Send 菜单项，点击后中间面板切换为 Send 列表
-- [ ] 列表正确显示已同步的 Send 数据
-- [ ] 类型筛选和搜索功能正常
-- [ ] 空状态正确显示
+- [x] `pnpm build` — 通过
+- [x] 侧边栏显示 Send 菜单项，点击后中间面板切换为 Send 列表
+- [x] 列表正确显示已同步的 Send 数据
+- [x] 类型筛选和搜索功能正常
+- [x] 空状态正确显示
 
 ---
 
@@ -463,62 +463,51 @@
 
 **文件：** `src/features/send/components/send-detail-panel.tsx`（新建）
 
-- [ ] Props：`sendId: string | null`, `sends: SendItemDto[]`, `onEdit`, `onDelete`, `baseUrl`
-- [ ] 未选中状态：居中提示 "Select a send to view details"
-- [ ] 标题区域：Send 名称（`text-lg font-bold`）+ 类型 Badge（Text/File）+ 编辑按钮（Edit2 图标）+ 删除按钮（Trash2 图标）
-- [ ] 内容区域（参考 CipherDetailPanel 的 label + value 行样式）：
+- [x] Props：`sendId: string | null`, `sends: SendItemDto[]`, `onEdit`, `onDelete`, `baseUrl`
+- [x] 未选中状态：居中提示 "Select a send to view details"
+- [x] 标题区域：Send 名称（`text-base font-bold`）+ 类型 Badge（Text/File）+ 编辑按钮（Edit2 图标）+ 删除按钮（Trash2 图标）
+- [x] 内容区域（参考 CipherDetailPanel 的 label + value 行样式）：
   - Text Send：文本内容区域（hidden 时默认 `••••••••`，点击 Eye 图标切换显示）
   - File Send：文件名 + 文件大小
   - 备注
-- [ ] Send 链接区域：链接文本 + 复制按钮（Copy 图标）
-- [ ] 详情区域：密码保护状态、最大访问次数、当前访问次数、隐藏邮箱、禁用状态
-- [ ] 时间区域：过期时间、删除时间、最后更新时间
+- [x] Send 链接区域：链接文本 + 复制按钮（Copy 图标）
+- [x] 详情区域：密码保护状态、最大访问次数、当前访问次数、隐藏邮箱、禁用状态
+- [x] 时间区域：过期时间、删除时间、最后更新时间
 
 ### 8.2 集成到 vault-page
 
 **文件：** `src/features/vault/components/vault-page.tsx`
 
-- [ ] 右侧面板条件渲染：`selectedMenuId === SEND_ID ? <SendDetailPanel /> : <CipherDetailPanel />`
+- [x] 右侧面板条件渲染：`selectedMenuId === SEND_ID ? <SendDetailPanel /> : <CipherDetailPanel />`
 
 ### 8.3 工具函数
 
 **文件：** `src/features/send/utils.ts`
 
-- [ ] `generateSendLink(baseUrl, accessId, key)` — 生成 Send 分享链接
-- [ ] `isSendExpired(send)` — 判断是否已过期
-- [ ] `formatSendDate(dateStr, t)` — 格式化日期显示
+- [x] `generateSendLink(baseUrl, accessId, key)` — 生成 Send 分享链接
+- [x] `isSendExpired(send)` — 判断是否已过期
+- [x] `formatSendDate(dateStr, t)` — 格式化日期显示
 
 ### 8.4 i18n
 
 **文件：** `src/i18n/resources/en.ts` + `src/i18n/resources/zh.ts`
 
-- [ ] `send.detail.selectPrompt` — "Select a send to view details"
-- [ ] `send.detail.textContent` — "Text Content"
-- [ ] `send.detail.fileInfo` — "File"
-- [ ] `send.detail.notes` — "Notes"
-- [ ] `send.detail.sendLink` — "Send Link"
-- [ ] `send.detail.details` — "Details"
-- [ ] `send.detail.password` — "Password"
-- [ ] `send.detail.passwordProtected` — "Protected"
-- [ ] `send.detail.passwordNone` — "None"
-- [ ] `send.detail.maxViews` — "Max views"
-- [ ] `send.detail.currentViews` — "Current views"
-- [ ] `send.detail.hideEmail` — "Hide email"
-- [ ] `send.detail.disabled` — "Disabled"
-- [ ] `send.detail.dates` — "Dates"
-- [ ] `send.detail.expiration` — "Expiration"
-- [ ] `send.detail.deletion` — "Deletion"
-- [ ] `send.detail.lastUpdated` — "Last updated"
-- [ ] `send.detail.noExpiration` — "No expiration"
-- [ ] `send.detail.linkCopied` — "Send link copied"
+- [x] `send.detail.selectPrompt`
+- [x] `send.detail.textContent`
+- [x] `send.detail.sendLink`
+- [x] `send.detail.details`
+- [x] `send.detail.password` / `passwordProtected` / `passwordNone`
+- [x] `send.detail.maxViews` / `currentViews`
+- [x] `send.detail.dates` / `expiration` / `deletion` / `lastUpdated` / `noExpiration`
+- [x] `send.detail.linkCopied`
 
 ### 验收标准
 
-- [ ] `pnpm build` — 通过
-- [ ] 选中 Send 后右侧面板显示完整详情
-- [ ] Text Send 的 hidden 文本可以切换显示/隐藏
-- [ ] 复制链接功能正常
-- [ ] 未选中时显示提示文字
+- [x] `pnpm build` — 通过
+- [x] 选中 Send 后右侧面板显示完整详情
+- [x] Text Send 的 hidden 文本可以切换显示/隐藏
+- [x] 复制链接功能正常
+- [x] 未选中时显示提示文字
 
 ---
 
@@ -531,19 +520,19 @@
 
 **文件：** `src/features/send/hooks/use-send-mutations.ts`（新建）
 
-- [ ] `createSend` mutation — 调用 `commands.createSend()`
-- [ ] `updateSend` mutation — 调用 `commands.updateSend()`
-- [ ] `deleteSend` mutation — 调用 `commands.deleteSend()`
-- [ ] 每个 mutation 返回 `{ mutate, mutateAsync, isLoading, error }`
-- [ ] 参考 `use-cipher-mutations.ts` 的模式
+- [x] `createSend` mutation — 调用 `commands.createSend()`
+- [x] `updateSend` mutation — 调用 `commands.updateSend()`
+- [x] `deleteSend` mutation — 调用 `commands.deleteSend()`
+- [x] 每个 mutation 返回 `{ mutate, mutateAsync, isLoading, error }`
+- [x] 参考 `use-cipher-mutations.ts` 的模式
 
 ### 9.2 表单 Dialog 组件
 
 **文件：** `src/features/send/components/send-form-dialog.tsx`（新建）
 
-- [ ] Props：`open`, `mode: "create" | "edit"`, `initialSend?`, `onOpenChange`, `onConfirm`, `isLoading`
-- [ ] 使用 `@tanstack/react-form`
-- [ ] 表单字段：
+- [x] Props：`open`, `mode: "create" | "edit"`, `initialSend?`, `onOpenChange`, `onConfirm`, `isLoading`
+- [x] 使用 `@tanstack/react-form`
+- [x] 表单字段：
   - 类型选择（Select：Text=0 / File=1）— 创建时可选，编辑时 disabled
   - 名称（TextInput，必填）
   - Text 专属区域（type=0 时显示）：文本内容（Textarea）+ 隐藏文本（Switch）
@@ -556,57 +545,57 @@
     - 删除时间（TextInput type=datetime-local，必填，默认 7 天后）
     - 隐藏邮箱（Switch）
     - 禁用（Switch）
-- [ ] 底部按钮：Cancel + Create Send / Save（与 CipherFormDialog 一致）
-- [ ] 编辑模式：从 initialSend 填充表单默认值
+- [x] 底部按钮：Cancel + Create Send / Save（与 CipherFormDialog 一致）
+- [x] 编辑模式：从 initialSend 填充表单默认值
 
 ### 9.3 集成到 vault-page
 
 **文件：** `src/features/vault/components/vault-page.tsx`
 
-- [ ] 添加 Send 表单状态：`isSendFormOpen`, `sendFormMode`, `selectedSendForEdit`
-- [ ] `handleCreateSend()` — 打开创建表单
-- [ ] `handleEditSend(send)` — 打开编辑表单
-- [ ] `handleSendFormConfirm(send)` — 调用 mutation + toast 反馈 + 关闭 dialog
-- [ ] 渲染 `<SendFormDialog />`
+- [x] 添加 Send 表单状态：`isSendFormOpen`, `sendFormMode`, `selectedSendForEdit`
+- [x] `handleCreateSend()` — 打开创建表单
+- [x] `handleEditSend(send)` — 打开编辑表单
+- [x] `handleSendFormConfirm(send)` — 调用 mutation + toast 反馈 + 关闭 dialog
+- [x] 渲染 `<SendFormDialog />`
 
 ### 9.4 i18n
 
 **文件：** `src/i18n/resources/en.ts` + `src/i18n/resources/zh.ts`
 
-- [ ] `send.form.createTitle` — "Create Send"
-- [ ] `send.form.editTitle` — "Edit Send"
-- [ ] `send.form.createDescription` — "Create a new send to share securely"
-- [ ] `send.form.editDescription` — "Edit send details"
-- [ ] `send.form.type` — "Type"
-- [ ] `send.form.name` — "Name"
-- [ ] `send.form.textContent` — "Text Content"
-- [ ] `send.form.hideText` — "Hide text by default"
-- [ ] `send.form.file` — "File"
-- [ ] `send.form.chooseFile` — "Choose file..."
-- [ ] `send.form.notes` — "Notes"
-- [ ] `send.form.advanced` — "Advanced Options"
-- [ ] `send.form.password` — "Password"
-- [ ] `send.form.maxAccessCount` — "Max access count"
-- [ ] `send.form.expirationDate` — "Expiration date"
-- [ ] `send.form.deletionDate` — "Deletion date"
-- [ ] `send.form.hideEmail` — "Hide my email"
-- [ ] `send.form.disable` — "Disable this send"
-- [ ] `send.form.submit.create` — "Create Send"
-- [ ] `send.form.submit.save` — "Save"
-- [ ] `send.feedback.createSuccess` — "Send created"
-- [ ] `send.feedback.createError` — "Failed to create send"
-- [ ] `send.feedback.saveSuccess` — "Send saved"
-- [ ] `send.feedback.saveError` — "Failed to save send"
+- [x] `send.form.createTitle` — "Create Send"
+- [x] `send.form.editTitle` — "Edit Send"
+- [x] `send.form.createDescription` — "Create a new send to share securely"
+- [x] `send.form.editDescription` — "Edit send details"
+- [x] `send.form.type` — "Type"
+- [x] `send.form.name` — "Name"
+- [x] `send.form.textContent` — "Text Content"
+- [x] `send.form.hideText` — "Hide text by default"
+- [x] `send.form.file` — "File"
+- [x] `send.form.chooseFile` — "Choose file..."
+- [x] `send.form.notes` — "Notes"
+- [x] `send.form.advanced` — "Advanced Options"
+- [x] `send.form.password` — "Password"
+- [x] `send.form.maxAccessCount` — "Max access count"
+- [x] `send.form.expirationDate` — "Expiration date"
+- [x] `send.form.deletionDate` — "Deletion date"
+- [x] `send.form.hideEmail` — "Hide my email"
+- [x] `send.form.disable` — "Disable this send"
+- [x] `send.form.submit.create` — "Create Send"
+- [x] `send.form.submit.save` — "Save"
+- [x] `send.feedback.createSuccess` — "Send created"
+- [x] `send.feedback.createError` — "Failed to create send"
+- [x] `send.feedback.saveSuccess` — "Send saved"
+- [x] `send.feedback.saveError` — "Failed to save send"
 
 ### 验收标准
 
-- [ ] `pnpm build` — 通过
-- [ ] 点击新建按钮打开创建表单，类型可切换
-- [ ] Text Send：可输入文本内容，可切换隐藏
-- [ ] File Send：可选择文件
-- [ ] 高级选项折叠/展开正常
-- [ ] 编辑模式正确填充已有数据
-- [ ] 提交后 toast 反馈正确
+- [x] `pnpm build` — 通过
+- [x] 点击新建按钮打开创建表单，类型可切换
+- [x] Text Send：可输入文本内容，可切换隐藏
+- [x] File Send：可选择文件
+- [x] 高级选项折叠/展开正常
+- [x] 编辑模式正确填充已有数据
+- [x] 提交后 toast 反馈正确
 
 ---
 
@@ -619,76 +608,76 @@
 
 **文件：** `src/features/send/components/delete-send-dialog.tsx`（新建）
 
-- [ ] Props：`open`, `sendName`, `onOpenChange`, `onConfirm`, `isLoading`
-- [ ] 完全参考 `delete-cipher-dialog.tsx` 的样式
-- [ ] 红色警告图标 + 确认文案 + Cancel / Delete 按钮
+- [x] Props：`open`, `sendName`, `onOpenChange`, `onConfirm`, `isLoading`
+- [x] 完全参考 `delete-cipher-dialog.tsx` 的样式
+- [x] 红色警告图标 + 确认文案 + Cancel / Delete 按钮
 
 ### 10.2 集成删除到 vault-page
 
 **文件：** `src/features/vault/components/vault-page.tsx`
 
-- [ ] 添加删除状态：`isDeleteSendDialogOpen`, `selectedSendIdForDelete`, `selectedSendNameForDelete`
-- [ ] `handleDeleteSend(sendId, sendName)` — 打开删除确认
-- [ ] `handleDeleteSendConfirm()` — 调用 deleteSend mutation + toast + 关闭
-- [ ] 渲染 `<DeleteSendDialog />`
+- [x] 添加删除状态：`isDeleteSendDialogOpen`, `selectedSendIdForDelete`, `selectedSendNameForDelete`
+- [x] `handleDeleteSend(sendId, sendName)` — 打开删除确认
+- [x] `handleDeleteSendConfirm()` — 调用 deleteSend mutation + toast + 关闭
+- [x] 渲染 `<DeleteSendDialog />`
 
 ### 10.3 列表右键菜单
 
 **文件：** `src/features/send/components/send-list-panel.tsx`
 
-- [ ] 为每个 SendRow 包裹 ContextMenu
-- [ ] 菜单项：编辑（Edit2 图标）、复制链接（Copy 图标）、删除（Trash2 图标，destructive）
+- [x] 为每个 SendRow 包裹 ContextMenu
+- [x] 菜单项：编辑（Edit2 图标）、复制链接（Copy 图标）、删除（Trash2 图标，destructive）
 
 ### 10.4 详情面板操作按钮联动
 
 **文件：** `src/features/send/components/send-detail-panel.tsx`
 
-- [ ] 编辑按钮 → 调用 `onEdit(send)`
-- [ ] 删除按钮 → 调用 `onDelete(sendId, sendName)`
+- [x] 编辑按钮 → 调用 `onEdit(send)`
+- [x] 删除按钮 → 调用 `onDelete(sendId, sendName)`
 
 ### 10.5 事件驱动刷新
 
 **文件：** `src/features/vault/components/vault-page.tsx`
 
-- [ ] 使用 `useSendEvents` 监听 Send 变更事件
-- [ ] 事件触发时自动刷新 Send 列表
-- [ ] 删除当前选中的 Send 后清空 `selectedSendId`
+- [x] 使用 `useSendEvents` 监听 Send 变更事件
+- [x] 事件触发时自动刷新 Send 列表
+- [x] 删除当前选中的 Send 后清空 `selectedSendId`
 
 ### 10.6 i18n 补全
 
 **文件：** `src/i18n/resources/en.ts` + `src/i18n/resources/zh.ts`
 
-- [ ] `send.dialogs.delete.title` — "Delete Send"
-- [ ] `send.dialogs.delete.descriptionPrefix` — "Are you sure you want to delete"
-- [ ] `send.dialogs.delete.descriptionSuffix` — "? This action cannot be undone."
-- [ ] `send.dialogs.delete.deleting` — "Deleting..."
-- [ ] `send.feedback.deleteSuccess` — "Send deleted"
-- [ ] `send.feedback.deleteError` — "Failed to delete send"
-- [ ] `send.contextMenu.edit` — "Edit"
-- [ ] `send.contextMenu.copyLink` — "Copy link"
-- [ ] `send.contextMenu.delete` — "Delete"
+- [x] `send.dialogs.delete.title` — "Delete Send"
+- [x] `send.dialogs.delete.descriptionPrefix` — "Are you sure you want to delete"
+- [x] `send.dialogs.delete.descriptionSuffix` — "? This action cannot be undone."
+- [x] `send.dialogs.delete.deleting` — "Deleting..."
+- [x] `send.feedback.deleteSuccess` — "Send deleted"
+- [x] `send.feedback.deleteError` — "Failed to delete send"
+- [x] `send.contextMenu.edit` — "Edit"
+- [x] `send.contextMenu.copyLink` — "Copy link"
+- [x] `send.contextMenu.delete` — "Delete"
 
 ### 10.7 WebSocket 增量同步协调
 
-- [ ] 确认现有 `SyncSendCreate/Update/Delete` push event 处理与新的 CRUD 操作不冲突
-- [ ] 手动 CRUD 后本地数据已更新，WebSocket 增量同步到达时 upsert 幂等
+- [x] 确认现有 `SyncSendCreate/Update/Delete` push event 处理与新的 CRUD 操作不冲突
+- [x] 手动 CRUD 后本地数据已更新，WebSocket 增量同步到达时 upsert 幂等
 
 ### 10.8 Pre-commit 全量验证
 
 **Rust：**
-- [ ] `cargo test`
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings`
-- [ ] `cargo fmt`
+- [x] `cargo test`
+- [x] `cargo clippy --all-targets --all-features -- -D warnings`
+- [x] `cargo fmt`
 
 **Frontend：**
-- [ ] `pnpm run biome:write`
-- [ ] `pnpm run biome:format`
-- [ ] `pnpm build`
+- [x] `pnpm run biome:write`
+- [x] `pnpm run biome:format`
+- [x] `pnpm build`
 
 ### 验收标准
 
-- [ ] 全栈 pre-commit checks 全部通过
-- [ ] 完整用户流程可用：
+- [x] 全栈 pre-commit checks 全部通过
+- [x] 完整用户流程可用：
   1. 侧边栏点击 Send → 显示列表
   2. 点击 + 创建 Text Send → 列表刷新显示新 Send
   3. 选中 Send → 右侧显示详情

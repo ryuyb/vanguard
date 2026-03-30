@@ -48,7 +48,12 @@ impl UpdateSendUseCase {
                 field: "send_id".to_string(),
             });
         }
-        if send.name.as_ref().map(|n| n.trim().is_empty()).unwrap_or(true) {
+        if send
+            .name
+            .as_ref()
+            .map(|n| n.trim().is_empty())
+            .unwrap_or(true)
+        {
             return Err(AppError::ValidationFieldError {
                 field: "send.name".to_string(),
                 message: "send name is required".to_string(),
@@ -73,8 +78,11 @@ impl UpdateSendUseCase {
             revision_date: Some(result.revision_date.clone()),
             ..encrypted
         };
-        self.vault_repository.upsert_send(&account_id, &persisted).await?;
-        self.event_port.emit_send_updated(&account_id, &result.send_id);
+        self.vault_repository
+            .upsert_send(&account_id, &persisted)
+            .await?;
+        self.event_port
+            .emit_send_updated(&account_id, &result.send_id);
 
         Ok(result)
     }

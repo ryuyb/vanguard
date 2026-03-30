@@ -243,7 +243,10 @@ export function CipherDetailPanel({
     cipher.data?.passwordRevisionDate,
   );
   const customFields = (() => {
-    const rawFields = [...(cipher.fields ?? []), ...(cipher.data?.fields ?? [])];
+    const rawFields = [
+      ...(cipher.fields ?? []),
+      ...(cipher.data?.fields ?? []),
+    ];
     const seen = new Set<string>();
     const normalizedFields: Array<{
       key: string;
