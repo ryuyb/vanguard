@@ -13,6 +13,7 @@ import {
   LogOut,
   Plus,
   Search,
+  Send,
   Settings,
   Star,
   Trash2,
@@ -60,6 +61,16 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  DeleteSendDialog,
+  SEND_ID,
+  SendDetailPanel,
+  SendFormDialog,
+  SendListPanel,
+  useSendEvents,
+  useSendList,
+  useSendMutations,
+} from "@/features/send";
+import {
   ALL_ITEMS_ID,
   CipherDetailPanel,
   CipherRow,
@@ -83,7 +94,6 @@ import { useVaultPageModel } from "@/features/vault/hooks";
 import { useCipherMutations } from "@/features/vault/hooks/use-cipher-mutations";
 import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
-
 import { vaultCipherDetailToSyncCipher } from "@/features/vault/utils/cipher-converter";
 import { toast } from "@/lib/toast";
 
@@ -168,6 +178,87 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   const [trashActionCipherId, setTrashActionCipherId] = useState("");
   const [trashActionCipherName, setTrashActionCipherName] = useState("");
   const [isTrashActionLoading, setIsTrashActionLoading] = useState(false);
+
+  // Send 状态
+  const [selectedSendId, setSelectedSendId] = useState<string | null>(null);
+  const [isSendFormOpen, setIsSendFormOpen] = useState(false);
+  const [sendFormMode, setSendFormMode] = useState<"create" | "edit">("create");
+  const [selectedSendForEdit, setSelectedSendForEdit] = useState<
+    (typeof filteredSends)[number] | null
+  >(null);
+  const [isDeleteSendDialogOpen, setIsDeleteSendDialogOpen] = useState(false);
+  const [selectedSendIdForDelete, setSelectedSendIdForDelete] = useState("");
+  const [selectedSendNameForDelete, setSelectedSendNameForDelete] =
+    useState("");
+  const {
+    filteredSends,
+    sendCount,
+    isLoading: isSendLoading,
+    sendTypeFilter,
+    setSendTypeFilter,
+    reload: reloadSends,
+  } = useSendList();
+
+  const sendMutations = useSendMutations();
+
+  const handleCreateSend = () => {
+    setSendFormMode("create");
+    setSelectedSendForEdit(null);
+    setIsSendFormOpen(true);
+  };
+
+  const handleEditSend = (send: (typeof filteredSends)[number]) => {
+    setSendFormMode("edit");
+    setSelectedSendForEdit(send);
+    setIsSendFormOpen(true);
+  };
+
+  const handleSendFormConfirm = async (
+    send: import("@/bindings").SyncSend,
+    fileData?: number[] | null,
+  ) => {
+    try {
+      if (sendFormMode === "create") {
+        await sendMutations.createSend.mutateAsync({ send, fileData });
+        toast.success(t("send.feedback.createSuccess"));
+      } else {
+        await sendMutations.updateSend.mutateAsync({ sendId: send.id, send });
+        toast.success(t("send.feedback.saveSuccess"));
+      }
+      setIsSendFormOpen(false);
+    } catch {
+      toast.error(
+        sendFormMode === "create"
+          ? t("send.feedback.createError")
+          : t("send.feedback.saveError"),
+      );
+    }
+  };
+
+  const handleDeleteSend = (sendId: string, sendName: string) => {
+    setSelectedSendIdForDelete(sendId);
+    setSelectedSendNameForDelete(sendName);
+    setIsDeleteSendDialogOpen(true);
+  };
+
+  const handleDeleteSendConfirm = async () => {
+    try {
+      await sendMutations.deleteSend.mutateAsync(selectedSendIdForDelete);
+      toast.success(t("send.feedback.deleteSuccess"));
+      setIsDeleteSendDialogOpen(false);
+    } catch {
+      toast.error(t("send.feedback.deleteError"));
+    }
+  };
+
+  useSendEvents({
+    onSendCreated: () => void reloadSends(),
+    onSendUpdated: () => void reloadSends(),
+    onSendDeleted: () => {
+      void reloadSends();
+      setSelectedSendId(null);
+    },
+  });
 
   const {
     avatarText,
@@ -702,6 +793,45 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                       </div>
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMenuId(SEND_ID);
+                        setSelectedSendId(null);
+                        void reloadSends();
+                      }}
+                      className={[
+                        "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
+                        selectedMenuId === SEND_ID
+                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                          : "text-slate-700 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2.5">
+                          <Send
+                            className={[
+                              "size-4",
+                              selectedMenuId === SEND_ID
+                                ? "text-blue-600"
+                                : "text-slate-400",
+                            ].join(" ")}
+                          />
+                          {t("vault.page.menus.send")}
+                        </span>
+                        <span
+                          className={[
+                            "text-xs font-semibold",
+                            selectedMenuId === SEND_ID
+                              ? "text-blue-600"
+                              : "text-slate-400",
+                          ].join(" ")}
+                        >
+                          {sendCount}
+                        </span>
+                      </div>
+                    </button>
+
                     <div className="mt-4 mb-2 flex items-center justify-between px-3">
                       <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         {t("vault.page.folders.title")}
@@ -776,288 +906,303 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
             <ResizableHandle withHandle className="bg-slate-200" />
 
             <ResizablePanel defaultSize={40} minSize={24}>
-              <section className="flex h-full min-h-0 flex-col bg-slate-50/50 border-r border-slate-200">
-                <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
-                  <div className="relative h-8 min-w-0 flex-1">
-                    <div className="absolute inset-y-0 left-0 flex items-center">
+              {selectedMenuId === SEND_ID ? (
+                <SendListPanel
+                  sends={filteredSends}
+                  isLoading={isSendLoading}
+                  selectedSendId={selectedSendId}
+                  sendTypeFilter={sendTypeFilter}
+                  onSelectSend={setSelectedSendId}
+                  onCreateSend={handleCreateSend}
+                  onFilterChange={setSendTypeFilter}
+                  baseUrl={userBaseUrl}
+                  onEdit={(send) => handleEditSend(send)}
+                  onDelete={handleDeleteSend}
+                />
+              ) : (
+                <section className="flex h-full min-h-0 flex-col bg-slate-50/50 border-r border-slate-200">
+                  <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2 bg-white border-b border-slate-200">
+                    <div className="relative h-8 min-w-0 flex-1">
+                      <div className="absolute inset-y-0 left-0 flex items-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 justify-start gap-1 rounded-md px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[state=open]:bg-slate-100"
+                              aria-label={t("vault.page.filters.ariaLabel")}
+                              title={t("vault.page.filters.ariaLabel")}
+                            >
+                              <span>{toTypeFilterLabel(typeFilter)}</span>
+                              <ChevronDown className="size-3.5 text-slate-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-44">
+                            <DropdownMenuRadioGroup
+                              value={typeFilter}
+                              onValueChange={(value) =>
+                                setTypeFilter(value as CipherTypeFilter)
+                              }
+                            >
+                              <DropdownMenuRadioItem value="all">
+                                {t("vault.page.filters.types.all")}
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="login">
+                                {t("vault.page.filters.types.login")}
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="card">
+                                {t("vault.page.filters.types.card")}
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="identify">
+                                {t("vault.page.filters.types.identity")}
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="note">
+                                {t("vault.page.filters.types.note")}
+                              </DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="ssh_key">
+                                {t("vault.page.filters.types.sshKey")}
+                              </DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <AnimatePresence>
+                        {isInlineSearchOpen && (
+                          <motion.div
+                            className="absolute inset-y-0 right-0 left-2 z-20"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                          >
+                            <TextInput
+                              ref={inlineSearchInputRef}
+                              type="search"
+                              value={cipherSearchQuery}
+                              onChange={(event) =>
+                                setCipherSearchQuery(event.target.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  setCipherSearchQuery("");
+                                  setIsInlineSearchOpen(false);
+                                }
+                              }}
+                              placeholder={t(
+                                "vault.page.search.inlinePlaceholder",
+                                {
+                                  menu: selectedMenuName,
+                                },
+                              )}
+                              className="h-8 bg-white text-xs border-slate-200"
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="size-8 px-0"
+                        aria-label={t("vault.page.cipher.create")}
+                        title={t("vault.page.cipher.create")}
+                        onClick={handleCreateCipher}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="size-8 px-0"
+                        aria-label={
+                          isInlineSearchOpen
+                            ? t("vault.page.search.close")
+                            : t("vault.page.search.inlinePlaceholder", {
+                                menu: selectedMenuName,
+                              })
+                        }
+                        title={
+                          isInlineSearchOpen
+                            ? t("vault.page.search.close")
+                            : t("vault.page.search.inlinePlaceholder", {
+                                menu: selectedMenuName,
+                              })
+                        }
+                        onClick={() => {
+                          if (isInlineSearchOpen) {
+                            setCipherSearchQuery("");
+                            setIsInlineSearchOpen(false);
+                            return;
+                          }
+                          setIsInlineSearchOpen(true);
+                        }}
+                      >
+                        <AnimatePresence mode="wait" initial={false}>
+                          {isInlineSearchOpen ? (
+                            <motion.span
+                              key="close"
+                              initial={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                              exit={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                              transition={{ duration: 0.16, ease: "easeOut" }}
+                              className="inline-flex"
+                            >
+                              <X className="size-4" />
+                            </motion.span>
+                          ) : (
+                            <motion.span
+                              key="search"
+                              initial={{ opacity: 0, rotate: 90, scale: 0.85 }}
+                              animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                              exit={{ opacity: 0, rotate: -90, scale: 0.85 }}
+                              transition={{ duration: 0.16, ease: "easeOut" }}
+                              className="inline-flex"
+                            >
+                              <Search className="size-4" />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             type="button"
                             variant="ghost"
-                            className="h-8 justify-start gap-1 rounded-md px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 data-[state=open]:bg-slate-100"
-                            aria-label={t("vault.page.filters.ariaLabel")}
-                            title={t("vault.page.filters.ariaLabel")}
+                            className="size-8 px-0"
+                            aria-label={t("vault.page.sort.ariaLabel")}
+                            title={t("vault.page.sort.ariaLabel")}
                           >
-                            <span>{toTypeFilterLabel(typeFilter)}</span>
-                            <ChevronDown className="size-3.5 text-slate-400" />
+                            <ArrowUpDown className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-44">
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuLabel>
+                            {t("vault.page.sort.byLabel")}
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
                           <DropdownMenuRadioGroup
-                            value={typeFilter}
+                            value={sortBy}
                             onValueChange={(value) =>
-                              setTypeFilter(value as CipherTypeFilter)
+                              setSortBy(value as CipherSortBy)
                             }
                           >
-                            <DropdownMenuRadioItem value="all">
-                              {t("vault.page.filters.types.all")}
+                            <DropdownMenuRadioItem value="title">
+                              {t("vault.page.sort.by.title")}
                             </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="login">
-                              {t("vault.page.filters.types.login")}
+                            <DropdownMenuRadioItem value="created">
+                              {t("vault.page.sort.by.created")}
                             </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="card">
-                              {t("vault.page.filters.types.card")}
+                            <DropdownMenuRadioItem value="modified">
+                              {t("vault.page.sort.by.modified")}
                             </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="identify">
-                              {t("vault.page.filters.types.identity")}
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="note">
-                              {t("vault.page.filters.types.note")}
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="ssh_key">
-                              {t("vault.page.filters.types.sshKey")}
-                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>
+                            {t("vault.page.sort.directionLabel")}
+                          </DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={sortDirection}
+                            onValueChange={(value) =>
+                              setSortDirection(value as CipherSortDirection)
+                            }
+                          >
+                            {sortBy === "title" ? (
+                              <>
+                                <DropdownMenuRadioItem value="asc">
+                                  {t("vault.page.sort.direction.alphaAsc")}
+                                </DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="desc">
+                                  {t("vault.page.sort.direction.alphaDesc")}
+                                </DropdownMenuRadioItem>
+                              </>
+                            ) : (
+                              <>
+                                <DropdownMenuRadioItem value="desc">
+                                  {t("vault.page.sort.direction.newestFirst")}
+                                </DropdownMenuRadioItem>
+                                <DropdownMenuRadioItem value="asc">
+                                  {t("vault.page.sort.direction.oldestFirst")}
+                                </DropdownMenuRadioItem>
+                              </>
+                            )}
                           </DropdownMenuRadioGroup>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-
-                    <AnimatePresence>
-                      {isInlineSearchOpen && (
-                        <motion.div
-                          className="absolute inset-y-0 right-0 left-2 z-20"
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          transition={{ duration: 0.18, ease: "easeOut" }}
-                        >
-                          <TextInput
-                            ref={inlineSearchInputRef}
-                            type="search"
-                            value={cipherSearchQuery}
-                            onChange={(event) =>
-                              setCipherSearchQuery(event.target.value)
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Escape") {
-                                setCipherSearchQuery("");
-                                setIsInlineSearchOpen(false);
-                              }
-                            }}
-                            placeholder={t(
-                              "vault.page.search.inlinePlaceholder",
-                              {
-                                menu: selectedMenuName,
-                              },
-                            )}
-                            className="h-8 bg-white text-xs border-slate-200"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="size-8 px-0"
-                      aria-label={t("vault.page.cipher.create")}
-                      title={t("vault.page.cipher.create")}
-                      onClick={handleCreateCipher}
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="size-8 px-0"
-                      aria-label={
-                        isInlineSearchOpen
-                          ? t("vault.page.search.close")
-                          : t("vault.page.search.inlinePlaceholder", {
-                              menu: selectedMenuName,
-                            })
-                      }
-                      title={
-                        isInlineSearchOpen
-                          ? t("vault.page.search.close")
-                          : t("vault.page.search.inlinePlaceholder", {
-                              menu: selectedMenuName,
-                            })
-                      }
-                      onClick={() => {
-                        if (isInlineSearchOpen) {
-                          setCipherSearchQuery("");
-                          setIsInlineSearchOpen(false);
-                          return;
-                        }
-                        setIsInlineSearchOpen(true);
-                      }}
-                    >
-                      <AnimatePresence mode="wait" initial={false}>
-                        {isInlineSearchOpen ? (
-                          <motion.span
-                            key="close"
-                            initial={{ opacity: 0, rotate: -90, scale: 0.85 }}
-                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                            exit={{ opacity: 0, rotate: 90, scale: 0.85 }}
-                            transition={{ duration: 0.16, ease: "easeOut" }}
-                            className="inline-flex"
+                  <ScrollArea className="min-h-0 flex-1 overflow-hidden [&>div>div]:!block">
+                    <div className="space-y-1.5 px-3 py-2 min-w-0 w-full">
+                      {filteredCiphers.map(
+                        (cipher: (typeof filteredCiphers)[number]) => (
+                          <CipherRowObserver
+                            key={cipher.id}
+                            cipherId={cipher.id}
+                            onVisibilityChange={setCipherRowVisible}
                           >
-                            <X className="size-4" />
-                          </motion.span>
-                        ) : (
-                          <motion.span
-                            key="search"
-                            initial={{ opacity: 0, rotate: 90, scale: 0.85 }}
-                            animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                            exit={{ opacity: 0, rotate: -90, scale: 0.85 }}
-                            transition={{ duration: 0.16, ease: "easeOut" }}
-                            className="inline-flex"
-                          >
-                            <Search className="size-4" />
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="size-8 px-0"
-                          aria-label={t("vault.page.sort.ariaLabel")}
-                          title={t("vault.page.sort.ariaLabel")}
-                        >
-                          <ArrowUpDown className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuLabel>
-                          {t("vault.page.sort.byLabel")}
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuRadioGroup
-                          value={sortBy}
-                          onValueChange={(value) =>
-                            setSortBy(value as CipherSortBy)
-                          }
-                        >
-                          <DropdownMenuRadioItem value="title">
-                            {t("vault.page.sort.by.title")}
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="created">
-                            {t("vault.page.sort.by.created")}
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="modified">
-                            {t("vault.page.sort.by.modified")}
-                          </DropdownMenuRadioItem>
-                        </DropdownMenuRadioGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>
-                          {t("vault.page.sort.directionLabel")}
-                        </DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={sortDirection}
-                          onValueChange={(value) =>
-                            setSortDirection(value as CipherSortDirection)
-                          }
-                        >
-                          {sortBy === "title" ? (
-                            <>
-                              <DropdownMenuRadioItem value="asc">
-                                {t("vault.page.sort.direction.alphaAsc")}
-                              </DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="desc">
-                                {t("vault.page.sort.direction.alphaDesc")}
-                              </DropdownMenuRadioItem>
-                            </>
-                          ) : (
-                            <>
-                              <DropdownMenuRadioItem value="desc">
-                                {t("vault.page.sort.direction.newestFirst")}
-                              </DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="asc">
-                                {t("vault.page.sort.direction.oldestFirst")}
-                              </DropdownMenuRadioItem>
-                            </>
-                          )}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                <ScrollArea className="min-h-0 flex-1 overflow-hidden [&>div>div]:!block">
-                  <div className="space-y-1.5 px-3 py-2 min-w-0 w-full">
-                    {filteredCiphers.map(
-                      (cipher: (typeof filteredCiphers)[number]) => (
-                        <CipherRowObserver
-                          key={cipher.id}
-                          cipherId={cipher.id}
-                          onVisibilityChange={setCipherRowVisible}
-                        >
-                          <ContextMenu>
-                            <ContextMenuTrigger asChild>
-                              <div className="min-w-0">
-                                <CipherRow
-                                  cipher={cipher}
-                                  onClick={() => {
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div className="min-w-0">
+                                  <CipherRow
+                                    cipher={cipher}
+                                    onClick={() => {
+                                      void loadCipherDetail(cipher.id);
+                                    }}
+                                    selected={cipher.id === selectedCipherId}
+                                  />
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent className="w-44">
+                                <ContextMenuItem
+                                  onSelect={() => {
                                     void loadCipherDetail(cipher.id);
                                   }}
-                                  selected={cipher.id === selectedCipherId}
-                                />
-                              </div>
-                            </ContextMenuTrigger>
-                            <ContextMenuContent className="w-44">
-                              <ContextMenuItem
-                                onSelect={() => {
-                                  void loadCipherDetail(cipher.id);
-                                }}
-                              >
-                                <Eye className="size-4" />
-                                {t("vault.page.cipher.contextMenu.view")}
-                              </ContextMenuItem>
-                              {selectedMenuId !== TRASH_ID && (
-                                <>
-                                  <ContextMenuItem
-                                    onSelect={async () => {
-                                      const result =
-                                        await commands.vaultGetCipherDetail({
-                                          cipherId: cipher.id,
-                                        });
-                                      if (result.status === "error") return;
-                                      handleEditCipher(result.data.cipher);
-                                    }}
-                                  >
-                                    <Edit2 className="size-4" />
-                                    {t("vault.page.cipher.contextMenu.edit")}
-                                  </ContextMenuItem>
-                                  <ContextMenuItem
-                                    onSelect={() => {
-                                      void handleCloneCipher(cipher.id);
-                                    }}
-                                  >
-                                    <Copy className="size-4" />
-                                    {t("vault.page.cipher.contextMenu.clone")}
-                                  </ContextMenuItem>
-                                </>
-                              )}
-                            </ContextMenuContent>
-                          </ContextMenu>
-                        </CipherRowObserver>
-                      ),
-                    )}
-                    {filteredCiphers.length === 0 && (
-                      <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600">
-                        {t("vault.page.states.emptyFiltered")}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </section>
+                                >
+                                  <Eye className="size-4" />
+                                  {t("vault.page.cipher.contextMenu.view")}
+                                </ContextMenuItem>
+                                {selectedMenuId !== TRASH_ID && (
+                                  <>
+                                    <ContextMenuItem
+                                      onSelect={async () => {
+                                        const result =
+                                          await commands.vaultGetCipherDetail({
+                                            cipherId: cipher.id,
+                                          });
+                                        if (result.status === "error") return;
+                                        handleEditCipher(result.data.cipher);
+                                      }}
+                                    >
+                                      <Edit2 className="size-4" />
+                                      {t("vault.page.cipher.contextMenu.edit")}
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                      onSelect={() => {
+                                        void handleCloneCipher(cipher.id);
+                                      }}
+                                    >
+                                      <Copy className="size-4" />
+                                      {t("vault.page.cipher.contextMenu.clone")}
+                                    </ContextMenuItem>
+                                  </>
+                                )}
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          </CipherRowObserver>
+                        ),
+                      )}
+                      {filteredCiphers.length === 0 && (
+                        <div className="rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                          {t("vault.page.states.emptyFiltered")}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </section>
+              )}
             </ResizablePanel>
 
             <ResizableHandle withHandle className="bg-slate-200" />
@@ -1066,64 +1211,82 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white">
                 <ScrollArea className="h-full min-w-0 [&>[data-slot=scroll-area-viewport]]:min-w-0 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:h-full [&>[data-slot=scroll-area-viewport]>div]:min-w-0 [&>[data-slot=scroll-area-viewport]>div]:w-full">
                   <div className="flex h-full min-w-0 w-full flex-col p-3">
-                    {!selectedCipherId && <div className="min-h-80" />}
+                    {selectedMenuId === SEND_ID ? (
+                      <SendDetailPanel
+                        sendId={selectedSendId}
+                        sends={filteredSends}
+                        baseUrl={userBaseUrl}
+                        onEdit={(send) => handleEditSend(send)}
+                        onDelete={handleDeleteSend}
+                      />
+                    ) : (
+                      <>
+                        {!selectedCipherId && <div className="min-h-80" />}
 
-                    {selectedCipherId && isCipherDetailLoading && (
-                      <div className="flex items-center gap-2 text-sm text-slate-700 bg-white rounded-lg border border-slate-200 px-3 py-2">
-                        <LoaderCircle className="size-4 animate-spin text-blue-600" />
-                        {t("vault.page.states.loadingCipherDetail")}
-                      </div>
+                        {selectedCipherId && isCipherDetailLoading && (
+                          <div className="flex items-center gap-2 text-sm text-slate-700 bg-white rounded-lg border border-slate-200 px-3 py-2">
+                            <LoaderCircle className="size-4 animate-spin text-blue-600" />
+                            {t("vault.page.states.loadingCipherDetail")}
+                          </div>
+                        )}
+
+                        {selectedCipherId &&
+                          !isCipherDetailLoading &&
+                          cipherDetailError && (
+                            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                              {cipherDetailError}
+                            </div>
+                          )}
+
+                        {selectedCipherId &&
+                          !isCipherDetailLoading &&
+                          !cipherDetailError &&
+                          selectedCipherDetail && (
+                            <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden">
+                              <CipherDetailPanel
+                                key={selectedCipherDetail.id}
+                                cipher={selectedCipherDetail}
+                                mode={
+                                  selectedMenuId === TRASH_ID
+                                    ? "trash"
+                                    : "normal"
+                                }
+                                onEdit={() =>
+                                  handleEditCipher(selectedCipherDetail)
+                                }
+                                onDelete={() =>
+                                  handleDeleteCipher(
+                                    selectedCipherDetail.id,
+                                    selectedCipherDetail.name ??
+                                      t("vault.page.cipher.untitled"),
+                                  )
+                                }
+                                onRestore={() => {
+                                  setTrashActionCipherId(
+                                    selectedCipherDetail.id,
+                                  );
+                                  setTrashActionCipherName(
+                                    selectedCipherDetail.name ??
+                                      t("vault.page.cipher.untitled"),
+                                  );
+                                  setIsRestoreDialogOpen(true);
+                                }}
+                                onPermanentDelete={() => {
+                                  setTrashActionCipherId(
+                                    selectedCipherDetail.id,
+                                  );
+                                  setTrashActionCipherName(
+                                    selectedCipherDetail.name ??
+                                      t("vault.page.cipher.untitled"),
+                                  );
+                                  setIsPermanentDeleteDialogOpen(true);
+                                }}
+                                isActionLoading={isTrashActionLoading}
+                              />
+                            </div>
+                          )}
+                      </>
                     )}
-
-                    {selectedCipherId &&
-                      !isCipherDetailLoading &&
-                      cipherDetailError && (
-                        <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
-                          {cipherDetailError}
-                        </div>
-                      )}
-
-                    {selectedCipherId &&
-                      !isCipherDetailLoading &&
-                      !cipherDetailError &&
-                      selectedCipherDetail && (
-                        <div className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden">
-                          <CipherDetailPanel
-                            key={selectedCipherDetail.id}
-                            cipher={selectedCipherDetail}
-                            mode={
-                              selectedMenuId === TRASH_ID ? "trash" : "normal"
-                            }
-                            onEdit={() =>
-                              handleEditCipher(selectedCipherDetail)
-                            }
-                            onDelete={() =>
-                              handleDeleteCipher(
-                                selectedCipherDetail.id,
-                                selectedCipherDetail.name ??
-                                  t("vault.page.cipher.untitled"),
-                              )
-                            }
-                            onRestore={() => {
-                              setTrashActionCipherId(selectedCipherDetail.id);
-                              setTrashActionCipherName(
-                                selectedCipherDetail.name ??
-                                  t("vault.page.cipher.untitled"),
-                              );
-                              setIsRestoreDialogOpen(true);
-                            }}
-                            onPermanentDelete={() => {
-                              setTrashActionCipherId(selectedCipherDetail.id);
-                              setTrashActionCipherName(
-                                selectedCipherDetail.name ??
-                                  t("vault.page.cipher.untitled"),
-                              );
-                              setIsPermanentDeleteDialogOpen(true);
-                            }}
-                            isActionLoading={isTrashActionLoading}
-                          />
-                        </div>
-                      )}
                   </div>
                 </ScrollArea>
               </section>
@@ -1135,6 +1298,28 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       <VaultSettingsDialog
         open={isSettingsDialogOpen}
         onOpenChange={setIsSettingsDialogOpen}
+      />
+
+      <SendFormDialog
+        open={isSendFormOpen}
+        mode={sendFormMode}
+        initialSend={selectedSendForEdit}
+        onOpenChange={setIsSendFormOpen}
+        onConfirm={(send, fileData) =>
+          void handleSendFormConfirm(send, fileData)
+        }
+        isLoading={
+          sendMutations.createSend.isLoading ||
+          sendMutations.updateSend.isLoading
+        }
+      />
+
+      <DeleteSendDialog
+        open={isDeleteSendDialogOpen}
+        sendName={selectedSendNameForDelete}
+        onOpenChange={setIsDeleteSendDialogOpen}
+        onConfirm={() => void handleDeleteSendConfirm()}
+        isLoading={sendMutations.deleteSend.isLoading}
       />
 
       <FolderDialog
