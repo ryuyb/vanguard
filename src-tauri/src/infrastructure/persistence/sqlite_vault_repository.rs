@@ -1270,6 +1270,95 @@ impl VaultRepositoryPort for SqliteVaultRepository {
         .await
     }
 
+    async fn list_live_sends(&self, account_id: &str) -> AppResult<Vec<SyncSend>> {
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            let mut statement = connection
+                .prepare("SELECT payload_json FROM live_sends ORDER BY id ASC")
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to prepare list live sends statement: {error}"),
+                })?;
+
+            let mut rows = statement
+                .query(params![])
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to query live sends: {error}"),
+                })?;
+
+            let mut sends = Vec::new();
+            while let Some(row) = rows.next().map_err(|error| AppError::InternalUnexpected {
+                message: format!("failed to iterate live sends: {error}"),
+            })? {
+                let payload_json: String =
+                    row.get(0).map_err(|error| AppError::InternalUnexpected {
+                        message: format!("failed to read live send payload: {error}"),
+                    })?;
+                sends.push(Self::from_json(&payload_json, "live sync send payload")?);
+            }
+
+            Ok(sends)
+        })
+        .await
+    }
+
+    async fn get_live_send(
+        &self,
+        account_id: &str,
+        send_id: &str,
+    ) -> AppResult<Option<SyncSend>> {
+        let send_id = send_id.to_string();
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            let payload_json: Option<String> = connection
+                .query_row(
+                    "SELECT payload_json FROM live_sends WHERE id = ?1 LIMIT 1",
+                    params![send_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to query live send by id: {error}"),
+                })?;
+
+            payload_json
+                .map(|value| Self::from_json(&value, "live sync send payload"))
+                .transpose()
+        })
+        .await
+    }
+
+    async fn upsert_send(&self, account_id: &str, send: &SyncSend) -> AppResult<()> {
+        let send = send.clone();
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            let payload_json = Self::to_json(&send, "sync send")?;
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO live_sends (id, payload_json)
+                    VALUES (?1, ?2)
+                    ON CONFLICT(id) DO UPDATE SET payload_json = excluded.payload_json
+                    "#,
+                    params![send.id, payload_json],
+                )
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to upsert send: {error}"),
+                })?;
+            Ok(())
+        })
+        .await
+    }
+
+    async fn delete_send(&self, account_id: &str, send_id: &str) -> AppResult<()> {
+        let send_id = send_id.to_string();
+        self.with_account_connection(account_id, move |connection, _account_id| {
+            connection
+                .execute("DELETE FROM live_sends WHERE id = ?1", params![send_id])
+                .map_err(|error| AppError::InternalUnexpected {
+                    message: format!("failed to delete send: {error}"),
+                })?;
+            Ok(())
+        })
+        .await
+    }
+
     async fn upsert_domains(
         &self,
         account_id: &str,

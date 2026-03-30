@@ -3,11 +3,11 @@ use crate::application::dto::sync::{
     SyncCipherIdentity, SyncCipherLogin, SyncCipherLoginFido2Credential, SyncCipherLoginUri,
     SyncCipherPasswordHistory, SyncCipherPermissions, SyncCipherSecureNote, SyncCipherSshKey,
     SyncCollection, SyncDomains, SyncFolder, SyncKdfParams, SyncMasterPasswordUnlock, SyncPolicy,
-    SyncProfile, SyncSend, SyncUserDecryption, SyncVaultPayload,
+    SyncProfile, SyncSend, SyncSendFile, SyncSendText, SyncUserDecryption, SyncVaultPayload,
 };
 
 use super::models::{
-    SyncAttachment as RemoteSyncAttachment, SyncCipher as RemoteSyncCipher,
+    SendRequestModel, SyncAttachment as RemoteSyncAttachment, SyncCipher as RemoteSyncCipher,
     SyncCipherCard as RemoteSyncCipherCard, SyncCipherData as RemoteSyncCipherData,
     SyncCipherField as RemoteSyncCipherField, SyncCipherIdentity as RemoteSyncCipherIdentity,
     SyncCipherLogin as RemoteSyncCipherLogin,
@@ -17,7 +17,8 @@ use super::models::{
     SyncCipherPermissions as RemoteSyncCipherPermissions,
     SyncCipherSecureNote as RemoteSyncCipherSecureNote, SyncCipherSshKey as RemoteSyncCipherSshKey,
     SyncFolder as RemoteSyncFolder, SyncGlobalEquivalentDomainEntry, SyncResponse,
-    SyncSend as RemoteSyncSend,
+    SyncSend as RemoteSyncSend, SyncSendFile as RemoteSyncSendFile,
+    SyncSendText as RemoteSyncSendText,
 };
 
 pub fn map_sync_response(response: SyncResponse) -> SyncVaultPayload {
@@ -358,6 +359,55 @@ pub fn map_sync_send(send: RemoteSyncSend) -> SyncSend {
         revision_date: send.revision_date,
         deletion_date: send.deletion_date,
         object: send.object,
+        access_id: send.access_id,
+        notes: send.notes,
+        key: send.key,
+        password: send.password,
+        text: send.text.map(|t| SyncSendText {
+            text: t.text,
+            hidden: t.hidden,
+        }),
+        file: send.file.map(|f| SyncSendFile {
+            id: f.id,
+            file_name: f.file_name,
+            size: f.size,
+            size_name: f.size_name,
+        }),
+        max_access_count: send.max_access_count,
+        access_count: send.access_count,
+        disabled: send.disabled,
+        hide_email: send.hide_email,
+        expiration_date: send.expiration_date,
+        emails: send.emails,
+        auth_type: send.auth_type,
+    }
+}
+
+pub fn map_send_to_request_model(send: &SyncSend) -> SendRequestModel {
+    SendRequestModel {
+        r#type: send.r#type,
+        auth_type: send.auth_type,
+        file_length: None,
+        name: send.name.clone(),
+        notes: send.notes.clone(),
+        key: send.key.clone().unwrap_or_default(),
+        max_access_count: send.max_access_count,
+        expiration_date: send.expiration_date.clone(),
+        deletion_date: send.deletion_date.clone().unwrap_or_default(),
+        file: send.file.as_ref().map(|f| RemoteSyncSendFile {
+            id: f.id.clone(),
+            file_name: f.file_name.clone(),
+            size: f.size.clone(),
+            size_name: f.size_name.clone(),
+        }),
+        text: send.text.as_ref().map(|t| RemoteSyncSendText {
+            text: t.text.clone(),
+            hidden: t.hidden,
+        }),
+        password: send.password.clone(),
+        emails: send.emails.clone(),
+        disabled: send.disabled.unwrap_or(false),
+        hide_email: send.hide_email,
     }
 }
 pub fn map_cipher_to_remote(cipher: &SyncCipher) -> RemoteSyncCipher {

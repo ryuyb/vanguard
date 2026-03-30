@@ -592,6 +592,22 @@ pub struct SyncCipherSshKey {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SyncSendText {
+    pub text: Option<String>,
+    pub hidden: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncSendFile {
+    pub id: Option<String>,
+    pub file_name: Option<String>,
+    pub size: Option<String>,
+    pub size_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncSend {
     pub id: String,
     pub r#type: Option<i32>,
@@ -599,6 +615,47 @@ pub struct SyncSend {
     pub revision_date: Option<String>,
     pub deletion_date: Option<String>,
     pub object: Option<String>,
+    pub access_id: Option<String>,
+    pub notes: Option<String>,
+    pub key: Option<String>,
+    pub password: Option<String>,
+    pub text: Option<SyncSendText>,
+    pub file: Option<SyncSendFile>,
+    pub max_access_count: Option<i32>,
+    pub access_count: Option<i32>,
+    pub disabled: Option<bool>,
+    pub hide_email: Option<bool>,
+    pub expiration_date: Option<String>,
+    pub emails: Option<String>,
+    pub auth_type: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendRequestModel {
+    pub r#type: Option<i32>,
+    pub auth_type: Option<i32>,
+    pub file_length: Option<i64>,
+    pub name: Option<String>,
+    pub notes: Option<String>,
+    pub key: String,
+    pub max_access_count: Option<i32>,
+    pub expiration_date: Option<String>,
+    pub deletion_date: String,
+    pub file: Option<SyncSendFile>,
+    pub text: Option<SyncSendText>,
+    pub password: Option<String>,
+    pub emails: Option<String>,
+    pub disabled: bool,
+    pub hide_email: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SendFileUploadDataResponse {
+    pub id: Option<String>,
+    pub file_upload_url: Option<String>,
+    pub send: Option<SyncSend>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

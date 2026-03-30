@@ -3,9 +3,9 @@ use super::endpoints::VaultwardenEndpoints;
 use super::error::{VaultwardenError, VaultwardenResult};
 use super::models::{
     CipherResponse, GetFoldersResponse, PasswordLoginRequest, PreloginRequest, PreloginResponse,
-    RefreshTokenRequest, RevisionDateResponse, SendEmailLoginRequest, SyncCipher, SyncFolder,
-    SyncResponse, SyncSend, TokenErrorResponse, TokenRequest, TokenResponse,
-    VerifyEmailTokenRequest,
+    RefreshTokenRequest, RevisionDateResponse, SendEmailLoginRequest, SendFileUploadDataResponse,
+    SendRequestModel, SyncCipher, SyncFolder, SyncResponse, SyncSend, TokenErrorResponse,
+    TokenRequest, TokenResponse, VerifyEmailTokenRequest,
 };
 use std::time::Duration;
 
@@ -750,6 +750,170 @@ impl VaultwardenClient {
                 )))
             }
         }
+    }
+
+    pub async fn create_send(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        body: &SendRequestModel,
+    ) -> VaultwardenResult<SyncSend> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::sends(base_url);
+
+        let response = self
+            .http_client
+            .post(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(body)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body_text = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body_text));
+        }
+
+        serde_json::from_str::<SyncSend>(&body_text)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid send response: {error}")))
+    }
+
+    pub async fn create_file_send(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        body: &SendRequestModel,
+    ) -> VaultwardenResult<SendFileUploadDataResponse> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::sends_file_v2(base_url);
+
+        let response = self
+            .http_client
+            .post(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(body)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body_text = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body_text));
+        }
+
+        serde_json::from_str::<SendFileUploadDataResponse>(&body_text)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid file send response: {error}")))
+    }
+
+    pub async fn upload_send_file(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+        file_id: &str,
+        file_data: Vec<u8>,
+    ) -> VaultwardenResult<()> {
+        let base_url = Self::validated_base_url(base_url)?;
+        let endpoint = VaultwardenEndpoints::send_file_upload(base_url, send_id, file_id);
+
+        let part = reqwest::multipart::Part::bytes(file_data).file_name("upload");
+        let form = reqwest::multipart::Form::new().part("data", part);
+
+        let response = self
+            .http_client
+            .post(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            let body_text = response
+                .text()
+                .await
+                .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+            return Err(Self::api_error(status, body_text));
+        }
+
+        Ok(())
+    }
+
+    pub async fn update_send(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+        body: &SendRequestModel,
+    ) -> VaultwardenResult<SyncSend> {
+        let endpoint = self.send_endpoint(base_url, send_id)?;
+
+        let response = self
+            .http_client
+            .put(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .json(body)
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body_text = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body_text));
+        }
+
+        serde_json::from_str::<SyncSend>(&body_text)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid send response: {error}")))
+    }
+
+    pub async fn delete_send(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+    ) -> VaultwardenResult<()> {
+        let endpoint = self.send_endpoint(base_url, send_id)?;
+
+        let response = self
+            .http_client
+            .delete(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            let body_text = response
+                .text()
+                .await
+                .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+            return Err(Self::api_error(status, body_text));
+        }
+
+        Ok(())
     }
 
     pub async fn create_cipher(

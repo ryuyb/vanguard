@@ -8,9 +8,10 @@ use crate::application::dto::auth::{
     WebauthnRequestExtensions as AppWebauthnRequestExtensions,
 };
 use crate::application::dto::sync::{
-    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RestoreCipherCommand,
-    RevisionDateQuery, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand,
-    SyncVaultPayload, UpdateCipherCommand,
+    CipherMutationResult, CreateCipherCommand, CreateFileSendResult, CreateSendCommand,
+    DeleteCipherCommand, DeleteSendCommand, RestoreCipherCommand, RevisionDateQuery,
+    SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
+    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
 };
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
@@ -18,7 +19,8 @@ use crate::support::result::AppResult;
 
 use super::error::VaultwardenError;
 use super::mapper::{
-    map_cipher_to_remote, map_sync_cipher, map_sync_folder, map_sync_response, map_sync_send,
+    map_cipher_to_remote, map_send_to_request_model, map_sync_cipher, map_sync_folder,
+    map_sync_response, map_sync_send,
 };
 use super::models::{
     PasswordLoginRequest, PreloginRequest, RefreshTokenRequest, SendEmailLoginRequest,
@@ -324,6 +326,81 @@ impl RemoteVaultPort for VaultwardenRemotePort {
     async fn restore_cipher(&self, command: RestoreCipherCommand) -> AppResult<()> {
         self.client
             .restore_cipher(&command.base_url, &command.access_token, &command.cipher_id)
+            .await
+            .map_err(map_vaultwarden_error)
+    }
+
+    async fn create_send(&self, command: CreateSendCommand) -> AppResult<SendMutationResult> {
+        let body = map_send_to_request_model(&command.send);
+        let response = self
+            .client
+            .create_send(&command.base_url, &command.access_token, &body)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(SendMutationResult {
+            send_id: response.id,
+            revision_date: response.revision_date.unwrap_or_default(),
+        })
+    }
+
+    async fn create_file_send(
+        &self,
+        command: CreateSendCommand,
+    ) -> AppResult<CreateFileSendResult> {
+        let body = map_send_to_request_model(&command.send);
+        let response = self
+            .client
+            .create_file_send(&command.base_url, &command.access_token, &body)
+            .await
+            .map_err(map_vaultwarden_error)?;
+
+        let send = response.send.ok_or_else(|| crate::support::error::AppError::InternalUnexpected {
+            message: "file send response missing send object".to_string(),
+        })?;
+
+        Ok(CreateFileSendResult {
+            send_id: send.id,
+            file_id: response.id.unwrap_or_default(),
+            url: response.file_upload_url.unwrap_or_default(),
+            revision_date: send.revision_date.unwrap_or_default(),
+        })
+    }
+
+    async fn upload_send_file(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+        file_id: &str,
+        file_data: Vec<u8>,
+    ) -> AppResult<()> {
+        self.client
+            .upload_send_file(base_url, access_token, send_id, file_id, file_data)
+            .await
+            .map_err(map_vaultwarden_error)
+    }
+
+    async fn update_send(&self, command: UpdateSendCommand) -> AppResult<SendMutationResult> {
+        let body = map_send_to_request_model(&command.send);
+        let response = self
+            .client
+            .update_send(
+                &command.base_url,
+                &command.access_token,
+                &command.send_id,
+                &body,
+            )
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(SendMutationResult {
+            send_id: response.id,
+            revision_date: response.revision_date.unwrap_or_default(),
+        })
+    }
+
+    async fn delete_send(&self, command: DeleteSendCommand) -> AppResult<()> {
+        self.client
+            .delete_send(&command.base_url, &command.access_token, &command.send_id)
             .await
             .map_err(map_vaultwarden_error)
     }

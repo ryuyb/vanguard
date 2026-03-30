@@ -55,6 +55,23 @@ impl VaultwardenEndpoints {
         format!("{}/api/sends/{}", normalize_base(base_url), send_id)
     }
 
+    pub fn sends(base_url: &str) -> String {
+        format!("{}/api/sends", normalize_base(base_url))
+    }
+
+    pub fn sends_file_v2(base_url: &str) -> String {
+        format!("{}/api/sends/file/v2", normalize_base(base_url))
+    }
+
+    pub fn send_file_upload(base_url: &str, send_id: &str, file_id: &str) -> String {
+        format!(
+            "{}/api/sends/{}/file/{}",
+            normalize_base(base_url),
+            send_id,
+            file_id
+        )
+    }
+
     pub fn ciphers(base_url: &str) -> String {
         format!("{}/api/ciphers", normalize_base(base_url))
     }

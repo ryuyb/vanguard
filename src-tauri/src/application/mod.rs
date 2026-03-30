@@ -3,6 +3,7 @@ pub mod crypto;
 pub mod dto;
 pub mod policy;
 pub mod ports;
+pub mod send_encryption;
 pub mod services;
 pub mod totp;
 pub mod use_cases;

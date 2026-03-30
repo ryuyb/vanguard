@@ -269,6 +269,20 @@ pub struct SyncCipherSshKey {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct SyncSendText {
+    pub text: Option<String>,
+    pub hidden: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct SyncSendFile {
+    pub id: Option<String>,
+    pub file_name: Option<String>,
+    pub size: Option<String>,
+    pub size_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct SyncSend {
     pub id: String,
     pub r#type: Option<i32>,
@@ -276,6 +290,58 @@ pub struct SyncSend {
     pub revision_date: Option<String>,
     pub deletion_date: Option<String>,
     pub object: Option<String>,
+    pub access_id: Option<String>,
+    pub notes: Option<String>,
+    pub key: Option<String>,
+    pub password: Option<String>,
+    pub text: Option<SyncSendText>,
+    pub file: Option<SyncSendFile>,
+    pub max_access_count: Option<i32>,
+    pub access_count: Option<i32>,
+    pub disabled: Option<bool>,
+    pub hide_email: Option<bool>,
+    pub expiration_date: Option<String>,
+    pub emails: Option<String>,
+    pub auth_type: Option<i32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateSendCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub send: SyncSend,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateSendCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub send_id: String,
+    pub send: SyncSend,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeleteSendCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub send_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SendMutationResult {
+    pub send_id: String,
+    pub revision_date: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateFileSendResult {
+    pub send_id: String,
+    pub file_id: String,
+    pub url: String,
+    pub revision_date: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

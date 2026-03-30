@@ -5,9 +5,10 @@ use crate::application::dto::auth::{
     SendEmailLoginCommand, SessionInfo, VerifyEmailTokenCommand,
 };
 use crate::application::dto::sync::{
-    CipherMutationResult, CreateCipherCommand, DeleteCipherCommand, RestoreCipherCommand,
-    RevisionDateQuery, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend, SyncVaultCommand,
-    SyncVaultPayload, UpdateCipherCommand,
+    CipherMutationResult, CreateCipherCommand, CreateFileSendResult, CreateSendCommand,
+    DeleteCipherCommand, DeleteSendCommand, RestoreCipherCommand, RevisionDateQuery,
+    SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
+    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
 };
 use crate::support::result::AppResult;
 
@@ -58,4 +59,24 @@ pub trait RemoteVaultPort: Send + Sync {
     ) -> AppResult<CipherMutationResult>;
 
     async fn restore_cipher(&self, command: RestoreCipherCommand) -> AppResult<()>;
+
+    async fn create_send(&self, command: CreateSendCommand) -> AppResult<SendMutationResult>;
+
+    async fn create_file_send(
+        &self,
+        command: CreateSendCommand,
+    ) -> AppResult<CreateFileSendResult>;
+
+    async fn upload_send_file(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+        file_id: &str,
+        file_data: Vec<u8>,
+    ) -> AppResult<()>;
+
+    async fn update_send(&self, command: UpdateSendCommand) -> AppResult<SendMutationResult>;
+
+    async fn delete_send(&self, command: DeleteSendCommand) -> AppResult<()>;
 }
