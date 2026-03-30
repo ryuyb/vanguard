@@ -23,6 +23,7 @@ use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
+use crate::application::use_cases::remove_send_password_use_case::RemoveSendPasswordUseCase;
 use crate::application::use_cases::restore_cipher_use_case::RestoreCipherUseCase;
 use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
@@ -172,6 +173,12 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         Arc::clone(&sync_event_port),
     ));
 
+    let remove_send_password_use_case = Arc::new(RemoveSendPasswordUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
     let list_sends_use_case = Arc::new(ListSendsUseCase::new(Arc::clone(&vault_repository)));
 
     let app_state = AppState::new(
@@ -194,6 +201,7 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         create_send_use_case,
         update_send_use_case,
         delete_send_use_case,
+        remove_send_password_use_case,
         list_sends_use_case,
         vault_repository,
         auth_state_path,

@@ -6,9 +6,9 @@ use crate::application::dto::auth::{
 };
 use crate::application::dto::sync::{
     CipherMutationResult, CreateCipherCommand, CreateFileSendResult, CreateSendCommand,
-    DeleteCipherCommand, DeleteSendCommand, RestoreCipherCommand, RevisionDateQuery,
-    SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
-    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
+    DeleteCipherCommand, DeleteSendCommand, RemoveSendPasswordCommand, RestoreCipherCommand,
+    RevisionDateQuery, SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder,
+    SyncSend, SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
 };
 use crate::support::result::AppResult;
 
@@ -77,4 +77,7 @@ pub trait RemoteVaultPort: Send + Sync {
     async fn update_send(&self, command: UpdateSendCommand) -> AppResult<SendMutationResult>;
 
     async fn delete_send(&self, command: DeleteSendCommand) -> AppResult<()>;
+
+    async fn remove_send_password(&self, command: RemoveSendPasswordCommand)
+        -> AppResult<SyncSend>;
 }

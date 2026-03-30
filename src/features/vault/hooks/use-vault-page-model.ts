@@ -74,6 +74,9 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     null,
   );
   const [selectedMenuId, setSelectedMenuId] = useState(ALL_ITEMS_ID);
+  useEffect(() => {
+    console.log("[debug] selectedMenuId changed to:", selectedMenuId);
+  }, [selectedMenuId]);
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );

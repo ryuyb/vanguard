@@ -331,6 +331,14 @@ pub struct DeleteSendCommand {
 }
 
 #[derive(Debug, Clone)]
+pub struct RemoveSendPasswordCommand {
+    pub account_id: String,
+    pub base_url: String,
+    pub access_token: String,
+    pub send_id: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct SendMutationResult {
     pub send_id: String,
     pub revision_date: String,

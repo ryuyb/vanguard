@@ -403,6 +403,14 @@ async deleteSend(request: DeleteSendRequestDto) : Promise<Result<null, ErrorPayl
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async removeSendPassword(request: RemoveSendPasswordRequestDto) : Promise<Result<SendMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_send_password", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -565,6 +573,7 @@ export type RefreshSessionRequestDto = Record<string, never>
  */
 export type RefreshSessionResponseDto = { success: boolean; isSessionValid: boolean }
 export type RegisterFinishRequestDto = { baseUrl: string; email: string; name: string; masterPassword: string; masterPasswordHint: string | null; token: string; kdf: number; kdfIterations: number; kdfMemory: number | null; kdfParallelism: number | null }
+export type RemoveSendPasswordRequestDto = { sendId: string }
 export type RenameFolderRequest = { folderId: string; newName: string }
 export type RestoreAuthStateRequestDto = Record<string, never>
 export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }
@@ -573,7 +582,7 @@ export type RestoreCipherRequestDto = { cipherId: string }
 export type SendCreated = { accountId: string; sendId: string }
 export type SendDeleted = { accountId: string; sendId: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
-export type SendItemDto = { id: string; type: number | null; name: string | null; disabled: boolean | null; expirationDate: string | null; deletionDate: string | null; accessCount: number | null; maxAccessCount: number | null; hasPassword: boolean; revisionDate: string | null }
+export type SendItemDto = { id: string; type: number | null; name: string | null; notes: string | null; disabled: boolean | null; hideEmail: boolean | null; expirationDate: string | null; deletionDate: string | null; accessCount: number | null; maxAccessCount: number | null; hasPassword: boolean; revisionDate: string | null; text: SyncSendText | null; accessId: string | null; key: string | null; urlKey: string | null; fileName: string | null; sizeName: string | null }
 export type SendMutationResponseDto = { sendId: string; revisionDate: string }
 export type SendUpdated = { accountId: string; sendId: string }
 export type SendVerificationEmailRequestDto = { baseUrl: string; email: string; name: string | null }

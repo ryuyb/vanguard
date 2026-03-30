@@ -33,6 +33,8 @@ export interface AppTranslationCatalog {
     states: {
       loading: string;
       unavailable: string;
+      yes: string;
+      no: string;
     };
   };
   auth: {

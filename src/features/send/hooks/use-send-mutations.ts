@@ -48,6 +48,15 @@ export function useSendMutations(options?: UseSendMutationsOptions) {
     onSuccess: () => options?.onSuccess?.(),
   });
 
+  const removeSendPasswordMutation = useMutation({
+    mutationFn: async (sendId: string) => {
+      const result = await commands.removeSendPassword({ sendId });
+      if (result.status === "error") throw new Error(result.error.message);
+      return result.data;
+    },
+    onSuccess: () => options?.onSuccess?.(),
+  });
+
   return {
     createSend: {
       mutateAsync: createSendMutation.mutateAsync,
@@ -63,6 +72,11 @@ export function useSendMutations(options?: UseSendMutationsOptions) {
       mutateAsync: deleteSendMutation.mutateAsync,
       isLoading: deleteSendMutation.isPending,
       error: deleteSendMutation.error,
+    },
+    removeSendPassword: {
+      mutateAsync: removeSendPasswordMutation.mutateAsync,
+      isLoading: removeSendPasswordMutation.isPending,
+      error: removeSendPasswordMutation.error,
     },
   };
 }

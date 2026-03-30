@@ -21,6 +21,8 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
     states: {
       loading: "加载中...",
       unavailable: "暂不可用",
+      yes: "是",
+      no: "否",
     },
   },
   auth: {
@@ -955,6 +957,7 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       notes: "备注",
       advanced: "高级选项",
       password: "密码",
+      removePassword: "移除",
       maxAccessCount: "最大访问次数",
       expirationDate: "过期时间",
       deletionDate: "删除时间",
@@ -972,6 +975,7 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
       saveError: "保存 Send 失败",
       deleteSuccess: "Send 已删除",
       deleteError: "删除 Send 失败",
+      removePasswordSuccess: "密码已移除",
     },
     dialogs: {
       delete: {
@@ -979,6 +983,11 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
         descriptionPrefix: "确定要删除",
         descriptionSuffix: "吗？此操作无法撤销。",
         deleting: "删除中...",
+      },
+      removePassword: {
+        title: "移除密码",
+        description: "确定要移除此 Send 的密码吗？",
+        confirm: "移除",
       },
     },
     contextMenu: {
@@ -989,7 +998,6 @@ export const zhTranslationCatalog: AppTranslationCatalog = {
     detail: {
       selectPrompt: "选择一个 Send 查看详情",
       textContent: "文本内容",
-      textHidden: "••••••••",
       fileInfo: "文件",
       notes: "备注",
       sendLink: "分享链接",

@@ -59,11 +59,7 @@ export function SendDetailPanel({
   const isFile = send.type === 1;
   const expired = isSendExpired(send);
   const Icon = isFile ? Paperclip : FileText;
-  const sendLink = generateSendLink(
-    baseUrl,
-    (send as SendItemDto & { accessId?: string }).accessId,
-    (send as SendItemDto & { key?: string }).key,
-  );
+  const sendLink = generateSendLink(baseUrl, send.accessId, send.urlKey);
   const handleCopyLink = async () => {
     if (!sendLink) return;
     await navigator.clipboard.writeText(sendLink);
@@ -165,11 +161,11 @@ export function SendDetailPanel({
           </div>
           <div
             className={cn(
-              "text-sm font-medium text-slate-900 break-words",
+              "text-sm font-medium text-slate-900 break-words whitespace-pre-wrap",
               !textVisible && "blur-sm select-none",
             )}
           >
-            {t("send.detail.textHidden")}
+            {textVisible ? (send.text?.text ?? "••••••••") : "••••••••"}
           </div>
         </div>
       )}
@@ -199,7 +195,7 @@ export function SendDetailPanel({
         />
         <DetailRow
           label={t("send.detail.disabled")}
-          value={send.disabled ? t("common.yes") : t("common.no")}
+          value={send.disabled ? t("common.states.yes") : t("common.states.no")}
         />
       </div>
 

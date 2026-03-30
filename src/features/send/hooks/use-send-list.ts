@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { commands, type SendItemDto } from "@/bindings";
 import type { SendTypeFilter } from "../types";
 
-export function useSendList() {
+export function useSendList(enabled = false) {
   const [sends, setSends] = useState<SendItemDto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sendTypeFilter, setSendTypeFilter] = useState<SendTypeFilter>("all");
@@ -19,6 +19,12 @@ export function useSendList() {
       setIsLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (enabled) {
+      void reload();
+    }
+  }, [enabled, reload]);
 
   const filteredSends = useMemo(() => {
     return sends.filter((send) => {

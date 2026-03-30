@@ -4,6 +4,16 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SendItemDto, SyncSend } from "@/bindings";
 import { TextInput } from "@/components/text-input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -35,6 +45,7 @@ type SendFormDialogProps = {
   initialSend?: SendItemDto | null;
   onOpenChange: (open: boolean) => void;
   onConfirm: (send: SyncSend, fileData?: number[] | null) => void;
+  onRemovePassword?: (sendId: string) => Promise<void>;
   isLoading?: boolean;
 };
 
@@ -51,6 +62,7 @@ export function SendFormDialog({
   initialSend,
   onOpenChange,
   onConfirm,
+  onRemovePassword,
   isLoading = false,
 }: SendFormDialogProps) {
   const { t } = useTranslation();
@@ -58,20 +70,28 @@ export function SendFormDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sendType, setSendType] = useState(initialSend?.type ?? 0);
+  const hasExistingPassword =
+    mode === "edit" && initialSend?.hasPassword === true;
+  const [passwordRemoved, setPasswordRemoved] = useState(false);
+  const [isRemovingPassword, setIsRemovingPassword] = useState(false);
+  const [confirmRemovePassword, setConfirmRemovePassword] = useState(false);
 
   const form = useForm({
     defaultValues: {
       type: initialSend?.type ?? 0,
       name: initialSend?.name ?? "",
-      textContent: "",
-      textHidden: false,
-      notes: "",
+      textContent: initialSend?.text?.text ?? "",
+      textHidden: initialSend?.text?.hidden ?? false,
+      notes: initialSend?.notes ?? "",
       password: "",
-      maxAccessCount: "",
+      maxAccessCount:
+        initialSend?.maxAccessCount != null
+          ? String(initialSend.maxAccessCount)
+          : "",
       expirationDate: initialSend?.expirationDate?.slice(0, 16) ?? "",
       deletionDate:
         initialSend?.deletionDate?.slice(0, 16) ?? defaultDeletionDate(),
-      hideEmail: false,
+      hideEmail: initialSend?.hideEmail ?? false,
       disabled: initialSend?.disabled ?? false,
     },
     onSubmit: async ({ value }) => {
@@ -86,8 +106,11 @@ export function SendFormDialog({
         type: value.type,
         name: value.name || null,
         notes: value.notes || null,
-        key: null,
-        password: value.password || null,
+        key: initialSend?.key ?? null,
+        password:
+          hasExistingPassword && !passwordRemoved
+            ? null
+            : value.password || null,
         text:
           value.type === 0
             ? { text: value.textContent || null, hidden: value.textHidden }
@@ -223,27 +246,42 @@ export function SendFormDialog({
           {isFile && (
             <div className="space-y-1.5">
               <Label>{t("send.form.file")}</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {t("send.form.chooseFile")}
-                </Button>
-                {selectedFile && (
-                  <span className="text-xs text-slate-600 truncate">
-                    {selectedFile.name}
-                  </span>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-              />
+              {mode === "edit" && initialSend?.fileName ? (
+                <div className="text-sm text-slate-600">
+                  <span>{initialSend.fileName}</span>
+                  {initialSend.sizeName && (
+                    <span className="ml-2 text-slate-400">
+                      ({initialSend.sizeName})
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {t("send.form.chooseFile")}
+                    </Button>
+                    {selectedFile && (
+                      <span className="text-xs text-slate-600 truncate">
+                        {selectedFile.name}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) =>
+                      setSelectedFile(e.target.files?.[0] ?? null)
+                    }
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -282,15 +320,37 @@ export function SendFormDialog({
             <CollapsibleContent className="space-y-4 pt-2">
               <div className="space-y-1.5">
                 <Label>{t("send.form.password")}</Label>
-                <form.Field name="password">
-                  {(field) => (
+                {hasExistingPassword && !passwordRemoved ? (
+                  <div className="flex items-center gap-2">
                     <TextInput
                       type="password"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
+                      value="••••••••"
+                      disabled
+                      className="flex-1"
                     />
-                  )}
-                </form.Field>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isRemovingPassword}
+                      onClick={() => setConfirmRemovePassword(true)}
+                    >
+                      {isRemovingPassword
+                        ? "..."
+                        : t("send.form.removePassword")}
+                    </Button>
+                  </div>
+                ) : (
+                  <form.Field name="password">
+                    {(field) => (
+                      <TextInput
+                        type="password"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                      />
+                    )}
+                  </form.Field>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -371,7 +431,7 @@ export function SendFormDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              {t("app.actions.cancel")}
+              {t("common.actions.cancel")}
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isLoading
@@ -383,6 +443,46 @@ export function SendFormDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <AlertDialog
+        open={confirmRemovePassword}
+        onOpenChange={setConfirmRemovePassword}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("send.dialogs.removePassword.title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("send.dialogs.removePassword.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingPassword}>
+              {t("common.actions.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRemovingPassword}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!onRemovePassword || !initialSend) return;
+                setIsRemovingPassword(true);
+                try {
+                  await onRemovePassword(initialSend.id);
+                  setPasswordRemoved(true);
+                  setConfirmRemovePassword(false);
+                } finally {
+                  setIsRemovingPassword(false);
+                }
+              }}
+            >
+              {isRemovingPassword
+                ? "..."
+                : t("send.dialogs.removePassword.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

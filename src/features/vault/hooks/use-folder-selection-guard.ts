@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
+import { SEND_ID } from "@/features/send/constants";
 import {
   ALL_ITEMS_ID,
   FAVORITES_ID,
@@ -21,7 +22,8 @@ export function useFolderSelectionGuard({
       selectedMenuId === ALL_ITEMS_ID ||
       selectedMenuId === FAVORITES_ID ||
       selectedMenuId === TRASH_ID ||
-      selectedMenuId === NO_FOLDER_ID
+      selectedMenuId === NO_FOLDER_ID ||
+      selectedMenuId === SEND_ID
     ) {
       return;
     }

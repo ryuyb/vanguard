@@ -62,7 +62,8 @@ pub fn run() {
             interfaces::tauri::commands::send::list_sends,
             interfaces::tauri::commands::send::create_send,
             interfaces::tauri::commands::send::update_send,
-            interfaces::tauri::commands::send::delete_send
+            interfaces::tauri::commands::send::delete_send,
+            interfaces::tauri::commands::send::remove_send_password
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,

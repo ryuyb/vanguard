@@ -25,6 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   commands,
+  type SendItemDto,
   type SyncCipher,
   type VaultCipherDetailDto,
 } from "@/bindings";
@@ -183,21 +184,12 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
   const [selectedSendId, setSelectedSendId] = useState<string | null>(null);
   const [isSendFormOpen, setIsSendFormOpen] = useState(false);
   const [sendFormMode, setSendFormMode] = useState<"create" | "edit">("create");
-  const [selectedSendForEdit, setSelectedSendForEdit] = useState<
-    (typeof filteredSends)[number] | null
-  >(null);
+  const [selectedSendForEdit, setSelectedSendForEdit] =
+    useState<SendItemDto | null>(null);
   const [isDeleteSendDialogOpen, setIsDeleteSendDialogOpen] = useState(false);
   const [selectedSendIdForDelete, setSelectedSendIdForDelete] = useState("");
   const [selectedSendNameForDelete, setSelectedSendNameForDelete] =
     useState("");
-  const {
-    filteredSends,
-    sendCount,
-    isLoading: isSendLoading,
-    sendTypeFilter,
-    setSendTypeFilter,
-    reload: reloadSends,
-  } = useSendList();
 
   const sendMutations = useSendMutations();
 
@@ -207,7 +199,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     setIsSendFormOpen(true);
   };
 
-  const handleEditSend = (send: (typeof filteredSends)[number]) => {
+  const handleEditSend = (send: SendItemDto) => {
     setSendFormMode("edit");
     setSelectedSendForEdit(send);
     setIsSendFormOpen(true);
@@ -309,6 +301,15 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     viewData,
     isVaultUnlockedSessionExpired,
   } = useVaultPageModel({ navigateTo });
+
+  const {
+    filteredSends,
+    sendCount,
+    isLoading: isSendLoading,
+    sendTypeFilter,
+    setSendTypeFilter,
+    reload: reloadSends,
+  } = useSendList(pageState === "ready");
 
   const folderActions = useFolderActions({
     onSuccess: () => {
@@ -1301,6 +1302,11 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
       />
 
       <SendFormDialog
+        key={
+          isSendFormOpen
+            ? `send-form-${selectedSendForEdit?.id ?? "new"}`
+            : "closed"
+        }
         open={isSendFormOpen}
         mode={sendFormMode}
         initialSend={selectedSendForEdit}
@@ -1308,6 +1314,10 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         onConfirm={(send, fileData) =>
           void handleSendFormConfirm(send, fileData)
         }
+        onRemovePassword={async (sendId) => {
+          await sendMutations.removeSendPassword.mutateAsync(sendId);
+          toast.success(t("send.feedback.removePasswordSuccess"));
+        }}
         isLoading={
           sendMutations.createSend.isLoading ||
           sendMutations.updateSend.isLoading

@@ -55,6 +55,14 @@ impl VaultwardenEndpoints {
         format!("{}/api/sends/{}", normalize_base(base_url), send_id)
     }
 
+    pub fn send_remove_password(base_url: &str, send_id: &str) -> String {
+        format!(
+            "{}/api/sends/{}/remove-password",
+            normalize_base(base_url),
+            send_id
+        )
+    }
+
     pub fn sends(base_url: &str) -> String {
         format!("{}/api/sends", normalize_base(base_url))
     }

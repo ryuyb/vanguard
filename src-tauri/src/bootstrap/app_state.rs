@@ -23,6 +23,7 @@ use crate::application::use_cases::delete_send_use_case::DeleteSendUseCase;
 use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
 use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
+use crate::application::use_cases::remove_send_password_use_case::RemoveSendPasswordUseCase;
 use crate::application::use_cases::restore_cipher_use_case::RestoreCipherUseCase;
 use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
@@ -119,6 +120,7 @@ pub struct AppState {
     create_send_use_case: Arc<CreateSendUseCase>,
     update_send_use_case: Arc<UpdateSendUseCase>,
     delete_send_use_case: Arc<DeleteSendUseCase>,
+    remove_send_password_use_case: Arc<RemoveSendPasswordUseCase>,
     list_sends_use_case: Arc<ListSendsUseCase>,
     vault_repository: Arc<dyn VaultRepositoryPort>,
     // Unified unlock state manager - replaces vault_user_keys and auth_session
@@ -149,6 +151,7 @@ impl AppState {
         create_send_use_case: Arc<CreateSendUseCase>,
         update_send_use_case: Arc<UpdateSendUseCase>,
         delete_send_use_case: Arc<DeleteSendUseCase>,
+        remove_send_password_use_case: Arc<RemoveSendPasswordUseCase>,
         list_sends_use_case: Arc<ListSendsUseCase>,
         vault_repository: Arc<dyn VaultRepositoryPort>,
         auth_states_dir: PathBuf,
@@ -198,6 +201,7 @@ impl AppState {
             create_send_use_case,
             update_send_use_case,
             delete_send_use_case,
+            remove_send_password_use_case,
             list_sends_use_case,
             vault_repository,
             unlock_manager,
@@ -276,6 +280,10 @@ impl AppState {
 
     pub fn delete_send_use_case(&self) -> Arc<DeleteSendUseCase> {
         Arc::clone(&self.delete_send_use_case)
+    }
+
+    pub fn remove_send_password_use_case(&self) -> Arc<RemoveSendPasswordUseCase> {
+        Arc::clone(&self.remove_send_password_use_case)
     }
 
     pub fn list_sends_use_case(&self) -> Arc<ListSendsUseCase> {

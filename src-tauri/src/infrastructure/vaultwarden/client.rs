@@ -917,6 +917,41 @@ impl VaultwardenClient {
         Ok(())
     }
 
+    pub async fn remove_send_password(
+        &self,
+        base_url: &str,
+        access_token: &str,
+        send_id: &str,
+    ) -> VaultwardenResult<SyncSend> {
+        let endpoint = {
+            let base_url = Self::validated_base_url(base_url)?;
+            VaultwardenEndpoints::send_remove_password(base_url, send_id)
+        };
+
+        let response = self
+            .http_client
+            .put(endpoint.as_str())
+            .bearer_auth(access_token)
+            .header("Bitwarden-Client-Version", "2024.12.0")
+            .header("Content-Length", "0")
+            .send()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        let status = response.status().as_u16();
+        let body_text = response
+            .text()
+            .await
+            .map_err(|error| VaultwardenError::Transport(error.to_string()))?;
+
+        if !(200..300).contains(&status) {
+            return Err(Self::api_error(status, body_text));
+        }
+
+        serde_json::from_str::<SyncSend>(&body_text)
+            .map_err(|error| VaultwardenError::Decode(format!("invalid send response: {error}")))
+    }
+
     pub async fn create_cipher(
         &self,
         base_url: &str,

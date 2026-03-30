@@ -337,12 +337,27 @@ impl SyncService {
 
         match self
             .sync_vault_use_case
-            .execute_send_incremental(command, send_id, push_type)
+            .execute_send_incremental(command, send_id.clone(), push_type)
             .await
         {
             Ok(outcome) => {
                 self.record_sync_success(&account_id, &outcome.result);
                 self.sync_event_port.emit_sync_succeeded(&outcome.context);
+                match push_type {
+                    PushType::SyncSendCreate => {
+                        self.sync_event_port
+                            .emit_send_created(&account_id, &send_id);
+                    }
+                    PushType::SyncSendUpdate => {
+                        self.sync_event_port
+                            .emit_send_updated(&account_id, &send_id);
+                    }
+                    PushType::SyncSendDelete => {
+                        self.sync_event_port
+                            .emit_send_deleted(&account_id, &send_id);
+                    }
+                    _ => {}
+                }
                 Ok(outcome)
             }
             Err(error) => {

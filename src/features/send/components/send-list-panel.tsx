@@ -124,7 +124,7 @@ export function SendListPanel({
           ) : (
             sends.map((send) => (
               <ContextMenu key={send.id}>
-                <ContextMenuTrigger>
+                <ContextMenuTrigger asChild>
                   <SendRow
                     send={send}
                     selected={send.id === selectedSendId}
@@ -140,8 +140,8 @@ export function SendListPanel({
                     onClick={() => {
                       const link = generateSendLink(
                         baseUrl,
-                        (send as SendItemDto & { accessId?: string }).accessId,
-                        (send as SendItemDto & { key?: string }).key,
+                        send.accessId,
+                        send.urlKey,
                       );
                       if (link) void navigator.clipboard.writeText(link);
                     }}

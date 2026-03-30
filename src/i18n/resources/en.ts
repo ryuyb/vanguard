@@ -21,6 +21,8 @@ export const enTranslationCatalog: AppTranslationCatalog = {
     states: {
       loading: "Loading...",
       unavailable: "Unavailable",
+      yes: "Yes",
+      no: "No",
     },
   },
   auth: {
@@ -975,6 +977,7 @@ export const enTranslationCatalog: AppTranslationCatalog = {
       notes: "Notes",
       advanced: "Advanced Options",
       password: "Password",
+      removePassword: "Remove",
       maxAccessCount: "Max access count",
       expirationDate: "Expiration date",
       deletionDate: "Deletion date",
@@ -992,6 +995,7 @@ export const enTranslationCatalog: AppTranslationCatalog = {
       saveError: "Failed to save send",
       deleteSuccess: "Send deleted",
       deleteError: "Failed to delete send",
+      removePasswordSuccess: "Password removed",
     },
     dialogs: {
       delete: {
@@ -999,6 +1003,12 @@ export const enTranslationCatalog: AppTranslationCatalog = {
         descriptionPrefix: "Are you sure you want to delete",
         descriptionSuffix: "? This action cannot be undone.",
         deleting: "Deleting...",
+      },
+      removePassword: {
+        title: "Remove Password",
+        description:
+          "Are you sure you want to remove the password from this Send?",
+        confirm: "Remove",
       },
     },
     contextMenu: {
@@ -1009,7 +1019,6 @@ export const enTranslationCatalog: AppTranslationCatalog = {
     detail: {
       selectPrompt: "Select a send to view details",
       textContent: "Text Content",
-      textHidden: "••••••••",
       fileInfo: "File",
       notes: "Notes",
       sendLink: "Send Link",

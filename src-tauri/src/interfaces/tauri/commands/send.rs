@@ -4,8 +4,8 @@ use crate::application::ports::unlock_context_port::UnlockContextProvider;
 use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::interfaces::tauri::dto::send::{
-    to_send_item_dto, CreateSendRequestDto, DeleteSendRequestDto, SendItemDto,
-    SendMutationResponseDto, UpdateSendRequestDto,
+    to_send_item_dto, CreateSendRequestDto, DeleteSendRequestDto, RemoveSendPasswordRequestDto,
+    SendItemDto, SendMutationResponseDto, UpdateSendRequestDto,
 };
 use crate::support::error::{AppError, ErrorPayload};
 use crate::support::redaction::redact_sensitive;
@@ -27,7 +27,7 @@ fn log_command_error(command: &str, error: &AppError) -> ErrorPayload {
 pub async fn list_sends(state: State<'_, AppState>) -> Result<Vec<SendItemDto>, ErrorPayload> {
     let unlock_manager = state.unlock_manager();
     let ctx = unlock_manager
-        .require_fully_unlocked()
+        .require_unlocked()
         .await
         .map_err(|e| log_command_error("list_sends", &e))?;
 
@@ -35,11 +35,14 @@ pub async fn list_sends(state: State<'_, AppState>) -> Result<Vec<SendItemDto>, 
     let user_key = ctx.key.to_dto();
 
     let sends = ListSendsUseCase::new(state.vault_repository())
-        .execute(account_id, user_key)
+        .execute(account_id, user_key.clone())
         .await
         .map_err(|e| log_command_error("list_sends", &e))?;
 
-    Ok(sends.into_iter().map(to_send_item_dto).collect())
+    Ok(sends
+        .into_iter()
+        .map(|s| to_send_item_dto(s, &user_key))
+        .collect())
 }
 
 #[tauri::command]
@@ -137,4 +140,32 @@ pub async fn delete_send(
         .map_err(|e| log_command_error("delete_send", &e))?;
 
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn remove_send_password(
+    request: RemoveSendPasswordRequestDto,
+    state: State<'_, AppState>,
+) -> Result<SendMutationResponseDto, ErrorPayload> {
+    let unlock_manager = state.unlock_manager();
+    let ctx = unlock_manager
+        .require_fully_unlocked()
+        .await
+        .map_err(|e| log_command_error("remove_send_password", &e))?;
+
+    let account_id = ctx.account.account_id;
+    let base_url = ctx.account.base_url;
+    let access_token = ctx.session.access_token;
+
+    let result = state
+        .remove_send_password_use_case()
+        .execute(account_id, base_url, access_token, request.send_id)
+        .await
+        .map_err(|e| log_command_error("remove_send_password", &e))?;
+
+    Ok(SendMutationResponseDto {
+        send_id: result.send_id,
+        revision_date: result.revision_date,
+    })
 }

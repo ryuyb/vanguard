@@ -9,9 +9,9 @@ use crate::application::dto::auth::{
 };
 use crate::application::dto::sync::{
     CipherMutationResult, CreateCipherCommand, CreateFileSendResult, CreateSendCommand,
-    DeleteCipherCommand, DeleteSendCommand, RestoreCipherCommand, RevisionDateQuery,
-    SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder, SyncSend,
-    SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
+    DeleteCipherCommand, DeleteSendCommand, RemoveSendPasswordCommand, RestoreCipherCommand,
+    RevisionDateQuery, SendMutationResult, SoftDeleteCipherCommand, SyncCipher, SyncFolder,
+    SyncSend, SyncVaultCommand, SyncVaultPayload, UpdateCipherCommand, UpdateSendCommand,
 };
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::support::error::AppError;
@@ -406,6 +406,18 @@ impl RemoteVaultPort for VaultwardenRemotePort {
             .delete_send(&command.base_url, &command.access_token, &command.send_id)
             .await
             .map_err(map_vaultwarden_error)
+    }
+
+    async fn remove_send_password(
+        &self,
+        command: RemoveSendPasswordCommand,
+    ) -> AppResult<SyncSend> {
+        let response = self
+            .client
+            .remove_send_password(&command.base_url, &command.access_token, &command.send_id)
+            .await
+            .map_err(map_vaultwarden_error)?;
+        Ok(map_sync_send(response))
     }
 }
 

@@ -11,6 +11,7 @@ pub mod list_ciphers_use_case;
 pub mod list_sends_use_case;
 pub mod master_password_unlock_use_case;
 pub mod poll_revision_use_case;
+pub mod remove_send_password_use_case;
 pub mod restore_cipher_use_case;
 pub mod soft_delete_cipher_use_case;
 pub mod sync_vault_use_case;

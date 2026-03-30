@@ -1231,13 +1231,6 @@ impl SyncVaultUseCase {
     }
 
     async fn persist_incremental_send(&self, account_id: &str, send: SyncSend) -> AppResult<()> {
-        if send.deletion_date.is_some() {
-            self.vault_repository
-                .delete_send_live(account_id, &send.id)
-                .await?;
-            return Ok(());
-        }
-
         self.vault_repository
             .upsert_send_live(account_id, send)
             .await
