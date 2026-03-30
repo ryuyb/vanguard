@@ -16,14 +16,18 @@ use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::create_cipher_use_case::CreateCipherUseCase;
+use crate::application::use_cases::create_send_use_case::CreateSendUseCase;
 use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
+use crate::application::use_cases::delete_send_use_case::DeleteSendUseCase;
 use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
+use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
 use crate::application::use_cases::restore_cipher_use_case::RestoreCipherUseCase;
 use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::sync_vault_use_case::SyncVaultUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
+use crate::application::use_cases::update_send_use_case::UpdateSendUseCase;
 use crate::bootstrap::app_state::AppState;
 use crate::bootstrap::config::AppConfig;
 use crate::bootstrap::unlock_state::{UnlockState, UnlockStatus};
@@ -150,6 +154,26 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         Arc::clone(&sync_event_port),
     ));
 
+    let create_send_use_case = Arc::new(CreateSendUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let update_send_use_case = Arc::new(UpdateSendUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let delete_send_use_case = Arc::new(DeleteSendUseCase::new(
+        Arc::clone(&remote_vault),
+        Arc::clone(&vault_repository),
+        Arc::clone(&sync_event_port),
+    ));
+
+    let list_sends_use_case = Arc::new(ListSendsUseCase::new(Arc::clone(&vault_repository)));
+
     let app_state = AppState::new(
         auth_service,
         sync_service,
@@ -167,6 +191,11 @@ pub fn build_app_state<R: Runtime, M: Manager<R>>(manager: &M) -> AppResult<AppS
         restore_cipher_use_case,
         fetch_cipher_use_case,
         text_injection_port,
+        create_send_use_case,
+        update_send_use_case,
+        delete_send_use_case,
+        list_sends_use_case,
+        vault_repository,
         auth_state_path,
         config,
     );

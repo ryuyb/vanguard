@@ -371,6 +371,38 @@ async restoreCipher(request: RestoreCipherRequestDto) : Promise<Result<null, Err
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listSends() : Promise<Result<SendItemDto[], ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_sends") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async createSend(request: CreateSendRequestDto) : Promise<Result<SendMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_send", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateSend(request: UpdateSendRequestDto) : Promise<Result<SendMutationResponseDto, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_send", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteSend(request: DeleteSendRequestDto) : Promise<Result<null, ErrorPayload>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_send", { request }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -381,6 +413,9 @@ export const events = __makeEvents__<{
 cipherCreated: CipherCreated,
 cipherDeleted: CipherDeleted,
 cipherUpdated: CipherUpdated,
+sendCreated: SendCreated,
+sendDeleted: SendDeleted,
+sendUpdated: SendUpdated,
 unlockStateChanged: UnlockStateChanged,
 vaultFoldersSynced: VaultFoldersSynced,
 vaultSyncAuthRequired: VaultSyncAuthRequired,
@@ -392,6 +427,9 @@ vaultSyncSucceeded: VaultSyncSucceeded
 cipherCreated: "cipher:created",
 cipherDeleted: "cipher:deleted",
 cipherUpdated: "cipher:updated",
+sendCreated: "send:created",
+sendDeleted: "send:deleted",
+sendUpdated: "send:updated",
 unlockStateChanged: "unlock-state:changed",
 vaultFoldersSynced: "vault-folders:synced",
 vaultSyncAuthRequired: "vault-sync:auth-required",
@@ -498,12 +536,14 @@ export type CipherSshKey<S> = { privateKey: string | null; publicKey: string | n
 export type CipherUpdated = { accountId: string; cipherId: string }
 export type CreateCipherRequestDto = { cipher: SyncCipher }
 export type CreateFolderRequest = { name: string }
+export type CreateSendRequestDto = { send: SyncSend; fileData: number[] | null }
 /**
  * Marker type for decrypted cipher state
  */
 export type Decrypted = null
 export type DeleteCipherRequestDto = { cipherId: string }
 export type DeleteFolderRequest = { folderId: string }
+export type DeleteSendRequestDto = { sendId: string }
 export type ErrorPayload = { code: string; message: string; details?: JsonValue | null; timestamp: number; severity: ErrorSeverity }
 export type ErrorSeverity = "info" | "warning" | "error" | "fatal"
 export type FolderDto = { id: string; name: string }
@@ -530,7 +570,12 @@ export type RestoreAuthStateRequestDto = Record<string, never>
 export type RestoreAuthStateResponseDto = { status: RestoreAuthStateStatusDto; accountId: string | null; baseUrl: string | null; email: string | null }
 export type RestoreAuthStateStatusDto = "needsLogin" | "locked" | "authenticated"
 export type RestoreCipherRequestDto = { cipherId: string }
+export type SendCreated = { accountId: string; sendId: string }
+export type SendDeleted = { accountId: string; sendId: string }
 export type SendEmailLoginRequestDto = { baseUrl: string; email: string | null; masterPassword: string | null; authRequestId: string | null; authRequestAccessCode: string | null }
+export type SendItemDto = { id: string; type: number | null; name: string | null; disabled: boolean | null; expirationDate: string | null; deletionDate: string | null; accessCount: number | null; maxAccessCount: number | null; hasPassword: boolean; revisionDate: string | null }
+export type SendMutationResponseDto = { sendId: string; revisionDate: string }
+export type SendUpdated = { accountId: string; sendId: string }
 export type SendVerificationEmailRequestDto = { baseUrl: string; email: string; name: string | null }
 export type SendVerificationEmailResponseDto = { outcome: "disabled"; message: string } | { outcome: "emailVerificationRequired" } | { outcome: "directRegistration"; token: string }
 /**
@@ -563,6 +608,9 @@ export type SyncCipherSshKey = { private_key: string | null; public_key: string 
 export type SyncCountsDto = { folders: number; collections: number; policies: number; ciphers: number; sends: number }
 export type SyncMetricsDto = { windowSize: number; sampleCount: number; successCount: number; failureCount: number; failureRate: number; lastDurationMs: number | null; averageDurationMs: number | null; lastCounts: SyncCountsDto | null; averageCounts: SyncCountsDto | null }
 export type SyncNowRequestDto = { excludeDomains: boolean | null }
+export type SyncSend = { id: string; type: number | null; name: string | null; revision_date: string | null; deletion_date: string | null; object: string | null; access_id: string | null; notes: string | null; key: string | null; password: string | null; text: SyncSendText | null; file: SyncSendFile | null; max_access_count: number | null; access_count: number | null; disabled: boolean | null; hide_email: boolean | null; expiration_date: string | null; emails: string | null; auth_type: number | null }
+export type SyncSendFile = { id: string | null; file_name: string | null; size: string | null; size_name: string | null }
+export type SyncSendText = { text: string | null; hidden: boolean | null }
 export type SyncStateDto = "idle" | "running" | "succeeded" | "degraded" | "failed"
 export type SyncStatusRequestDto = Record<string, never>
 export type SyncStatusResponseDto = { accountId: string; baseUrl: string | null; state: SyncStateDto; wsStatus: WsStatusDto; lastRevisionMs: string | null; lastSyncAtMs: string | null; lastError: string | null; counts: SyncCountsDto; metrics: SyncMetricsDto | null }
@@ -614,6 +662,7 @@ export type UnlockStatusDto =
 "unlocking"
 export type UpdateAppConfigRequest = { locale?: string | null; launchOnLogin?: boolean | null; showWebsiteIcon?: boolean | null; quickAccessShortcut?: string | null; lockShortcut?: string | null; requireMasterPasswordInterval?: string | null; lockOnSleep?: boolean | null; idleAutoLockDelay?: string | null; clipboardClearDelay?: string | null; spotlightAutofill?: boolean | null }
 export type UpdateCipherRequestDto = { cipherId: string; cipher: SyncCipher }
+export type UpdateSendRequestDto = { sendId: string; send: SyncSend }
 export type VaultBiometricStatusResponseDto = { supported: boolean; enabled: boolean }
 /**
  * Vault cipher detail DTO using domain type with flattened fields

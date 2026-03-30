@@ -11,17 +11,22 @@ use crate::application::ports::clipboard_port::ClipboardPort;
 use crate::application::ports::master_password_unlock_data_port::MasterPasswordUnlockDataPort;
 use crate::application::ports::pin_unlock_port::PinUnlockPort;
 use crate::application::ports::text_injection_port::TextInjectionPort;
+use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::ports::vault_runtime_port::VaultRuntimePort;
 use crate::application::services::auth_service::AuthService;
 use crate::application::services::realtime_sync_service::RealtimeSyncService;
 use crate::application::services::sync_service::SyncService;
 use crate::application::use_cases::create_cipher_use_case::CreateCipherUseCase;
+use crate::application::use_cases::create_send_use_case::CreateSendUseCase;
 use crate::application::use_cases::delete_cipher_use_case::DeleteCipherUseCase;
+use crate::application::use_cases::delete_send_use_case::DeleteSendUseCase;
 use crate::application::use_cases::fetch_cipher_use_case::FetchCipherUseCase;
 use crate::application::use_cases::get_cipher_detail_use_case::GetCipherDetailUseCase;
+use crate::application::use_cases::list_sends_use_case::ListSendsUseCase;
 use crate::application::use_cases::restore_cipher_use_case::RestoreCipherUseCase;
 use crate::application::use_cases::soft_delete_cipher_use_case::SoftDeleteCipherUseCase;
 use crate::application::use_cases::update_cipher_use_case::UpdateCipherUseCase;
+use crate::application::use_cases::update_send_use_case::UpdateSendUseCase;
 use crate::bootstrap::auth_persistence_port::{AuthPersistence, AuthPersistenceService};
 use crate::bootstrap::config::AppConfig;
 use crate::bootstrap::unlock_state::{UnifiedUnlockManager, VaultKeyMaterial};
@@ -110,6 +115,12 @@ pub struct AppState {
     restore_cipher_use_case: Arc<RestoreCipherUseCase>,
     fetch_cipher_use_case: Arc<FetchCipherUseCase>,
     text_injection_port: Arc<dyn TextInjectionPort>,
+    // Send use cases
+    create_send_use_case: Arc<CreateSendUseCase>,
+    update_send_use_case: Arc<UpdateSendUseCase>,
+    delete_send_use_case: Arc<DeleteSendUseCase>,
+    list_sends_use_case: Arc<ListSendsUseCase>,
+    vault_repository: Arc<dyn VaultRepositoryPort>,
     // Unified unlock state manager - replaces vault_user_keys and auth_session
     unlock_manager: Arc<UnifiedUnlockManager>,
     icon_service: Arc<IconService>,
@@ -135,6 +146,11 @@ impl AppState {
         restore_cipher_use_case: Arc<RestoreCipherUseCase>,
         fetch_cipher_use_case: Arc<FetchCipherUseCase>,
         text_injection_port: Arc<dyn TextInjectionPort>,
+        create_send_use_case: Arc<CreateSendUseCase>,
+        update_send_use_case: Arc<UpdateSendUseCase>,
+        delete_send_use_case: Arc<DeleteSendUseCase>,
+        list_sends_use_case: Arc<ListSendsUseCase>,
+        vault_repository: Arc<dyn VaultRepositoryPort>,
         auth_states_dir: PathBuf,
         config: AppConfig,
     ) -> Self {
@@ -179,6 +195,11 @@ impl AppState {
             restore_cipher_use_case,
             fetch_cipher_use_case,
             text_injection_port,
+            create_send_use_case,
+            update_send_use_case,
+            delete_send_use_case,
+            list_sends_use_case,
+            vault_repository,
             unlock_manager,
             icon_service: Arc::new(IconService::new().expect("Failed to create IconService")),
             focus_tracker: Arc::new(Mutex::new(FocusTracker::new())),
@@ -243,6 +264,26 @@ impl AppState {
 
     pub fn fetch_cipher_use_case(&self) -> Arc<FetchCipherUseCase> {
         Arc::clone(&self.fetch_cipher_use_case)
+    }
+
+    pub fn create_send_use_case(&self) -> Arc<CreateSendUseCase> {
+        Arc::clone(&self.create_send_use_case)
+    }
+
+    pub fn update_send_use_case(&self) -> Arc<UpdateSendUseCase> {
+        Arc::clone(&self.update_send_use_case)
+    }
+
+    pub fn delete_send_use_case(&self) -> Arc<DeleteSendUseCase> {
+        Arc::clone(&self.delete_send_use_case)
+    }
+
+    pub fn list_sends_use_case(&self) -> Arc<ListSendsUseCase> {
+        Arc::clone(&self.list_sends_use_case)
+    }
+
+    pub fn vault_repository(&self) -> Arc<dyn VaultRepositoryPort> {
+        Arc::clone(&self.vault_repository)
     }
 
     pub fn icon_service(&self) -> Arc<IconService> {

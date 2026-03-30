@@ -4,6 +4,7 @@ pub mod config;
 pub mod desktop;
 pub mod folder;
 pub mod icon;
+pub mod send;
 pub mod sync;
 pub mod unlock_state;
 pub mod vault;

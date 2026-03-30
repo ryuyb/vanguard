@@ -4,6 +4,7 @@ use tauri_specta::Event;
 use crate::application::ports::sync_event_port::SyncEventPort;
 use crate::domain::sync::SyncContext;
 use crate::interfaces::tauri::events::cipher::{CipherCreated, CipherDeleted, CipherUpdated};
+use crate::interfaces::tauri::events::send::{SendCreated, SendDeleted, SendUpdated};
 use crate::interfaces::tauri::events::sync::{
     VaultFoldersSynced, VaultSyncAuthRequired, VaultSyncFailed, VaultSyncLoggedOut,
     VaultSyncStarted, VaultSyncSucceeded,
@@ -147,6 +148,48 @@ impl<R: Runtime> SyncEventPort for TauriSyncEventAdapter<R> {
             log::warn!(
                 target: "vanguard::tauri::cipher",
                 "failed to emit cipher:deleted for account_id={account_id} cipher_id={cipher_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_send_created(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendCreated {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:created for account_id={account_id} send_id={send_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_send_updated(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendUpdated {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:updated for account_id={account_id} send_id={send_id}: {error}"
+            );
+        }
+    }
+
+    fn emit_send_deleted(&self, account_id: &str, send_id: &str) {
+        if let Err(error) = (SendDeleted {
+            account_id: String::from(account_id),
+            send_id: String::from(send_id),
+        })
+        .emit(&self.app)
+        {
+            log::warn!(
+                target: "vanguard::tauri::send",
+                "failed to emit send:deleted for account_id={account_id} send_id={send_id}: {error}"
             );
         }
     }

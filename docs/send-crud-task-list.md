@@ -226,9 +226,9 @@
 
 **文件：** `src-tauri/src/application/use_cases/create_send_use_case.rs`（新建）
 
-- [ ] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
-- [ ] `execute(account_id, base_url, access_token, send: SyncSend, user_key, file_data: Option<Vec<u8>>) -> AppResult<SendMutationResult>`
-- [ ] 流程：验证 name 非空 → encrypt_send → 判断类型：
+- [x] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
+- [x] `execute(account_id, base_url, access_token, send: SyncSend, user_key, file_data: Option<Vec<u8>>) -> AppResult<SendMutationResult>`
+- [x] 流程：验证 name 非空 → encrypt_send → 判断类型：
   - Text: `remote_vault.create_send` → 本地 `upsert_send` → emit
   - File: `remote_vault.create_file_send` → `upload_send_file(file_data)` → 本地 `upsert_send` → emit
 
@@ -236,66 +236,66 @@
 
 **文件：** `src-tauri/src/application/use_cases/update_send_use_case.rs`（新建）
 
-- [ ] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
-- [ ] `execute(account_id, base_url, access_token, send_id, send: SyncSend, user_key) -> AppResult<SendMutationResult>`
-- [ ] 流程：验证 → encrypt_send → `remote_vault.update_send` → 本地 `upsert_send` → emit
+- [x] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
+- [x] `execute(account_id, base_url, access_token, send_id, send: SyncSend, user_key) -> AppResult<SendMutationResult>`
+- [x] 流程：验证 → encrypt_send → `remote_vault.update_send` → 本地 `upsert_send` → emit
 
 ### 5.3 DeleteSendUseCase
 
 **文件：** `src-tauri/src/application/use_cases/delete_send_use_case.rs`（新建）
 
-- [ ] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
-- [ ] `execute(account_id, base_url, access_token, send_id) -> AppResult<()>`
-- [ ] 流程：验证 → `remote_vault.delete_send` → 本地 `delete_send` → emit
+- [x] 注入 `RemoteVaultPort`, `VaultRepositoryPort`, `SyncEventPort`
+- [x] `execute(account_id, base_url, access_token, send_id) -> AppResult<()>`
+- [x] 流程：验证 → `remote_vault.delete_send` → 本地 `delete_send` → emit
 
 ### 5.4 ListSendsUseCase
 
 **文件：** `src-tauri/src/application/use_cases/list_sends_use_case.rs`（新建）
 
-- [ ] 注入 `VaultRepositoryPort`
-- [ ] `execute(account_id, user_key) -> AppResult<Vec<SyncSend>>`
-- [ ] 流程：`vault_repository.list_live_sends` → 逐条 `decrypt_send` → 返回
+- [x] 注入 `VaultRepositoryPort`
+- [x] `execute(account_id, user_key) -> AppResult<Vec<SyncSend>>`
+- [x] 流程：`vault_repository.list_live_sends` → 逐条 `decrypt_send` → 返回
 
 ### 5.5 注册 use cases 模块
 
 **文件：** `src-tauri/src/application/use_cases/mod.rs`
 
-- [ ] 添加 `pub mod create_send_use_case;`
-- [ ] 添加 `pub mod update_send_use_case;`
-- [ ] 添加 `pub mod delete_send_use_case;`
-- [ ] 添加 `pub mod list_sends_use_case;`
+- [x] 添加 `pub mod create_send_use_case;`
+- [x] 添加 `pub mod update_send_use_case;`
+- [x] 添加 `pub mod delete_send_use_case;`
+- [x] 添加 `pub mod list_sends_use_case;`
 
 ### 5.6 扩展 SyncEventPort
 
 **文件：** `src-tauri/src/application/ports/sync_event_port.rs`
 
-- [ ] 添加 `fn emit_send_created(&self, account_id: &str, send_id: &str);`
-- [ ] 添加 `fn emit_send_updated(&self, account_id: &str, send_id: &str);`
-- [ ] 添加 `fn emit_send_deleted(&self, account_id: &str, send_id: &str);`
+- [x] 添加 `fn emit_send_created(&self, account_id: &str, send_id: &str);`
+- [x] 添加 `fn emit_send_updated(&self, account_id: &str, send_id: &str);`
+- [x] 添加 `fn emit_send_deleted(&self, account_id: &str, send_id: &str);`
 
 ### 5.7 实现 Tauri 事件
 
 **文件：** `src-tauri/src/interfaces/tauri/events/send.rs`（新建）
 
-- [ ] 定义 `SendCreated`、`SendUpdated`、`SendDeleted` 事件结构体（参考 `events/cipher.rs`）
+- [x] 定义 `SendCreated`、`SendUpdated`、`SendDeleted` 事件结构体（参考 `events/cipher.rs`）
 
 **文件：** `src-tauri/src/interfaces/tauri/events/mod.rs`
 
-- [ ] 添加 `pub mod send;`
+- [x] 添加 `pub mod send;`
 
 **文件：** `src-tauri/src/interfaces/tauri/events/sync_event_adapter.rs`
 
-- [ ] 实现 `emit_send_created`、`emit_send_updated`、`emit_send_deleted`（参考 cipher 事件实现）
+- [x] 实现 `emit_send_created`、`emit_send_updated`、`emit_send_deleted`（参考 cipher 事件实现）
 
 **文件：** `src-tauri/src/lib.rs`
 
-- [ ] 在 `collect_events!` 中注册 `SendCreated`、`SendUpdated`、`SendDeleted`
+- [x] 在 `collect_events!` 中注册 `SendCreated`、`SendUpdated`、`SendDeleted`
 
 ### 验收标准
 
-- [ ] `cargo test` — 通过
-- [ ] 4 个 use case 文件结构与现有 cipher use cases 一致
-- [ ] SyncEventPort 的 3 个新方法在 adapter 中有实现
+- [x] `cargo test` — 通过
+- [x] 4 个 use case 文件结构与现有 cipher use cases 一致
+- [x] SyncEventPort 的 3 个新方法在 adapter 中有实现
 
 ---
 
@@ -308,59 +308,59 @@
 
 **文件：** `src-tauri/src/interfaces/tauri/dto/send.rs`（新建）
 
-- [ ] `SendItemDto` — 列表项（id, type, name, disabled, expiration_date, deletion_date, access_count, max_access_count, has_password, revision_date）
-- [ ] `SendDetailDto` — 详情（SendItemDto 全部字段 + notes, text, file, hide_email, access_id, key, emails, auth_type）
-- [ ] `CreateSendRequestDto` — 创建请求（send: SyncSend, file_data: Option<Vec<u8>>）
-- [ ] `UpdateSendRequestDto` — 更新请求（send_id, send: SyncSend）
-- [ ] `DeleteSendRequestDto` — 删除请求（send_id）
-- [ ] `SendMutationResponseDto` — 变更响应（send_id, revision_date）
+- [x] `SendItemDto` — 列表项（id, type, name, disabled, expiration_date, deletion_date, access_count, max_access_count, has_password, revision_date）
+- [x] `SendDetailDto` — 详情（SendItemDto 全部字段 + notes, text, file, hide_email, access_id, key, emails, auth_type）
+- [x] `CreateSendRequestDto` — 创建请求（send: SyncSend, file_data: Option<Vec<u8>>）
+- [x] `UpdateSendRequestDto` — 更新请求（send_id, send: SyncSend）
+- [x] `DeleteSendRequestDto` — 删除请求（send_id）
+- [x] `SendMutationResponseDto` — 变更响应（send_id, revision_date）
 
 **文件：** `src-tauri/src/interfaces/tauri/dto/mod.rs`
 
-- [ ] 添加 `pub mod send;`
+- [x] 添加 `pub mod send;`
 
 ### 6.2 Tauri Commands
 
 **文件：** `src-tauri/src/interfaces/tauri/commands/send.rs`（新建）
 
-- [ ] `list_sends(state) -> Result<Vec<SendItemDto>, ErrorPayload>`
+- [x] `list_sends(state) -> Result<Vec<SendItemDto>, ErrorPayload>`
   - 获取 account_id + user_key → 调用 ListSendsUseCase → 映射为 SendItemDto
-- [ ] `create_send(state, request: CreateSendRequestDto) -> Result<SendMutationResponseDto, ErrorPayload>`
+- [x] `create_send(state, request: CreateSendRequestDto) -> Result<SendMutationResponseDto, ErrorPayload>`
   - 获取 session 信息 + user_key → 调用 CreateSendUseCase
-- [ ] `update_send(state, request: UpdateSendRequestDto) -> Result<SendMutationResponseDto, ErrorPayload>`
+- [x] `update_send(state, request: UpdateSendRequestDto) -> Result<SendMutationResponseDto, ErrorPayload>`
   - 获取 session 信息 + user_key → 调用 UpdateSendUseCase
-- [ ] `delete_send(state, request: DeleteSendRequestDto) -> Result<(), ErrorPayload>`
+- [x] `delete_send(state, request: DeleteSendRequestDto) -> Result<(), ErrorPayload>`
   - 获取 session 信息 → 调用 DeleteSendUseCase
 
 **文件：** `src-tauri/src/interfaces/tauri/commands/mod.rs`
 
-- [ ] 添加 `pub mod send;`
+- [x] 添加 `pub mod send;`
 
 ### 6.3 AppState 布线
 
 **文件：** `src-tauri/src/bootstrap/app_state.rs`
 
-- [ ] 添加字段：`create_send_use_case`, `update_send_use_case`, `delete_send_use_case`, `list_sends_use_case`（均为 `Arc<...>`）
-- [ ] 添加对应 getter 方法
-- [ ] 更新 `new()` 构造函数参数
+- [x] 添加字段：`create_send_use_case`, `update_send_use_case`, `delete_send_use_case`, `list_sends_use_case`（均为 `Arc<...>`）
+- [x] 添加对应 getter 方法
+- [x] 更新 `new()` 构造函数参数
 
 **文件：** `src-tauri/src/bootstrap/wiring.rs`
 
-- [ ] 构建 4 个 send use case 实例
-- [ ] 传入 `AppState::new()`
+- [x] 构建 4 个 send use case 实例
+- [x] 传入 `AppState::new()`
 
 ### 6.4 注册 Commands
 
 **文件：** `src-tauri/src/lib.rs`
 
-- [ ] 在 `collect_commands!` 中添加 `list_sends`, `create_send`, `update_send`, `delete_send`
+- [x] 在 `collect_commands!` 中添加 `list_sends`, `create_send`, `update_send`, `delete_send`
 
 ### 验收标准
 
-- [ ] `cargo build` — 成功编译
-- [ ] `cargo clippy --all-targets --all-features -- -D warnings` — 无警告
-- [ ] `src/bindings.ts` 自动生成，包含 `listSends`, `createSend`, `updateSend`, `deleteSend` 命令类型
-- [ ] `src/bindings.ts` 包含 `SendCreated`, `SendUpdated`, `SendDeleted` 事件类型
+- [x] `cargo build` — 成功编译
+- [x] `cargo clippy --all-targets --all-features -- -D warnings` — 无警告
+- [x] `src/bindings.ts` 自动生成，包含 `listSends`, `createSend`, `updateSend`, `deleteSend` 命令类型
+- [x] `src/bindings.ts` 包含 `SendCreated`, `SendUpdated`, `SendDeleted` 事件类型
 
 ---
 

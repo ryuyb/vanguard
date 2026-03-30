@@ -58,7 +58,11 @@ pub fn run() {
             interfaces::tauri::commands::cipher::update_cipher,
             interfaces::tauri::commands::cipher::delete_cipher,
             interfaces::tauri::commands::cipher::soft_delete_cipher,
-            interfaces::tauri::commands::cipher::restore_cipher
+            interfaces::tauri::commands::cipher::restore_cipher,
+            interfaces::tauri::commands::send::list_sends,
+            interfaces::tauri::commands::send::create_send,
+            interfaces::tauri::commands::send::update_send,
+            interfaces::tauri::commands::send::delete_send
         ])
         .events(tauri_specta::collect_events![
             interfaces::tauri::events::sync::VaultSyncStarted,
@@ -70,6 +74,9 @@ pub fn run() {
             interfaces::tauri::events::cipher::CipherCreated,
             interfaces::tauri::events::cipher::CipherUpdated,
             interfaces::tauri::events::cipher::CipherDeleted,
+            interfaces::tauri::events::send::SendCreated,
+            interfaces::tauri::events::send::SendUpdated,
+            interfaces::tauri::events::send::SendDeleted,
             interfaces::tauri::events::unlock_state::UnlockStateChanged
         ]);
 

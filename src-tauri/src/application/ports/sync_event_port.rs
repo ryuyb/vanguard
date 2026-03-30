@@ -18,4 +18,10 @@ pub trait SyncEventPort: Send + Sync {
     fn emit_cipher_updated(&self, account_id: &str, cipher_id: &str);
 
     fn emit_cipher_deleted(&self, account_id: &str, cipher_id: &str);
+
+    fn emit_send_created(&self, account_id: &str, send_id: &str);
+
+    fn emit_send_updated(&self, account_id: &str, send_id: &str);
+
+    fn emit_send_deleted(&self, account_id: &str, send_id: &str);
 }
