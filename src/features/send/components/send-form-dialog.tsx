@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, LoaderCircle } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SendItemDto, SyncSend } from "@/bindings";
@@ -335,9 +335,11 @@ export function SendFormDialog({
                       disabled={isRemovingPassword}
                       onClick={() => setConfirmRemovePassword(true)}
                     >
-                      {isRemovingPassword
-                        ? "..."
-                        : t("send.form.removePassword")}
+                      {isRemovingPassword ? (
+                        <LoaderCircle className="size-4 animate-spin" />
+                      ) : (
+                        t("send.form.removePassword")
+                      )}
                     </Button>
                   </div>
                 ) : (
@@ -434,11 +436,13 @@ export function SendFormDialog({
               {t("common.actions.cancel")}
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading
-                ? "..."
-                : mode === "create"
-                  ? t("send.form.submit.create")
-                  : t("send.form.submit.save")}
+              {isLoading ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : mode === "create" ? (
+                t("send.form.submit.create")
+              ) : (
+                t("send.form.submit.save")
+              )}
             </Button>
           </DialogFooter>
         </form>
@@ -476,9 +480,11 @@ export function SendFormDialog({
                 }
               }}
             >
-              {isRemovingPassword
-                ? "..."
-                : t("send.dialogs.removePassword.confirm")}
+              {isRemovingPassword ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                t("send.dialogs.removePassword.confirm")
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
