@@ -1,6 +1,8 @@
 mod push_type;
+mod sync_policy;
 
 pub use push_type::PushType;
+pub use sync_policy::{is_revision_changed, should_skip_payload_persist};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncState {

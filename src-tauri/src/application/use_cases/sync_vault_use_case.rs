@@ -9,7 +9,10 @@ use crate::application::policy::sync_policy::SyncPolicy;
 use crate::application::ports::remote_vault_port::RemoteVaultPort;
 use crate::application::ports::vault_repository_port::VaultRepositoryPort;
 use crate::application::use_cases::poll_revision_use_case::PollRevisionUseCase;
-use crate::domain::sync::{PushType, SyncItemCounts, SyncResult, SyncTrigger, VaultSnapshotMeta};
+use crate::domain::sync::{
+    is_revision_changed, should_skip_payload_persist, PushType, SyncItemCounts, SyncResult,
+    VaultSnapshotMeta,
+};
 use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::time::{sleep, timeout, Duration};
@@ -1123,34 +1126,6 @@ fn is_server_error_status(error: &AppError) -> bool {
     matches!(error.status(), Some(status) if (500..=599).contains(&status))
 }
 
-fn is_revision_changed(previous: Option<i64>, current: Option<i64>) -> bool {
-    match (previous, current) {
-        (_, None) => false,
-        (Some(previous), Some(current)) => previous != current,
-        (None, Some(_)) => true,
-    }
-}
-
-fn should_skip_payload_persist(
-    trigger: SyncTrigger,
-    last_sync_at_ms: Option<i64>,
-    previous_revision_ms: Option<i64>,
-    current_revision_ms: Option<i64>,
-) -> bool {
-    if matches!(trigger, SyncTrigger::Manual) {
-        return false;
-    }
-
-    if last_sync_at_ms.is_none() {
-        return false;
-    }
-
-    match (previous_revision_ms, current_revision_ms) {
-        (Some(previous), Some(current)) => previous == current,
-        _ => false,
-    }
-}
-
 fn summarize_counts(payload: &crate::application::dto::sync::SyncVaultPayload) -> SyncItemCounts {
     SyncItemCounts {
         folders: clamp_count(payload.folders.len()),
@@ -1213,8 +1188,8 @@ fn send_endpoint(base_url: &str, send_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_retryable_error, should_skip_payload_persist};
-    use crate::domain::sync::SyncTrigger;
+    use super::is_retryable_error;
+    use crate::domain::sync::{should_skip_payload_persist, SyncTrigger};
     use crate::support::error::AppError;
 
     #[test]
