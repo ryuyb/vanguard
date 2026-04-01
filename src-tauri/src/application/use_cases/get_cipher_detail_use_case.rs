@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::application::cipher_key::resolve_decryption_key;
 use crate::application::dto::sync::SyncCipher;
 use crate::application::dto::vault::{GetCipherDetailQuery, VaultUserKeyMaterial};
 use crate::application::services::sync_service::SyncService;
@@ -44,53 +45,12 @@ fn decrypt_cipher_detail(
     cipher: SyncCipher,
     user_key: &VaultUserKeyMaterial,
 ) -> Result<Cipher<Decrypted>, AppError> {
-    // Convert SyncCipher to Cipher<Encrypted>
     let encrypted: Cipher<Encrypted> = cipher.into();
 
-    // Resolve the decryption key (cipher-specific key or user key)
-    // cipher.key is a plain Option<String> field
-    let cipher_key_str = encrypted.key.as_deref();
+    // 使用 cipher_key 模块的方法
+    let detail_key = resolve_decryption_key(encrypted.key.as_deref(), user_key)?;
 
-    let detail_key = resolve_cipher_decryption_key(cipher_key_str, user_key)?;
-
-    // Decrypt using the new type-state pattern
     encrypted.decrypt(&detail_key, "cipher")
-}
-
-fn resolve_cipher_decryption_key(
-    cipher_key: Option<&str>,
-    user_key: &VaultUserKeyMaterial,
-) -> Result<VaultUserKeyMaterial, AppError> {
-    let Some(raw) = cipher_key else {
-        return Ok(user_key.clone());
-    };
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Ok(user_key.clone());
-    }
-
-    if vault_crypto::looks_like_cipher_string(trimmed) {
-        let decrypted = vault_crypto::decrypt_cipher_bytes(trimmed, user_key).map_err(|error| {
-            AppError::ValidationFieldError {
-                field: "unknown".to_string(),
-                message: format!("failed to decrypt field `cipher.key`: {}", error.message()),
-            }
-        })?;
-        return vault_crypto::parse_user_key_material(&decrypted).map_err(|error| {
-            AppError::ValidationFieldError {
-                field: "unknown".to_string(),
-                message: format!(
-                    "failed to parse decrypted field `cipher.key`: {}",
-                    error.message()
-                ),
-            }
-        });
-    }
-
-    vault_crypto::parse_user_key(trimmed).map_err(|error| AppError::ValidationFieldError {
-        field: "unknown".to_string(),
-        message: format!("failed to parse field `cipher.key`: {}", error.message()),
-    })
 }
 
 fn require_non_empty(value: &str, field: &str) -> AppResult<()> {
