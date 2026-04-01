@@ -72,18 +72,8 @@ fn parse_totp(raw_totp: &str) -> AppResult<TOTP> {
         TOTP::new_unchecked(Algorithm::SHA1, 6, 1, 30, secret, None, String::new())
     };
 
-    if totp.step == 0 || totp.step > 300 || totp.secret.is_empty() {
-        return Err(AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "invalid totp configuration".to_string(),
-        });
-    }
-    if totp.digits < 6 || totp.digits > 9 {
-        return Err(AppError::ValidationFieldError {
-            field: "unknown".to_string(),
-            message: "invalid totp configuration".to_string(),
-        });
-    }
+    // 使用 Domain 层验证替代 Application 层硬编码验证
+    crate::domain::totp::TotpConfiguration::from_totp(&totp)?;
 
     Ok(totp)
 }
