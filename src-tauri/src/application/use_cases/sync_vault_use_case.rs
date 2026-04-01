@@ -14,6 +14,39 @@ use crate::support::error::AppError;
 use crate::support::result::AppResult;
 use tokio::time::{sleep, timeout, Duration};
 
+#[derive(Clone, Copy)]
+enum IncrementalSyncKind {
+    Cipher,
+    Folder,
+    Send,
+}
+
+impl IncrementalSyncKind {
+    fn entity_type(&self) -> &'static str {
+        match self {
+            IncrementalSyncKind::Cipher => "cipher",
+            IncrementalSyncKind::Folder => "folder",
+            IncrementalSyncKind::Send => "send",
+        }
+    }
+
+    fn id_field_name(&self) -> &'static str {
+        match self {
+            IncrementalSyncKind::Cipher => "cipher_id",
+            IncrementalSyncKind::Folder => "folder_id",
+            IncrementalSyncKind::Send => "send_id",
+        }
+    }
+
+    fn endpoint(&self, base_url: &str, id: &str) -> String {
+        match self {
+            IncrementalSyncKind::Cipher => cipher_endpoint(base_url, id),
+            IncrementalSyncKind::Folder => folder_endpoint(base_url, id),
+            IncrementalSyncKind::Send => send_endpoint(base_url, id),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct SyncVaultUseCase {
     remote_vault: Arc<dyn RemoteVaultPort>,
@@ -79,145 +112,8 @@ impl SyncVaultUseCase {
         cipher_id: String,
         push_type: PushType,
     ) -> AppResult<SyncOutcome> {
-        require_non_empty(&command.account_id, "account_id")?;
-        require_non_empty(&command.base_url, "base_url")?;
-        require_non_empty(&command.access_token, "access_token")?;
-        require_non_empty(&cipher_id, "cipher_id")?;
-
-        let started_at = Instant::now();
-        let cipher_endpoint = cipher_endpoint(&command.base_url, &cipher_id);
-        let revision_endpoint = revision_endpoint(&command.base_url);
-        let previous_context = self
-            .vault_repository
-            .set_sync_running(&command.account_id, &command.base_url)
-            .await?;
-
-        log::info!(
-            target: "vanguard::sync",
-            "incremental cipher sync started account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={}",
-            command.account_id,
-            cipher_endpoint,
-            command.trigger,
-            push_type,
-            cipher_id
-        );
-
-        if let Err(error) = self
-            .apply_cipher_incremental_update(&command, &cipher_id, push_type)
+        self.execute_incremental(command, IncrementalSyncKind::Cipher, cipher_id, push_type)
             .await
-        {
-            log::error!(
-                target: "vanguard::sync",
-                "incremental cipher sync failed account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={} status={} error_code={} message={}",
-                command.account_id,
-                cipher_endpoint,
-                command.trigger,
-                push_type,
-                cipher_id,
-                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                error.code(),
-                error
-            );
-            let message = error.message();
-            self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
-                .await;
-            return Err(error);
-        }
-
-        let revision_ms = match self
-            .poll_revision_use_case
-            .execute(RevisionDateQuery {
-                base_url: command.base_url.clone(),
-                access_token: command.access_token.clone(),
-            })
-            .await
-        {
-            Ok(value) => Some(value),
-            Err(error) => {
-                if previous_context.last_sync_at_ms.is_none() {
-                    log::error!(
-                        target: "vanguard::sync",
-                        "revision-date failed on incremental sync account_id={} endpoint={} status={} error_code={} message={}",
-                        command.account_id,
-                        revision_endpoint,
-                        error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                        error.code(),
-                        error
-                    );
-                    let message = error.message();
-                    self.mark_sync_error_state(
-                        &command.account_id,
-                        &command.base_url,
-                        &error,
-                        message,
-                    )
-                    .await;
-                    return Err(error);
-                }
-
-                log::warn!(
-                    target: "vanguard::sync",
-                    "revision-date failed after incremental sync account_id={} endpoint={} status={} error_code={} message={} (fallback_to_previous_revision={})",
-                    command.account_id,
-                    revision_endpoint,
-                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                    error.code(),
-                    error,
-                    previous_context.last_revision_ms.is_some()
-                );
-                previous_context.last_revision_ms
-            }
-        };
-
-        let synced_at_ms = now_unix_ms()?;
-        let revision_changed = is_revision_changed(previous_context.last_revision_ms, revision_ms);
-        let mut counts = previous_context.counts.clone();
-        counts.ciphers = self
-            .vault_repository
-            .count_live_ciphers(&command.account_id)
-            .await?;
-
-        let context = self
-            .vault_repository
-            .set_sync_succeeded(
-                &command.account_id,
-                &command.base_url,
-                revision_ms,
-                synced_at_ms,
-                counts.clone(),
-            )
-            .await?;
-        self.vault_repository
-            .save_snapshot_meta(
-                &command.account_id,
-                VaultSnapshotMeta {
-                    snapshot_revision_ms: revision_ms,
-                    snapshot_synced_at_ms: synced_at_ms,
-                    source: command.trigger,
-                },
-            )
-            .await?;
-
-        let result = SyncResult {
-            duration_ms: clamp_duration_ms(started_at.elapsed()),
-            item_counts: counts,
-            revision_changed,
-        };
-
-        log::info!(
-            target: "vanguard::sync",
-            "incremental cipher sync finished account_id={} endpoint={} trigger={:?} push_type={:?} cipher_id={} duration_ms={} revision_changed={} ciphers={}",
-            command.account_id,
-            cipher_endpoint,
-            command.trigger,
-            push_type,
-            cipher_id,
-            result.duration_ms,
-            result.revision_changed,
-            result.item_counts.ciphers
-        );
-
-        Ok(SyncOutcome { context, result })
     }
 
     pub async fn execute_folder_incremental(
@@ -226,145 +122,8 @@ impl SyncVaultUseCase {
         folder_id: String,
         push_type: PushType,
     ) -> AppResult<SyncOutcome> {
-        require_non_empty(&command.account_id, "account_id")?;
-        require_non_empty(&command.base_url, "base_url")?;
-        require_non_empty(&command.access_token, "access_token")?;
-        require_non_empty(&folder_id, "folder_id")?;
-
-        let started_at = Instant::now();
-        let folder_endpoint = folder_endpoint(&command.base_url, &folder_id);
-        let revision_endpoint = revision_endpoint(&command.base_url);
-        let previous_context = self
-            .vault_repository
-            .set_sync_running(&command.account_id, &command.base_url)
-            .await?;
-
-        log::info!(
-            target: "vanguard::sync",
-            "incremental folder sync started account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={}",
-            command.account_id,
-            folder_endpoint,
-            command.trigger,
-            push_type,
-            folder_id
-        );
-
-        if let Err(error) = self
-            .apply_folder_incremental_update(&command, &folder_id, push_type)
+        self.execute_incremental(command, IncrementalSyncKind::Folder, folder_id, push_type)
             .await
-        {
-            log::error!(
-                target: "vanguard::sync",
-                "incremental folder sync failed account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={} status={} error_code={} message={}",
-                command.account_id,
-                folder_endpoint,
-                command.trigger,
-                push_type,
-                folder_id,
-                error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                error.code(),
-                error
-            );
-            let message = error.message();
-            self.mark_sync_error_state(&command.account_id, &command.base_url, &error, message)
-                .await;
-            return Err(error);
-        }
-
-        let revision_ms = match self
-            .poll_revision_use_case
-            .execute(RevisionDateQuery {
-                base_url: command.base_url.clone(),
-                access_token: command.access_token.clone(),
-            })
-            .await
-        {
-            Ok(value) => Some(value),
-            Err(error) => {
-                if previous_context.last_sync_at_ms.is_none() {
-                    log::error!(
-                        target: "vanguard::sync",
-                        "revision-date failed on incremental sync account_id={} endpoint={} status={} error_code={} message={}",
-                        command.account_id,
-                        revision_endpoint,
-                        error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                        error.code(),
-                        error
-                    );
-                    let message = error.message();
-                    self.mark_sync_error_state(
-                        &command.account_id,
-                        &command.base_url,
-                        &error,
-                        message,
-                    )
-                    .await;
-                    return Err(error);
-                }
-
-                log::warn!(
-                    target: "vanguard::sync",
-                    "revision-date failed after incremental sync account_id={} endpoint={} status={} error_code={} message={} (fallback_to_previous_revision={})",
-                    command.account_id,
-                    revision_endpoint,
-                    error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
-                    error.code(),
-                    error,
-                    previous_context.last_revision_ms.is_some()
-                );
-                previous_context.last_revision_ms
-            }
-        };
-
-        let synced_at_ms = now_unix_ms()?;
-        let revision_changed = is_revision_changed(previous_context.last_revision_ms, revision_ms);
-        let mut counts = previous_context.counts.clone();
-        counts.folders = self
-            .vault_repository
-            .count_live_folders(&command.account_id)
-            .await?;
-
-        let context = self
-            .vault_repository
-            .set_sync_succeeded(
-                &command.account_id,
-                &command.base_url,
-                revision_ms,
-                synced_at_ms,
-                counts.clone(),
-            )
-            .await?;
-        self.vault_repository
-            .save_snapshot_meta(
-                &command.account_id,
-                VaultSnapshotMeta {
-                    snapshot_revision_ms: revision_ms,
-                    snapshot_synced_at_ms: synced_at_ms,
-                    source: command.trigger,
-                },
-            )
-            .await?;
-
-        let result = SyncResult {
-            duration_ms: clamp_duration_ms(started_at.elapsed()),
-            item_counts: counts,
-            revision_changed,
-        };
-
-        log::info!(
-            target: "vanguard::sync",
-            "incremental folder sync finished account_id={} endpoint={} trigger={:?} push_type={:?} folder_id={} duration_ms={} revision_changed={} folders={}",
-            command.account_id,
-            folder_endpoint,
-            command.trigger,
-            push_type,
-            folder_id,
-            result.duration_ms,
-            result.revision_changed,
-            result.item_counts.folders
-        );
-
-        Ok(SyncOutcome { context, result })
     }
 
     pub async fn execute_send_incremental(
@@ -373,13 +132,24 @@ impl SyncVaultUseCase {
         send_id: String,
         push_type: PushType,
     ) -> AppResult<SyncOutcome> {
+        self.execute_incremental(command, IncrementalSyncKind::Send, send_id, push_type)
+            .await
+    }
+
+    async fn execute_incremental(
+        &self,
+        command: SyncVaultCommand,
+        kind: IncrementalSyncKind,
+        entity_id: String,
+        push_type: PushType,
+    ) -> AppResult<SyncOutcome> {
         require_non_empty(&command.account_id, "account_id")?;
         require_non_empty(&command.base_url, "base_url")?;
         require_non_empty(&command.access_token, "access_token")?;
-        require_non_empty(&send_id, "send_id")?;
+        require_non_empty(&entity_id, kind.id_field_name())?;
 
         let started_at = Instant::now();
-        let send_endpoint = send_endpoint(&command.base_url, &send_id);
+        let entity_endpoint = kind.endpoint(&command.base_url, &entity_id);
         let revision_endpoint = revision_endpoint(&command.base_url);
         let previous_context = self
             .vault_repository
@@ -388,26 +158,30 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental send sync started account_id={} endpoint={} trigger={:?} push_type={:?} send_id={}",
+            "incremental {} sync started account_id={} endpoint={} trigger={:?} push_type={:?} {}_id={}",
+            kind.entity_type(),
             command.account_id,
-            send_endpoint,
+            entity_endpoint,
             command.trigger,
             push_type,
-            send_id
+            kind.entity_type(),
+            entity_id
         );
 
         if let Err(error) = self
-            .apply_send_incremental_update(&command, &send_id, push_type)
+            .apply_incremental_update(&command, kind, &entity_id, push_type)
             .await
         {
             log::error!(
                 target: "vanguard::sync",
-                "incremental send sync failed account_id={} endpoint={} trigger={:?} push_type={:?} send_id={} status={} error_code={} message={}",
+                "incremental {} sync failed account_id={} endpoint={} trigger={:?} push_type={:?} {}_id={} status={} error_code={} message={}",
+                kind.entity_type(),
                 command.account_id,
-                send_endpoint,
+                entity_endpoint,
                 command.trigger,
                 push_type,
-                send_id,
+                kind.entity_type(),
+                entity_id,
                 error.status().map(|value| value.to_string()).unwrap_or_else(|| String::from("n/a")),
                 error.code(),
                 error
@@ -466,10 +240,26 @@ impl SyncVaultUseCase {
         let synced_at_ms = now_unix_ms()?;
         let revision_changed = is_revision_changed(previous_context.last_revision_ms, revision_ms);
         let mut counts = previous_context.counts.clone();
-        counts.sends = self
-            .vault_repository
-            .count_live_sends(&command.account_id)
-            .await?;
+        match kind {
+            IncrementalSyncKind::Cipher => {
+                counts.ciphers = self
+                    .vault_repository
+                    .count_live_ciphers(&command.account_id)
+                    .await?;
+            }
+            IncrementalSyncKind::Folder => {
+                counts.folders = self
+                    .vault_repository
+                    .count_live_folders(&command.account_id)
+                    .await?;
+            }
+            IncrementalSyncKind::Send => {
+                counts.sends = self
+                    .vault_repository
+                    .count_live_sends(&command.account_id)
+                    .await?;
+            }
+        }
 
         let context = self
             .vault_repository
@@ -500,18 +290,48 @@ impl SyncVaultUseCase {
 
         log::info!(
             target: "vanguard::sync",
-            "incremental send sync finished account_id={} endpoint={} trigger={:?} push_type={:?} send_id={} duration_ms={} revision_changed={} sends={}",
+            "incremental {} sync finished account_id={} endpoint={} trigger={:?} push_type={:?} {}_id={} duration_ms={} revision_changed={} {}={}",
+            kind.entity_type(),
             command.account_id,
-            send_endpoint,
+            entity_endpoint,
             command.trigger,
             push_type,
-            send_id,
+            kind.entity_type(),
+            entity_id,
             result.duration_ms,
             result.revision_changed,
-            result.item_counts.sends
+            kind.entity_type(),
+            match kind {
+                IncrementalSyncKind::Cipher => result.item_counts.ciphers,
+                IncrementalSyncKind::Folder => result.item_counts.folders,
+                IncrementalSyncKind::Send => result.item_counts.sends,
+            }
         );
 
         Ok(SyncOutcome { context, result })
+    }
+
+    async fn apply_incremental_update(
+        &self,
+        command: &SyncVaultCommand,
+        kind: IncrementalSyncKind,
+        entity_id: &str,
+        push_type: PushType,
+    ) -> AppResult<()> {
+        match kind {
+            IncrementalSyncKind::Cipher => {
+                self.apply_cipher_incremental_update(command, entity_id, push_type)
+                    .await
+            }
+            IncrementalSyncKind::Folder => {
+                self.apply_folder_incremental_update(command, entity_id, push_type)
+                    .await
+            }
+            IncrementalSyncKind::Send => {
+                self.apply_send_incremental_update(command, entity_id, push_type)
+                    .await
+            }
+        }
     }
 
     pub async fn sync_folders_only(&self, command: SyncVaultCommand) -> AppResult<SyncOutcome> {
