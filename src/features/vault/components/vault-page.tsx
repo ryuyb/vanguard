@@ -52,6 +52,7 @@ import {
   SendDetailPanel,
   SendDialogs,
   SendListPanel,
+  SEND_ID,
   useSendEvents,
   useSendList,
   useSendMutations,
@@ -174,7 +175,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     selectedMenuId !== FAVORITES_ID &&
     selectedMenuId !== TRASH_ID &&
     selectedMenuId !== NO_FOLDER_ID &&
-    selectedMenuId !== "send"
+    selectedMenuId !== SEND_ID
       ? selectedMenuId
       : null;
 
@@ -462,13 +463,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedMenuId("send");
+                        setSelectedMenuId(SEND_ID);
                         sendOps.setSelectedSendId(null);
                         void reloadSends();
                       }}
                       className={[
                         "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
-                        selectedMenuId === "send"
+                        selectedMenuId === SEND_ID
                           ? "bg-blue-50 text-blue-700 shadow-sm"
                           : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
@@ -478,7 +479,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <Send
                             className={[
                               "size-4",
-                              selectedMenuId === "send"
+                              selectedMenuId === SEND_ID
                                 ? "text-blue-600"
                                 : "text-slate-400",
                             ].join(" ")}
@@ -488,7 +489,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         <span
                           className={[
                             "text-xs font-semibold",
-                            selectedMenuId === "send"
+                            selectedMenuId === SEND_ID
                               ? "text-blue-600"
                               : "text-slate-400",
                           ].join(" ")}
@@ -572,7 +573,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
             <ResizableHandle withHandle className="bg-slate-200" />
 
             <ResizablePanel defaultSize={40} minSize={24}>
-              {selectedMenuId === "send" ? (
+              {selectedMenuId === SEND_ID ? (
                 <SendListPanel
                   sends={filteredSends}
                   isLoading={isSendLoading}
@@ -882,7 +883,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white">
                 <ScrollArea className="h-full min-w-0 [&>[data-slot=scroll-area-viewport]]:min-w-0 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:h-full [&>[data-slot=scroll-area-viewport]>div]:min-w-0 [&>[data-slot=scroll-area-viewport]>div]:w-full">
                   <div className="flex h-full min-w-0 w-full flex-col p-3">
-                    {selectedMenuId === "send" ? (
+                    {selectedMenuId === SEND_ID ? (
                       <SendDetailPanel
                         sendId={sendOps.selectedSendId}
                         sends={filteredSends}
