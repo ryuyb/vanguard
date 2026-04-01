@@ -55,19 +55,19 @@ export function useCipherMutations(options?: UseCipherMutationsOptions) {
     createCipher: {
       mutate: createCipherMutation.mutate,
       mutateAsync: createCipherMutation.mutateAsync,
-      isLoading: createCipherMutation.isPending,
+      isPending: createCipherMutation.isPending,
       error: createCipherMutation.error,
     },
     updateCipher: {
       mutate: updateCipherMutation.mutate,
       mutateAsync: updateCipherMutation.mutateAsync,
-      isLoading: updateCipherMutation.isPending,
+      isPending: updateCipherMutation.isPending,
       error: updateCipherMutation.error,
     },
     deleteCipher: {
       mutate: deleteCipherMutation.mutate,
       mutateAsync: deleteCipherMutation.mutateAsync,
-      isLoading: deleteCipherMutation.isPending,
+      isPending: deleteCipherMutation.isPending,
       error: deleteCipherMutation.error,
     },
   };

@@ -60,22 +60,22 @@ export function useSendMutations(options?: UseSendMutationsOptions) {
   return {
     createSend: {
       mutateAsync: createSendMutation.mutateAsync,
-      isLoading: createSendMutation.isPending,
+      isPending: createSendMutation.isPending,
       error: createSendMutation.error,
     },
     updateSend: {
       mutateAsync: updateSendMutation.mutateAsync,
-      isLoading: updateSendMutation.isPending,
+      isPending: updateSendMutation.isPending,
       error: updateSendMutation.error,
     },
     deleteSend: {
       mutateAsync: deleteSendMutation.mutateAsync,
-      isLoading: deleteSendMutation.isPending,
+      isPending: deleteSendMutation.isPending,
       error: deleteSendMutation.error,
     },
     removeSendPassword: {
       mutateAsync: removeSendPasswordMutation.mutateAsync,
-      isLoading: removeSendPasswordMutation.isPending,
+      isPending: removeSendPasswordMutation.isPending,
       error: removeSendPasswordMutation.error,
     },
   };

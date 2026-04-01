@@ -59,17 +59,17 @@ export function useFolderActions(options?: UseFolderActionsOptions) {
   return {
     createFolder: {
       mutate: createFolderMutation.mutate,
-      isLoading: createFolderMutation.isPending,
+      isPending: createFolderMutation.isPending,
       error: createFolderMutation.error,
     },
     renameFolder: {
       mutate: renameFolderMutation.mutate,
-      isLoading: renameFolderMutation.isPending,
+      isPending: renameFolderMutation.isPending,
       error: renameFolderMutation.error,
     },
     deleteFolder: {
       mutate: deleteFolderMutation.mutate,
-      isLoading: deleteFolderMutation.isPending,
+      isPending: deleteFolderMutation.isPending,
       error: deleteFolderMutation.error,
     },
     isCreating,

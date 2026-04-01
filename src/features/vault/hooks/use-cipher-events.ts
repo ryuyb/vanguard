@@ -9,25 +9,40 @@ type UseCipherEventsOptions = {
 
 export function useCipherEvents(options?: UseCipherEventsOptions) {
   useEffect(() => {
-    const unlistenCreated = events.cipherCreated.listen((event) => {
-      console.log(`Cipher created: ${event.payload.cipherId}`);
-      options?.onCipherCreated?.(event.payload.cipherId);
-    });
+    let cleanupStarted = false;
+    const unlistenFns: Array<() => void> = [];
 
-    const unlistenUpdated = events.cipherUpdated.listen((event) => {
-      console.log(`Cipher updated: ${event.payload.cipherId}`);
-      options?.onCipherUpdated?.(event.payload.cipherId);
-    });
+    const setupListeners = async () => {
+      const [unlistenCreated, unlistenUpdated, unlistenDeleted] =
+        await Promise.all([
+          events.cipherCreated.listen((event) => {
+            options?.onCipherCreated?.(event.payload.cipherId);
+          }),
+          events.cipherUpdated.listen((event) => {
+            options?.onCipherUpdated?.(event.payload.cipherId);
+          }),
+          events.cipherDeleted.listen((event) => {
+            options?.onCipherDeleted?.(event.payload.cipherId);
+          }),
+        ]);
 
-    const unlistenDeleted = events.cipherDeleted.listen((event) => {
-      console.log(`Cipher deleted: ${event.payload.cipherId}`);
-      options?.onCipherDeleted?.(event.payload.cipherId);
-    });
+      unlistenFns.push(unlistenCreated, unlistenUpdated, unlistenDeleted);
+
+      // If cleanup started during async setup, immediately unlisten
+      if (cleanupStarted) {
+        for (const fn of unlistenFns) {
+          fn();
+        }
+      }
+    };
+
+    setupListeners();
 
     return () => {
-      unlistenCreated.then((fn) => fn());
-      unlistenUpdated.then((fn) => fn());
-      unlistenDeleted.then((fn) => fn());
+      cleanupStarted = true;
+      for (const fn of unlistenFns) {
+        fn();
+      }
     };
   }, [
     options?.onCipherCreated,

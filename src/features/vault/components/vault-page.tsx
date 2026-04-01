@@ -21,14 +21,9 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  commands,
-  type SendItemDto,
-  type SyncCipher,
-  type VaultCipherDetailDto,
-} from "@/bindings";
+import { commands } from "@/bindings";
 import { TextInput } from "@/components/text-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,14 +32,6 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,14 +49,13 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  DeleteSendDialog,
-  SEND_ID,
   SendDetailPanel,
-  SendFormDialog,
+  SendDialogs,
   SendListPanel,
   useSendEvents,
   useSendList,
   useSendMutations,
+  useSendOperations,
 } from "@/features/send";
 import {
   ALL_ITEMS_ID,
@@ -81,174 +67,46 @@ import {
   FAVORITES_ID,
   FolderTreeMenuItem,
   HeaderSearchPanel,
-  ICON_OBSERVER_CONFIG,
   NO_FOLDER_ID,
   TRASH_ID,
   toTypeFilterLabel,
-  VaultSettingsDialog,
+  useCipherOperations,
+  useFolderOperations,
+  useTrashOperations,
+  VaultDialogs,
 } from "@/features/vault";
-import { CipherFormDialog } from "@/features/vault/components/cipher-form-dialog";
-import { DeleteCipherDialog } from "@/features/vault/components/delete-cipher-dialog";
-import { DeleteFolderDialog } from "@/features/vault/components/delete-folder-dialog";
-import { FolderDialog } from "@/features/vault/components/folder-dialog";
 import { useVaultPageModel } from "@/features/vault/hooks";
-import { useCipherMutations } from "@/features/vault/hooks/use-cipher-mutations";
-import { useFolderActions } from "@/features/vault/hooks/use-folder-actions";
 import type { VaultPageNavigationTarget } from "@/features/vault/hooks/use-vault-page-model";
-import { vaultCipherDetailToSyncCipher } from "@/features/vault/utils/cipher-converter";
 import { toast } from "@/lib/toast";
 
 type VaultPageProps = {
   navigateTo: (to: VaultPageNavigationTarget) => Promise<void>;
 };
 
-function CipherRowObserver({
-  children,
-  cipherId,
-  onVisibilityChange,
-}: {
-  children: React.ReactNode;
-  cipherId: string;
-  onVisibilityChange: (cipherId: string, visible: boolean) => void;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const callbackRef = useRef(onVisibilityChange);
-
-  useEffect(() => {
-    callbackRef.current = onVisibilityChange;
-  }, [onVisibilityChange]);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) {
-      return;
-    }
-
-    let rafId = 0;
-    const observer = new IntersectionObserver(([entry]) => {
-      window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(() => {
-        callbackRef.current(cipherId, entry?.isIntersecting === true);
-      });
-    }, ICON_OBSERVER_CONFIG);
-
-    observer.observe(node);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      observer.disconnect();
-    };
-  }, [cipherId]);
-
-  return <div ref={ref}>{children}</div>;
+function CipherRowObserver({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>;
 }
 
 export function VaultPage({ navigateTo }: VaultPageProps) {
   const { t } = useTranslation();
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
 
-  // 文件夹操作状态
-  const [folderDialogMode, setFolderDialogMode] = useState<"create" | "rename">(
-    "create",
-  );
-  const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedFolderName, setSelectedFolderName] = useState("");
-  const [parentFolderName, setParentFolderName] = useState<string | null>(null);
-
-  // Cipher 操作状态
-  const [cipherFormMode, setCipherFormMode] = useState<"create" | "edit">(
-    "create",
-  );
-  const [isCipherFormOpen, setIsCipherFormOpen] = useState(false);
-  const [isDeleteCipherDialogOpen, setIsDeleteCipherDialogOpen] =
-    useState(false);
-  const [selectedCipherForEdit, setSelectedCipherForEdit] =
-    useState<SyncCipher | null>(null);
-  const [selectedCipherIdForDelete, setSelectedCipherIdForDelete] = useState<
-    string | null
-  >(null);
-  const [selectedCipherNameForDelete, setSelectedCipherNameForDelete] =
-    useState("");
-
-  // 回收站操作状态
-  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
-  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] =
-    useState(false);
-  const [trashActionCipherId, setTrashActionCipherId] = useState("");
-  const [trashActionCipherName, setTrashActionCipherName] = useState("");
-  const [isTrashActionLoading, setIsTrashActionLoading] = useState(false);
-
-  // Send 状态
-  const [selectedSendId, setSelectedSendId] = useState<string | null>(null);
-  const [isSendFormOpen, setIsSendFormOpen] = useState(false);
-  const [sendFormMode, setSendFormMode] = useState<"create" | "edit">("create");
-  const [selectedSendForEdit, setSelectedSendForEdit] =
-    useState<SendItemDto | null>(null);
-  const [isDeleteSendDialogOpen, setIsDeleteSendDialogOpen] = useState(false);
-  const [selectedSendIdForDelete, setSelectedSendIdForDelete] = useState("");
-  const [selectedSendNameForDelete, setSelectedSendNameForDelete] =
-    useState("");
-
+  // 使用 operations hooks 替代分散的状态和 handler
+  const folderOps = useFolderOperations();
+  const cipherOps = useCipherOperations();
+  const trashOps = useTrashOperations({
+    onSuccess: () => void loadVaultData(),
+  });
+  const sendOps = useSendOperations();
   const sendMutations = useSendMutations();
 
-  const handleCreateSend = () => {
-    setSendFormMode("create");
-    setSelectedSendForEdit(null);
-    setIsSendFormOpen(true);
-  };
-
-  const handleEditSend = (send: SendItemDto) => {
-    setSendFormMode("edit");
-    setSelectedSendForEdit(send);
-    setIsSendFormOpen(true);
-  };
-
-  const handleSendFormConfirm = async (
-    send: import("@/bindings").SyncSend,
-    fileData?: number[] | null,
-  ) => {
-    try {
-      if (sendFormMode === "create") {
-        await sendMutations.createSend.mutateAsync({ send, fileData });
-        toast.success(t("send.feedback.createSuccess"));
-      } else {
-        await sendMutations.updateSend.mutateAsync({ sendId: send.id, send });
-        toast.success(t("send.feedback.saveSuccess"));
-      }
-      setIsSendFormOpen(false);
-    } catch {
-      toast.error(
-        sendFormMode === "create"
-          ? t("send.feedback.createError")
-          : t("send.feedback.saveError"),
-      );
-    }
-  };
-
-  const handleDeleteSend = (sendId: string, sendName: string) => {
-    setSelectedSendIdForDelete(sendId);
-    setSelectedSendNameForDelete(sendName);
-    setIsDeleteSendDialogOpen(true);
-  };
-
-  const handleDeleteSendConfirm = async () => {
-    try {
-      await sendMutations.deleteSend.mutateAsync(selectedSendIdForDelete);
-      toast.success(t("send.feedback.deleteSuccess"));
-      setIsDeleteSendDialogOpen(false);
-    } catch {
-      toast.error(t("send.feedback.deleteError"));
-    }
-  };
-
+  // Send events handling
   useSendEvents({
     onSendCreated: () => void reloadSends(),
     onSendUpdated: () => void reloadSends(),
     onSendDeleted: () => {
       void reloadSends();
-      setSelectedSendId(null);
+      sendOps.setSelectedSendId(null);
     },
   });
 
@@ -284,7 +142,6 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     selectedCipherId,
     selectedMenuId,
     selectedMenuName,
-    setCipherRowVisible,
     setCipherSearchQuery,
     setHeaderSearchQuery,
     setIsInlineSearchOpen,
@@ -311,223 +168,31 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
     reload: reloadSends,
   } = useSendList(pageState === "ready");
 
-  const folderActions = useFolderActions({
-    onSuccess: () => {
-      void loadVaultData();
-    },
-  });
+  // 计算 cipherFolderId（当前选中的文件夹 ID）
+  const cipherFolderId =
+    selectedMenuId !== ALL_ITEMS_ID &&
+    selectedMenuId !== FAVORITES_ID &&
+    selectedMenuId !== TRASH_ID &&
+    selectedMenuId !== NO_FOLDER_ID &&
+    selectedMenuId !== "send"
+      ? selectedMenuId
+      : null;
 
-  const cipherMutations = useCipherMutations({
-    onSuccess: () => {
-      // 成功后会自动触发事件，由 useCipherEvents 处理刷新
-    },
-  });
-
-  // 文件夹操作处理函数
-  const handleCreateFolder = () => {
-    setFolderDialogMode("create");
-    setSelectedFolderName("");
-    setParentFolderName(null);
-    setIsFolderDialogOpen(true);
-  };
-
-  const handleCreateSubFolder = (parentPath: string) => {
-    setFolderDialogMode("create");
-    setSelectedFolderName("");
-    setParentFolderName(parentPath);
-    setIsFolderDialogOpen(true);
-  };
-
-  const handleRenameFolder = (folderId: string, currentName: string) => {
-    setFolderDialogMode("rename");
-    setSelectedFolderId(folderId);
-    setSelectedFolderName(currentName);
-    setParentFolderName(null);
-    setIsFolderDialogOpen(true);
-  };
-
-  const handleDeleteFolder = (folderId: string, folderName: string) => {
-    setSelectedFolderId(folderId);
-    setSelectedFolderName(folderName);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleFolderDialogConfirm = (name: string) => {
-    if (folderDialogMode === "create") {
-      // 如果有父文件夹,创建子文件夹(通过名称前缀)
-      const fullName = parentFolderName ? `${parentFolderName}/${name}` : name;
-      folderActions.createFolder.mutate(fullName, {
-        onSuccess: () => {
-          setIsFolderDialogOpen(false);
-          toast.success(t("vault.feedback.folder.createSuccess.title"), {
-            description: t("vault.feedback.folder.createSuccess.description", {
-              name,
-            }),
-          });
-        },
-        onError: (error) => {
-          toast.error(t("vault.feedback.folder.createError.title"), {
-            description:
-              error instanceof Error
-                ? error.message
-                : t("vault.feedback.folder.createError.description"),
-          });
-        },
-      });
-    } else if (folderDialogMode === "rename" && selectedFolderId) {
-      folderActions.renameFolder.mutate(
-        { folderId: selectedFolderId, newName: name },
-        {
-          onSuccess: () => {
-            setIsFolderDialogOpen(false);
-            toast.success(t("vault.feedback.folder.renameSuccess.title"), {
-              description: t(
-                "vault.feedback.folder.renameSuccess.description",
-                {
-                  name,
-                },
-              ),
-            });
-          },
-          onError: (error) => {
-            toast.error(t("vault.feedback.folder.renameError.title"), {
-              description:
-                error instanceof Error
-                  ? error.message
-                  : t("vault.feedback.folder.renameError.description"),
-            });
-          },
-        },
-      );
+  // 处理删除文件夹后切换菜单
+  const handleDeleteFolderConfirm = async () => {
+    await folderOps.handleDeleteDialogConfirm();
+    if (
+      folderOps.selectedFolderId &&
+      selectedMenuId === folderOps.selectedFolderId
+    ) {
+      setSelectedMenuId(ALL_ITEMS_ID);
     }
   };
 
-  const handleDeleteDialogConfirm = () => {
-    if (selectedFolderId) {
-      folderActions.deleteFolder.mutate(selectedFolderId, {
-        onSuccess: () => {
-          setIsDeleteDialogOpen(false);
-          toast.success(t("vault.feedback.folder.deleteSuccess.title"), {
-            description: t("vault.feedback.folder.deleteSuccess.description", {
-              name: selectedFolderName,
-            }),
-          });
-          // 如果删除的是当前选中的文件夹,切换到 All Items
-          if (selectedMenuId === selectedFolderId) {
-            setSelectedMenuId(ALL_ITEMS_ID);
-          }
-        },
-        onError: (error) => {
-          toast.error(t("vault.feedback.folder.deleteError.title"), {
-            description:
-              error instanceof Error
-                ? error.message
-                : t("vault.feedback.folder.deleteError.description"),
-          });
-        },
-      });
-    }
-  };
-
-  // Cipher 操作处理函数
-  const handleCreateCipher = () => {
-    setCipherFormMode("create");
-    setSelectedCipherForEdit(null);
-    setIsCipherFormOpen(true);
-  };
-
-  const handleEditCipher = (cipher: VaultCipherDetailDto) => {
-    setCipherFormMode("edit");
-    setSelectedCipherForEdit(vaultCipherDetailToSyncCipher(cipher));
-    setIsCipherFormOpen(true);
-  };
-
-  const handleDeleteCipher = (cipherId: string, cipherName: string) => {
-    setSelectedCipherIdForDelete(cipherId);
-    setSelectedCipherNameForDelete(cipherName);
-    setIsDeleteCipherDialogOpen(true);
-  };
-
-  const handleCloneCipher = async (cipherId: string) => {
-    const result = await commands.vaultGetCipherDetail({ cipherId });
-    if (result.status === "error") return;
-    const cloned = vaultCipherDetailToSyncCipher(result.data.cipher);
-    cloned.id = "";
-    const suffix = t("vault.page.cipher.cloneSuffix");
-    const baseName = cloned.name ?? t("vault.page.cipher.untitled");
-    cloned.name = `${baseName} - ${suffix}`;
-    if (cloned.data) cloned.data.name = cloned.name;
-    setCipherFormMode("create");
-    setSelectedCipherForEdit(cloned);
-    setIsCipherFormOpen(true);
-  };
-
-  const handleCipherFormConfirm = (cipher: SyncCipher) => {
-    if (cipherFormMode === "create") {
-      cipherMutations.createCipher.mutate(cipher, {
-        onSuccess: () => {
-          setIsCipherFormOpen(false);
-          toast.success(t("vault.feedback.cipher.createSuccess.title"), {
-            description: t("vault.feedback.cipher.createSuccess.description", {
-              name: cipher.name ?? t("vault.page.cipher.untitled"),
-            }),
-          });
-        },
-        onError: (error) => {
-          toast.error(t("vault.feedback.cipher.createError.title"), {
-            description:
-              error instanceof Error
-                ? error.message
-                : t("vault.feedback.cipher.createError.description"),
-          });
-        },
-      });
-    } else if (cipherFormMode === "edit") {
-      cipherMutations.updateCipher.mutate(
-        { cipherId: cipher.id, cipher },
-        {
-          onSuccess: () => {
-            setIsCipherFormOpen(false);
-            toast.success(t("vault.feedback.cipher.saveSuccess.title"), {
-              description: t("vault.feedback.cipher.saveSuccess.description", {
-                name: cipher.name ?? t("vault.page.cipher.untitled"),
-              }),
-            });
-          },
-          onError: (error) => {
-            toast.error(t("vault.feedback.cipher.saveError.title"), {
-              description:
-                error instanceof Error
-                  ? error.message
-                  : t("vault.feedback.cipher.saveError.description"),
-            });
-          },
-        },
-      );
-    }
-  };
-
-  const handleDeleteCipherConfirm = () => {
-    if (selectedCipherIdForDelete) {
-      cipherMutations.deleteCipher.mutate(selectedCipherIdForDelete, {
-        onSuccess: () => {
-          setIsDeleteCipherDialogOpen(false);
-          toast.success(t("vault.feedback.cipher.deleteSuccess.title"), {
-            description: t("vault.feedback.cipher.deleteSuccess.description", {
-              name: selectedCipherNameForDelete,
-            }),
-          });
-        },
-        onError: (error) => {
-          toast.error(t("vault.feedback.cipher.deleteError.title"), {
-            description:
-              error instanceof Error
-                ? error.message
-                : t("vault.feedback.cipher.deleteError.description"),
-          });
-        },
-      });
-    }
+  // Remove password handler for SendDialogs
+  const handleRemoveSendPassword = async (sendId: string) => {
+    await sendMutations.removeSendPassword.mutateAsync(sendId);
+    toast.success(t("send.feedback.removePasswordSuccess"));
   };
 
   return (
@@ -797,13 +462,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedMenuId(SEND_ID);
-                        setSelectedSendId(null);
+                        setSelectedMenuId("send");
+                        sendOps.setSelectedSendId(null);
                         void reloadSends();
                       }}
                       className={[
                         "w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-all",
-                        selectedMenuId === SEND_ID
+                        selectedMenuId === "send"
                           ? "bg-blue-50 text-blue-700 shadow-sm"
                           : "text-slate-700 hover:bg-slate-50",
                       ].join(" ")}
@@ -813,7 +478,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           <Send
                             className={[
                               "size-4",
-                              selectedMenuId === SEND_ID
+                              selectedMenuId === "send"
                                 ? "text-blue-600"
                                 : "text-slate-400",
                             ].join(" ")}
@@ -823,7 +488,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         <span
                           className={[
                             "text-xs font-semibold",
-                            selectedMenuId === SEND_ID
+                            selectedMenuId === "send"
                               ? "text-blue-600"
                               : "text-slate-400",
                           ].join(" ")}
@@ -841,7 +506,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={handleCreateFolder}
+                        onClick={folderOps.handleCreateFolder}
                         className="h-6 px-2 text-xs"
                       >
                         <FolderPlus className="size-3.5" />
@@ -860,9 +525,9 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                           folderCipherCount={folderCipherCount}
                           onFolderSelect={setSelectedMenuId}
                           onOpenChange={onFolderTreeOpenChange}
-                          onRenameFolder={handleRenameFolder}
-                          onDeleteFolder={handleDeleteFolder}
-                          onCreateSubFolder={handleCreateSubFolder}
+                          onRenameFolder={folderOps.handleRenameFolder}
+                          onDeleteFolder={folderOps.handleDeleteFolder}
+                          onCreateSubFolder={folderOps.handleCreateSubFolder}
                         />
                       ))}
 
@@ -907,18 +572,18 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
             <ResizableHandle withHandle className="bg-slate-200" />
 
             <ResizablePanel defaultSize={40} minSize={24}>
-              {selectedMenuId === SEND_ID ? (
+              {selectedMenuId === "send" ? (
                 <SendListPanel
                   sends={filteredSends}
                   isLoading={isSendLoading}
-                  selectedSendId={selectedSendId}
+                  selectedSendId={sendOps.selectedSendId}
                   sendTypeFilter={sendTypeFilter}
-                  onSelectSend={setSelectedSendId}
-                  onCreateSend={handleCreateSend}
+                  onSelectSend={sendOps.setSelectedSendId}
+                  onCreateSend={sendOps.handleCreateSend}
                   onFilterChange={setSendTypeFilter}
                   baseUrl={userBaseUrl}
-                  onEdit={(send) => handleEditSend(send)}
-                  onDelete={handleDeleteSend}
+                  onEdit={(send) => sendOps.handleEditSend(send)}
+                  onDelete={sendOps.handleDeleteSend}
                 />
               ) : (
                 <section className="flex h-full min-h-0 flex-col bg-slate-50/50 border-r border-slate-200">
@@ -1010,7 +675,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                         className="size-8 px-0"
                         aria-label={t("vault.page.cipher.create")}
                         title={t("vault.page.cipher.create")}
-                        onClick={handleCreateCipher}
+                        onClick={cipherOps.handleCreateCipher}
                       >
                         <Plus className="size-4" />
                       </Button>
@@ -1139,11 +804,7 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                     <div className="space-y-1.5 px-3 py-2 min-w-0 w-full">
                       {filteredCiphers.map(
                         (cipher: (typeof filteredCiphers)[number]) => (
-                          <CipherRowObserver
-                            key={cipher.id}
-                            cipherId={cipher.id}
-                            onVisibilityChange={setCipherRowVisible}
-                          >
+                          <CipherRowObserver key={cipher.id}>
                             <ContextMenu>
                               <ContextMenuTrigger asChild>
                                 <div className="min-w-0">
@@ -1174,15 +835,24 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                             cipherId: cipher.id,
                                           });
                                         if (result.status === "error") return;
-                                        handleEditCipher(result.data.cipher);
+                                        cipherOps.handleEditCipher(
+                                          result.data.cipher,
+                                        );
                                       }}
                                     >
                                       <Edit2 className="size-4" />
                                       {t("vault.page.cipher.contextMenu.edit")}
                                     </ContextMenuItem>
                                     <ContextMenuItem
-                                      onSelect={() => {
-                                        void handleCloneCipher(cipher.id);
+                                      onSelect={async () => {
+                                        const result =
+                                          await commands.vaultGetCipherDetail({
+                                            cipherId: cipher.id,
+                                          });
+                                        if (result.status === "error") return;
+                                        await cipherOps.handleCloneCipher(
+                                          result.data.cipher,
+                                        );
                                       }}
                                     >
                                       <Copy className="size-4" />
@@ -1212,13 +882,13 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
               <section className="h-full min-h-0 min-w-0 overflow-x-hidden bg-white">
                 <ScrollArea className="h-full min-w-0 [&>[data-slot=scroll-area-viewport]]:min-w-0 [&>[data-slot=scroll-area-viewport]]:overflow-x-hidden [&>[data-slot=scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:h-full [&>[data-slot=scroll-area-viewport]>div]:min-w-0 [&>[data-slot=scroll-area-viewport]>div]:w-full">
                   <div className="flex h-full min-w-0 w-full flex-col p-3">
-                    {selectedMenuId === SEND_ID ? (
+                    {selectedMenuId === "send" ? (
                       <SendDetailPanel
-                        sendId={selectedSendId}
+                        sendId={sendOps.selectedSendId}
                         sends={filteredSends}
                         baseUrl={userBaseUrl}
-                        onEdit={(send) => handleEditSend(send)}
-                        onDelete={handleDeleteSend}
+                        onEdit={(send) => sendOps.handleEditSend(send)}
+                        onDelete={sendOps.handleDeleteSend}
                       />
                     ) : (
                       <>
@@ -1253,36 +923,32 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
                                     : "normal"
                                 }
                                 onEdit={() =>
-                                  handleEditCipher(selectedCipherDetail)
+                                  cipherOps.handleEditCipher(
+                                    selectedCipherDetail,
+                                  )
                                 }
                                 onDelete={() =>
-                                  handleDeleteCipher(
+                                  cipherOps.handleDeleteCipher(
                                     selectedCipherDetail.id,
                                     selectedCipherDetail.name ??
                                       t("vault.page.cipher.untitled"),
                                   )
                                 }
-                                onRestore={() => {
-                                  setTrashActionCipherId(
+                                onRestore={() =>
+                                  trashOps.handleRestoreCipher(
                                     selectedCipherDetail.id,
-                                  );
-                                  setTrashActionCipherName(
                                     selectedCipherDetail.name ??
                                       t("vault.page.cipher.untitled"),
-                                  );
-                                  setIsRestoreDialogOpen(true);
-                                }}
-                                onPermanentDelete={() => {
-                                  setTrashActionCipherId(
+                                  )
+                                }
+                                onPermanentDelete={() =>
+                                  trashOps.handlePermanentDeleteCipher(
                                     selectedCipherDetail.id,
-                                  );
-                                  setTrashActionCipherName(
                                     selectedCipherDetail.name ??
                                       t("vault.page.cipher.untitled"),
-                                  );
-                                  setIsPermanentDeleteDialogOpen(true);
-                                }}
-                                isActionLoading={isTrashActionLoading}
+                                  )
+                                }
+                                isActionLoading={trashOps.isTrashActionLoading}
                               />
                             </div>
                           )}
@@ -1296,236 +962,100 @@ export function VaultPage({ navigateTo }: VaultPageProps) {
         )}
       </section>
 
-      <VaultSettingsDialog
-        open={isSettingsDialogOpen}
-        onOpenChange={setIsSettingsDialogOpen}
-      />
-
-      <SendFormDialog
-        key={
-          isSendFormOpen
-            ? `send-form-${selectedSendForEdit?.id ?? "new"}`
-            : "closed"
-        }
-        open={isSendFormOpen}
-        mode={sendFormMode}
-        initialSend={selectedSendForEdit}
-        onOpenChange={setIsSendFormOpen}
-        onConfirm={(send, fileData) =>
-          void handleSendFormConfirm(send, fileData)
-        }
-        onRemovePassword={async (sendId) => {
-          await sendMutations.removeSendPassword.mutateAsync(sendId);
-          toast.success(t("send.feedback.removePasswordSuccess"));
+      {/* 使用 VaultDialogs 容器组件替换所有内联 Vault 对话框 */}
+      <VaultDialogs
+        // Settings
+        isSettingsDialogOpen={isSettingsDialogOpen}
+        onSettingsDialogOpenChange={setIsSettingsDialogOpen}
+        // Folder operations
+        folderDialogMode={folderOps.folderDialogMode}
+        isFolderDialogOpen={folderOps.isFolderDialogOpen}
+        isDeleteFolderDialogOpen={folderOps.isDeleteDialogOpen}
+        selectedFolderName={folderOps.selectedFolderName}
+        parentFolderName={folderOps.parentFolderName}
+        onFolderDialogOpenChange={(open) => {
+          if (!open) folderOps.closeFolderDialog();
         }}
-        isLoading={
-          sendMutations.createSend.isLoading ||
-          sendMutations.updateSend.isLoading
+        onDeleteFolderDialogOpenChange={(open) => {
+          if (!open) folderOps.closeDeleteDialog();
+        }}
+        onFolderDialogConfirm={(name) =>
+          void folderOps.handleFolderDialogConfirm(name)
         }
-      />
-
-      <DeleteSendDialog
-        open={isDeleteSendDialogOpen}
-        sendName={selectedSendNameForDelete}
-        onOpenChange={setIsDeleteSendDialogOpen}
-        onConfirm={() => void handleDeleteSendConfirm()}
-        isLoading={sendMutations.deleteSend.isLoading}
-      />
-
-      <FolderDialog
-        open={isFolderDialogOpen}
-        mode={folderDialogMode}
-        initialName={selectedFolderName}
-        parentFolderName={parentFolderName}
-        onOpenChange={setIsFolderDialogOpen}
-        onConfirm={handleFolderDialogConfirm}
-        isLoading={
-          folderDialogMode === "create"
-            ? folderActions.createFolder.isLoading
-            : folderActions.renameFolder.isLoading
+        onDeleteFolderDialogConfirm={() => void handleDeleteFolderConfirm()}
+        isFolderLoading={
+          folderOps.folderDialogMode === "create"
+            ? folderOps.isCreating
+            : folderOps.isRenaming || folderOps.isDeleting
         }
-      />
-
-      <DeleteFolderDialog
-        open={isDeleteDialogOpen}
-        folderName={selectedFolderName}
-        onOpenChange={setIsDeleteDialogOpen}
-        onConfirm={handleDeleteDialogConfirm}
-        isLoading={folderActions.deleteFolder.isLoading}
-      />
-
-      <CipherFormDialog
-        open={isCipherFormOpen}
-        mode={cipherFormMode}
-        initialCipher={selectedCipherForEdit}
-        folderId={
-          selectedMenuId !== ALL_ITEMS_ID &&
-          selectedMenuId !== FAVORITES_ID &&
-          selectedMenuId !== TRASH_ID &&
-          selectedMenuId !== NO_FOLDER_ID
-            ? selectedMenuId
-            : null
-        }
+        // Cipher operations
+        cipherFormMode={cipherOps.cipherFormMode}
+        isCipherFormOpen={cipherOps.isCipherFormOpen}
+        isDeleteCipherDialogOpen={cipherOps.isDeleteCipherDialogOpen}
+        selectedCipherForEdit={cipherOps.selectedCipherForEdit}
+        selectedCipherNameForDelete={cipherOps.selectedCipherNameForDelete}
+        cipherFolderId={cipherFolderId}
         folders={viewData?.folders ?? []}
-        onOpenChange={setIsCipherFormOpen}
-        onConfirm={handleCipherFormConfirm}
-        isLoading={
-          cipherFormMode === "create"
-            ? cipherMutations.createCipher.isLoading
-            : cipherMutations.updateCipher.isLoading
+        onCipherFormOpenChange={(open) => {
+          if (!open) cipherOps.closeCipherFormDialog();
+        }}
+        onDeleteCipherDialogOpenChange={(open) => {
+          if (!open) cipherOps.closeDeleteCipherDialog();
+        }}
+        onCipherFormConfirm={(cipher) =>
+          void cipherOps.handleCipherFormConfirm(cipher)
         }
+        onDeleteCipherDialogConfirm={() =>
+          void cipherOps.handleDeleteCipherConfirm()
+        }
+        isCipherFormLoading={
+          cipherOps.cipherFormMode === "create"
+            ? cipherOps.isCreating
+            : cipherOps.isUpdating
+        }
+        isDeleteCipherLoading={cipherOps.isDeleting}
+        // Trash operations
+        isRestoreDialogOpen={trashOps.isRestoreDialogOpen}
+        isPermanentDeleteDialogOpen={trashOps.isPermanentDeleteDialogOpen}
+        trashActionCipherName={trashOps.trashActionCipherName}
+        onRestoreDialogOpenChange={(open) => {
+          if (!open) trashOps.closeRestoreDialog();
+        }}
+        onPermanentDeleteDialogOpenChange={(open) => {
+          if (!open) trashOps.closePermanentDeleteDialog();
+        }}
+        onRestoreDialogConfirm={() => void trashOps.handleRestoreConfirm()}
+        onPermanentDeleteDialogConfirm={() =>
+          void trashOps.handlePermanentDeleteConfirm()
+        }
+        isTrashActionLoading={trashOps.isTrashActionLoading}
       />
 
-      <DeleteCipherDialog
-        open={isDeleteCipherDialogOpen}
-        cipherName={selectedCipherNameForDelete}
-        onOpenChange={setIsDeleteCipherDialogOpen}
-        onConfirm={handleDeleteCipherConfirm}
-        isLoading={cipherMutations.deleteCipher.isLoading}
+      {/* 使用 SendDialogs 容器组件替换所有内联 Send 对话框 */}
+      <SendDialogs
+        isSendFormOpen={sendOps.isSendFormOpen}
+        sendFormMode={sendOps.sendFormMode}
+        selectedSendForEdit={sendOps.selectedSendForEdit}
+        isDeleteSendDialogOpen={sendOps.isDeleteSendDialogOpen}
+        selectedSendNameForDelete={sendOps.selectedSendNameForDelete}
+        onSendFormOpenChange={(open) => {
+          if (!open) sendOps.closeSendFormDialog();
+        }}
+        onDeleteSendOpenChange={(open) => {
+          if (!open) sendOps.closeDeleteSendDialog();
+        }}
+        onSendFormConfirm={async (send, fileData) => {
+          await sendOps.handleSendFormConfirm(send, fileData);
+        }}
+        onDeleteSendConfirm={async () => {
+          await sendOps.handleDeleteSendConfirm();
+        }}
+        onRemovePassword={async (sendId) => {
+          await handleRemoveSendPassword(sendId);
+        }}
+        isSendFormLoading={sendOps.isCreating || sendOps.isUpdating}
+        isDeleteSendLoading={sendOps.isDeleting}
       />
-
-      {/* Restore confirmation dialog */}
-      <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">
-              {t("vault.dialogs.restoreCipher.title")}
-            </DialogTitle>
-            <DialogDescription className="text-sm text-slate-600 pt-2">
-              {t("vault.dialogs.restoreCipher.descriptionPrefix")}{" "}
-              <span className="font-semibold text-slate-900">
-                "{trashActionCipherName}"
-              </span>{" "}
-              {t("vault.dialogs.restoreCipher.descriptionSuffix")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsRestoreDialogOpen(false)}
-              disabled={isTrashActionLoading}
-              className="h-10"
-            >
-              {t("common.actions.cancel")}
-            </Button>
-            <Button
-              className="h-10"
-              disabled={isTrashActionLoading}
-              onClick={async () => {
-                setIsTrashActionLoading(true);
-                const result = await commands.restoreCipher({
-                  cipherId: trashActionCipherId,
-                });
-                setIsTrashActionLoading(false);
-                setIsRestoreDialogOpen(false);
-                if (result.status === "error") {
-                  toast.error(t("vault.feedback.cipher.restoreError.title"), {
-                    description: t(
-                      "vault.feedback.cipher.restoreError.description",
-                    ),
-                  });
-                  return;
-                }
-                toast.success(t("vault.feedback.cipher.restoreSuccess.title"), {
-                  description: t(
-                    "vault.feedback.cipher.restoreSuccess.description",
-                    { name: trashActionCipherName },
-                  ),
-                });
-                void loadVaultData();
-              }}
-            >
-              {isTrashActionLoading ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin" />
-                  {t("vault.dialogs.restoreCipher.confirming")}
-                </>
-              ) : (
-                t("vault.page.actions.restore")
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Permanent delete confirmation dialog */}
-      <Dialog
-        open={isPermanentDeleteDialogOpen}
-        onOpenChange={setIsPermanentDeleteDialogOpen}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="size-5 text-red-600" />
-              </div>
-              <DialogTitle className="text-lg font-bold text-slate-900">
-                {t("vault.dialogs.permanentDeleteCipher.title")}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-sm text-slate-600 pt-2">
-              {t("vault.dialogs.permanentDeleteCipher.descriptionPrefix")}{" "}
-              <span className="font-semibold text-slate-900">
-                "{trashActionCipherName}"
-              </span>{" "}
-              {t("vault.dialogs.permanentDeleteCipher.descriptionSuffix")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsPermanentDeleteDialogOpen(false)}
-              disabled={isTrashActionLoading}
-              className="h-10"
-            >
-              {t("common.actions.cancel")}
-            </Button>
-            <Button
-              variant="destructive"
-              className="h-10"
-              disabled={isTrashActionLoading}
-              onClick={async () => {
-                setIsTrashActionLoading(true);
-                const result = await commands.deleteCipher({
-                  cipherId: trashActionCipherId,
-                });
-                setIsTrashActionLoading(false);
-                setIsPermanentDeleteDialogOpen(false);
-                if (result.status === "error") {
-                  toast.error(
-                    t("vault.feedback.cipher.permanentDeleteError.title"),
-                    {
-                      description: t(
-                        "vault.feedback.cipher.permanentDeleteError.description",
-                      ),
-                    },
-                  );
-                  return;
-                }
-                toast.success(
-                  t("vault.feedback.cipher.permanentDeleteSuccess.title"),
-                  {
-                    description: t(
-                      "vault.feedback.cipher.permanentDeleteSuccess.description",
-                      { name: trashActionCipherName },
-                    ),
-                  },
-                );
-                void loadVaultData();
-              }}
-            >
-              {isTrashActionLoading ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin" />
-                  {t("vault.dialogs.permanentDeleteCipher.confirming")}
-                </>
-              ) : (
-                t("vault.page.actions.permanentDelete")
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

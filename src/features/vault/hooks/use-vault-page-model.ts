@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import {
   useCallback,
   useDeferredValue,
@@ -7,11 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  commands,
-  type VaultCipherDetailDto,
-  type VaultViewDataResponseDto,
-} from "@/bindings";
+import { commands, type VaultViewDataResponseDto } from "@/bindings";
 import { useUnifiedUnlock } from "@/features/auth/unlock/hooks";
 import {
   ALL_ITEMS_ID,
@@ -74,9 +69,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     null,
   );
   const [selectedMenuId, setSelectedMenuId] = useState(ALL_ITEMS_ID);
-  useEffect(() => {
-    console.log("[debug] selectedMenuId changed to:", selectedMenuId);
-  }, [selectedMenuId]);
   const [expandedNodeKeys, setExpandedNodeKeys] = useState<Set<string>>(
     new Set<string>(),
   );
@@ -376,22 +368,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     });
   }, [deferredHeaderSearchQuery, viewData?.ciphers]);
 
-  // Placeholder callbacks - icon loading is now handled by useIcon hook
-  const setCipherRowVisible = useCallback(
-    (_cipherId: string, _visible: boolean) => {
-      // No-op - visibility tracking not needed with new icon system
-    },
-    [],
-  );
-
-  const markCipherIconLoaded = useCallback((_cipherId: string) => {
-    // No-op - loaded state handled by useIcon hook
-  }, []);
-
-  const markCipherIconFallback = useCallback((_cipherId: string) => {
-    // No-op - error state handled by useIcon hook
-  }, []);
-
   useClearSelectionWhenMissing(filteredCiphers.map((cipher) => cipher.id));
 
   const folderCipherCount = useMemo(() => {
@@ -496,8 +472,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     loadVaultData,
     lockLabel,
     logoutLabel,
-    markCipherIconFallback,
-    markCipherIconLoaded,
     noFolderCipherCount,
     onFolderTreeOpenChange,
     onLock,
@@ -508,7 +482,6 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     selectedCipherId,
     selectedMenuId,
     selectedMenuName,
-    setCipherRowVisible,
     setCipherSearchQuery,
     setHeaderSearchQuery,
     setIsInlineSearchOpen,
@@ -523,57 +496,5 @@ export function useVaultPageModel({ navigateTo }: UseVaultPageModelParams) {
     userBaseUrl,
     userEmail,
     viewData,
-  } as {
-    avatarText: string;
-    cipherDetailError: string;
-    cipherSearchQuery: string;
-    errorText: string;
-    expandedNodeKeys: Set<string>;
-    favoriteCipherCount: number;
-    filteredCiphers: typeof ciphersWithIcons;
-    folderCipherCount: Map<string, number>;
-    folderTree: ReturnType<typeof buildFolderTree>;
-    headerSearchQuery: string;
-    headerSearchResults: CipherWithIcon[];
-    inlineSearchInputRef: typeof inlineSearchInputRef;
-    isCipherDetailLoading: boolean;
-    isFullyUnlocked: boolean;
-    isHeaderActionBusy: boolean;
-    isInlineSearchOpen: boolean;
-    isLocking: boolean;
-    isLoggingOut: boolean;
-    isRefreshing: boolean;
-    isVaultUnlockedSessionExpired: boolean;
-    loadCipherDetail: (cipherId: string) => Promise<void>;
-    loadVaultData: () => Promise<void>;
-    lockLabel: string;
-    logoutLabel: string;
-    markCipherIconFallback: (cipherId: string) => void;
-    markCipherIconLoaded: (cipherId: string) => void;
-    noFolderCipherCount: number;
-    onFolderTreeOpenChange: (nodeKey: string, open: boolean) => void;
-    onLock: () => Promise<void>;
-    onLogout: () => Promise<void>;
-    pageState: VaultPageState;
-    searchInputRef: typeof searchInputRef;
-    selectedCipherDetail: VaultCipherDetailDto | null;
-    selectedCipherId: string | null;
-    selectedMenuId: string;
-    selectedMenuName: string;
-    setCipherRowVisible: (cipherId: string, visible: boolean) => void;
-    setCipherSearchQuery: Dispatch<SetStateAction<string>>;
-    setHeaderSearchQuery: Dispatch<SetStateAction<string>>;
-    setIsInlineSearchOpen: Dispatch<SetStateAction<boolean>>;
-    setSelectedMenuId: Dispatch<SetStateAction<string>>;
-    setSortBy: Dispatch<SetStateAction<CipherSortBy>>;
-    setSortDirection: Dispatch<SetStateAction<CipherSortDirection>>;
-    setTypeFilter: Dispatch<SetStateAction<CipherTypeFilter>>;
-    sortBy: CipherSortBy;
-    sortDirection: CipherSortDirection;
-    trashCipherCount: number;
-    typeFilter: CipherTypeFilter;
-    userBaseUrl: string;
-    userEmail: string;
-    viewData: VaultViewDataResponseDto | null;
   };
 }

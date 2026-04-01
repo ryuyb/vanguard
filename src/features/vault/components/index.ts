@@ -1,7 +1,14 @@
 export { CipherDetailPanel } from "./cipher-detail-panel";
+export { CipherFormDialog } from "./cipher-form-dialog";
 export { CipherIcon, toCipherTypeIcon } from "./cipher-icon";
 export { CipherRow } from "./cipher-row";
+export { DeleteCipherDialog } from "./delete-cipher-dialog";
+export { DeleteFolderDialog } from "./delete-folder-dialog";
+export { FolderDialog } from "./folder-dialog";
 export { FolderTreeMenuItem } from "./folder-tree-menu-item";
 export { HeaderSearchPanel } from "./header-search-panel";
+export { PermanentDeleteCipherDialog } from "./permanent-delete-cipher-dialog";
+export { RestoreCipherDialog } from "./restore-cipher-dialog";
+export { VaultDialogs, type VaultDialogsProps } from "./vault-dialogs";
 export { VaultPage } from "./vault-page";
 export { VaultSettingsDialog } from "./vault-settings-dialog";

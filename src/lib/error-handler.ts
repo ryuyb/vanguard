@@ -5,6 +5,7 @@
  */
 
 import { debug as logDebug, error as logError } from "@tauri-apps/plugin-log";
+import { commands } from "@/bindings";
 import { getErrorMessage } from "./error-messages";
 import { toast } from "./toast";
 
@@ -162,11 +163,11 @@ export class ErrorHandler {
       response.code === "AUTH_TOKEN_EXPIRED" ||
       response.code === "AUTH_TOKEN_INVALID"
     ) {
-      // 清理本地会话数据
-      localStorage.removeItem("auth_token");
+      // 清理后端会话状态
+      void commands.authLogout({});
 
-      // 跳转到登录页
-      window.location.href = "/auth/login";
+      // 跳转到登录页 (/ 是登录页面的正确路由)
+      window.location.href = "/";
 
       return true; // 已处理,不显示 Toast
     }
