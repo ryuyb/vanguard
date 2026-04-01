@@ -1,3 +1,5 @@
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use crate::domain::unlock::{PinLockType, UnlockMethod};
 
 #[derive(Debug, Clone)]
@@ -54,7 +56,7 @@ pub struct VaultBiometricBundle {
     pub refresh_token: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 pub struct VaultUserKeyMaterial {
     pub enc_key: Vec<u8>,
     pub mac_key: Option<Vec<u8>>,

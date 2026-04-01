@@ -58,8 +58,8 @@ fn decrypt_vault_key(
     // Derive stretching key from master key (for decrypting the user key)
     let stretched = derive_stretched_master_key(&master_key)?;
     let wrapping_key = VaultUserKeyMaterial {
-        enc_key: stretched.enc_key,
-        mac_key: stretched.mac_key,
+        enc_key: stretched.enc_key.clone(),
+        mac_key: stretched.mac_key.clone(),
         refresh_token: None,
     };
 
@@ -79,8 +79,8 @@ fn decrypt_vault_key(
     })?;
 
     Ok(VaultUserKey {
-        enc_key: user_key.enc_key,
-        mac_key: user_key.mac_key,
+        enc_key: user_key.enc_key.clone(),
+        mac_key: user_key.mac_key.clone(),
     })
 }
 

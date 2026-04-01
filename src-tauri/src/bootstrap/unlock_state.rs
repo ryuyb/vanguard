@@ -148,9 +148,11 @@ impl VaultKeyMaterial {
 
 impl From<VaultUserKeyMaterial> for VaultKeyMaterial {
     fn from(dto: VaultUserKeyMaterial) -> Self {
+        // Clone fields because VaultUserKeyMaterial implements Drop (ZeroizeOnDrop)
+        // The original dto will be zeroized when dropped
         Self {
-            enc_key: dto.enc_key,
-            mac_key: dto.mac_key,
+            enc_key: dto.enc_key.clone(),
+            mac_key: dto.mac_key.clone(),
         }
     }
 }

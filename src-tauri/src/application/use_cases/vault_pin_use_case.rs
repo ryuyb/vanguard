@@ -218,7 +218,7 @@ impl VaultPinUseCase {
 
         Ok(UnlockVaultResult {
             account_id,
-            refresh_token: user_key.refresh_token,
+            refresh_token: user_key.refresh_token.clone(),
         })
     }
 }
@@ -382,8 +382,8 @@ fn decrypt_user_key_with_pin(
     };
 
     Ok(VaultUserKeyMaterial {
-        enc_key: user_key.enc_key,
-        mac_key: user_key.mac_key,
+        enc_key: user_key.enc_key.clone(),
+        mac_key: user_key.mac_key.clone(),
         refresh_token,
     })
 }

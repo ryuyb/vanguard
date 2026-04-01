@@ -189,7 +189,7 @@ impl VaultBiometricUseCase {
         );
         Ok(UnlockVaultResult {
             account_id,
-            refresh_token: user_key.refresh_token,
+            refresh_token: user_key.refresh_token.clone(),
         })
     }
 
